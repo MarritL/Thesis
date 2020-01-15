@@ -23,6 +23,8 @@ im = 0 # image for testing
 n_im = 2 # number of images per city
 bands = ['B1','B2','B3','B4','B5','B6','B7','B8','B8A','B9','B10','B11','B12']
 data_dir = '/home/cordolo/Documents/Studie Marrit/2019-2020/Thesis/Data/maxmind_world-cities-database'
+data_out = '/media/cordolo/5EBB-8C9A/Studie Marrit/2019-2020/Thesis/data/'
+csv_file = '/media/cordolo/5EBB-8C9A/Studie Marrit/2019-2020/Thesis/S21C_dataset.csv'
 
 #%% 
 "Preprocessing world cities dataset"
@@ -39,6 +41,7 @@ cities_cleaned.to_csv(os.path.join(data_dir,'cities_cleaned.csv'), index=False)
 #%%
 from ee_functions import filterOnCities, eeToNumpy
 import time
+import csv
 
 # init gee session
 #ee.Authenticate()
@@ -47,13 +50,12 @@ ee.Initialize()
 cities = pd.read_csv(os.path.join(data_dir, 'cities_cleaned.csv'))
 cities = cities[cities['Population'] >= minPop]
 cities_full = cities
-cities = cities_full.iloc[:5]
+cities = cities_full.iloc[:3]
 
 # create features
 features = []
 for i in range(len(cities)):
     p = ee.Geometry.Point((cities.iloc[i].Longitude, cities.iloc[i].Latitude))
-    #print('Projection, crs, and crs_transform:', p.projection().getInfo())
     f = ee.Feature(p) \
           .set({'city': cities.iloc[i].City, 'population':cities.iloc[i].Population})
     features.append(f)
@@ -61,37 +63,105 @@ for i in range(len(cities)):
 # create feature collection
 cities_fc = ee.FeatureCollection(features)
 
-# test if all went well
-#print("number of features :", cities_fc.size().getInfo())
-#first = cities_fc.first()
-#print("first city: ", first.getString('city').getInfo())
 
 # get image collection
-S21C = ee.ImageCollection("COPERNICUS/S2").filterBounds(cities_fc) \
-    .filterMetadata("CLOUDY_PIXEL_PERCENTAGE","less_than",1) \
+S21C = ee.ImageCollection('COPERNICUS/S2').filterBounds(cities_fc) \
+    .filterMetadata('CLOUDY_PIXEL_PERCENTAGE','less_than',1) \
     .select(bands)
-
-#first = S21C.first()
-#print('Projection, crs, and crs_transform:', first.projection().getInfo())
+    
 
 # filter image collection to get 2 random images per city
 cityCollection = cities_fc.map(filterOnCities(S21C, size, n=n_im)) #featurecollection of imagecollection per city
 cityList = cityCollection.toList(cityCollection.size().getInfo()) #List of imagecollection per city
 
-
 print('cityCollection size: ', cityCollection.size().getInfo())
-print('cityList size: ', len(cityList.getInfo()))
+
+imageList = []
+#bands = ["B1", "B2", "B3", "B4"]
+for im in range(len(cityList.getInfo())): 
+    
+    start_city = time.time()
+    imagePair = ee.ImageCollection(cityList.get(im))
+    images = imagePair.toList(imagePair.size().getInfo())
+    area = imagePair.geometry()    
+    
+    for i in range(n_im):
+        start = time.time()
+        imx = ee.Image(images.get(i))
+        
+        # get some metadata
+        im_id = str(im)+'_'+chr(ord('a')+i)
+        system_idx = imx.get('system:index').getInfo()
+        city = imx.get('city').getInfo()
+        datestr = system_idx.split('_')[0]
+        date = datestr.split('T')[0]
+        time_im = datestr.split('T')[1]
+
+        B = ee.ImageCollection([imx])
+        B = ee.Image(B.median())
+        
+        # covert to numpy array
+        np_image = eeToNumpy(B, area, bands)
+        # save
+        np.save(data_out+im_id+'.npy', np_image)
+        
+        # save some info in csv-file
+        with open(csv_file, 'a') as file:
+            writer = csv.writer(file, delimiter = ",")
+            writer.writerow([im_id, system_idx, city, date, time_im])   
+        
+        print("1 image: ", time.time() - start)
+    print("1 city: ", time.time() - start_city)
+
+testim = np.load(data_out+'0_'+chr(ord('a')+i)+'.npy')
+
+#%%
+# =============================================================================
+# def new_test(feature):
+#     print(feature.getInfo())
+#     
+#     return feature
+# 
+# test_collection = cityCollection.map(new_test)
+# =============================================================================
+    
+
+#%%
+resolution = 10
+#def new_test(area, bands, resolution=10):
+def prepare(imx):
+    # get some metadata
+    date = ee.Number(imx.get('GENERATION_TIME'))
+    city = imx.getString('city')
+    geom = imx.geometry()
+    
+    # reform image
+    B = ee.ImageCollection([imx]) 
+    B = ee.Image(B.median())
+    # add lat/lng and metadata
+    B = B.addBands(ee.Image.pixelLonLat()) \
+         .set({'city': city})\
+         .set({'date': date})\
+         .set({'geom': geom})
+
+    return ee.Image(B)  
 
 
+def createPair(feature):
 
+    imagePair = ee.ImageCollection(feature)
+    imagePair = imagePair.map(prepare)
+    return(imagePair)
+
+cityCollection = cityCollection.map(createPair)
+cityList = cityCollection.toList(cityCollection.size().getInfo()) #List of imagecollection per city
 
     
 imageList = []    
-#bands = ['B1','B2','B3','B4']
+bands = ['B1','B2','B3','B4']
 #n_bnds = len(bands)
 
-
-for im in [1,2,3]: 
+for im in [0,2]: 
     start_city = time.time()
     imagePair = ee.ImageCollection(cityList.get(im))
     images = imagePair.toList(imagePair.size().getInfo())
@@ -100,25 +170,25 @@ for im in [1,2,3]:
     
     for i in range(n_im):
         start = time.time()
-        imx = ee.Image(images.get(i))
+        B = ee.Image(images.get(i))
 
-        B = ee.ImageCollection([imx])
-        B = ee.Image(B.median())
         
         np_image = eeToNumpy(B, area, bands)
-           
+        np.save("/media/cordolo/5EBB-8C9A/Studie Marrit/2019-2020/Thesis/data/"+str(im)+'_'+str(i)+'.npy', np_image)
+        
         imageList.append(np_image)   
         print("1 image: ", time.time() - start)
     print("1 city: ", time.time() - start_city)
 
- 
+
+
+test_collection = imagePair.map(new_test)
+    
+test_collection = S21C.map(new_test(area, bands, 10))     
     
     
     
-    
-    
-    
-#%%
+
     
     
     

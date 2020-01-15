@@ -134,14 +134,23 @@ def eeToNumpy(img, area, bands=["B4","B3","B2"], resolution=10):
 
     # convert image band-by-band to numpy array
     for i, band in enumerate(bands):
-        np_b = np.array((ee.Array(img.get(band)).getInfo())).reshape((nrow, ncol))
+        
+        # call .get(band) until the right number of pixels is returned
+        # (error in gee: sometimes the image is returned only partly)
+        np_b = np.array(range(5), dtype=np.int32)
+        while np_b.shape[0] != nrow*ncol:
+            np_b = np.array((ee.Array(img.get(band)).getInfo()), dtype=np.int32)
+        np_b = np_b.reshape(nrow, ncol)
+        
         # normalize
-        np_b = np_b / np.max(np_b)
+        #np_b = np_b / np.max(np_b)
+        
         if i == 0:
             np_img = np.zeros([np_b.shape[0], np_b.shape[1], len(bands)])
         np_img[:,:,i] = np_b
 
     return np_img
+
 
 
 
