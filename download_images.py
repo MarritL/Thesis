@@ -15,49 +15,165 @@ import numpy as np
 from shapely.geometry import Point
 import geopandas as gpd
 import matplotlib.pyplot as plt
+import time
 
-# variables
-minPop = 200000 #min population per city
+# 'global' variables
+
 size = 600 #image size in pixels
 im = 0 # image for testing
 n_im = 2 # number of images per city
 bands = ['B1','B2','B3','B4','B5','B6','B7','B8','B8A','B9','B10','B11','B12']
-data_dir = '/home/cordolo/Documents/Studie Marrit/2019-2020/Thesis/Data/maxmind_world-cities-database'
+data_dir = '/home/cordolo/Documents/Studie Marrit/2019-2020/Thesis/Data'
 data_out = '/media/cordolo/5EBB-8C9A/Studie Marrit/2019-2020/Thesis/data/'
 csv_file = '/media/cordolo/5EBB-8C9A/Studie Marrit/2019-2020/Thesis/S21C_dataset.csv'
 
 #%% 
-"Preprocessing world cities dataset"
+"Try other dataset"
+import datapackage
+import geocoder
 
+# variables specific for this part
+minPop = 200000 #min population per city
+data_url = 'https://datahub.io/core/world-cities/datapackage.json'
+
+# to load Data Package into storage
+package = datapackage.Package(data_url)
+
+# to load only tabular data
+resources = package.resources
+for resource in resources:
+    if resource.tabular:
+        data = pd.read_csv(resource.descriptor['path'])
+   
 # import data world cities + coordinates 
-# downloaded at 06/01/2020 from https://simplemaps.com/data/world-cities
-cities = pd.read_csv(os.path.join(data_dir,'worldcitiespop.csv'), header=0)
+# worldcities.csv downloaded at 06/01/2020 from https://simplemaps.com/data/world-cities
+cities = pd.read_csv(os.path.join(data_dir,'worldcities.csv'), header=0)
 
-cities_cleaned = cities.drop_duplicates(subset = ['Longitude', 'Latitude'])
-cities_cleaned = cities_cleaned.dropna(subset = ['Longitude', 'Latitude', 'Population'])
+# data cleaning
+cities_cleaned = cities.drop_duplicates(subset = ['lat', 'lng'])
+cities_cleaned = cities_cleaned.dropna(subset = ['lat', 'lng', 'population'])
+cities_cleaned = cities_cleaned[cities_cleaned['population'] >= minPop]
 
+cities_merge = cities_cleaned.merge(data, left_on = ['city','country'], right_on = ['name','country'])
+cities_merge = cities_merge.drop('name', axis=1)
+
+# add alternative lat, lng coordinates
+cities_merge['Lng_alt'] = np.nan
+cities_merge['Lat_alt'] = np.nan
+
+
+for idx, row in cities_merge[1004:].iterrows():
+    #time.sleep(1)
+    print('\r {}'.format(idx), end='')
+    place = geocoder.geonames(row.geonameid, method='details', key='marrit_l')
+    if place == None:
+        continue
+    if place.feature_class != 'P':
+        continue
+    
+    cities_merge.loc[idx,'Lat_alt'] = float(place.lat)
+    cities_merge.loc[idx,'Lng_alt'] = float(place.lng)
+
+# save
+cities_merge.to_csv(os.path.join(data_dir,'cities_merge.csv'), index=False)
+
+
+# delete cities that are not found in the OSM database
+cities_cleaned = cities_cleaned.dropna(subset = ['Lng_alt', 'Lat_alt'])
+
+# save
 cities_cleaned.to_csv(os.path.join(data_dir,'cities_cleaned.csv'), index=False)
 
+
+
+
+
+
+#%% 
+"Preprocessing simplemaps world cities dataset"
+
+# imports
+from data_download_functions import placenameToCoordinates
+
+# variables specific for this part
+minPop = 200000 #min population per city
+
+# import data world cities + coordinates 
+# worldcities.csv downloaded at 06/01/2020 from https://simplemaps.com/data/world-cities
+cities = pd.read_csv(os.path.join(data_dir,'worldcities.csv'), header=0)
+
+# data cleaning
+cities_cleaned = cities.drop_duplicates(subset = ['lat', 'lng'])
+cities_cleaned = cities_cleaned.dropna(subset = ['lat', 'lng', 'population'])
+cities_cleaned = cities_cleaned[cities_cleaned['population'] >= minPop]
+
+cities_merge = cities_cleaned.merge(data, left_on = ['city','country'], right_on = ['name','country'])
+cities_merge = cities_merge.drop('name', axis=1)
+#cities_join = cities_cleaned.set_index('city').join(data.set_index('name'), rsuffix='_2')
+
+#%% 
+"Preprocessing world cities dataset"
+
+# imports
+from data_download_functions import placenameToCoordinates
+
+# variables specific for this part
+minPop = 200000 #min population per city
+
+# import data world cities + coordinates 
+# worldcities.csv downloaded at 06/01/2020 from https://simplemaps.com/data/world-cities
+# worldcitiespop.csv downloaded at 13/01/2020 from https://www.kaggle.com/max-mind/world-cities-database
+cities = pd.read_csv(os.path.join(data_dir,'maxmind_world-cities-database/worldcitiespop.csv'), header=0)
+cities = pd.read_csv(os.path.join(data_dir,'worldcities.csv'), header=0)
+
+# data cleaning
+cities_cleaned = cities.drop_duplicates(subset = ['Longitude', 'Latitude'])
+cities_cleaned = cities_cleaned.dropna(subset = ['Longitude', 'Latitude', 'Population'])
+cities_cleaned = cities_cleaned[cities_cleaned['Population'] >= minPop]
+# 1 city contained a typo in the name
+cities_cleaned.loc[cities_cleaned['City'] == 'ulubaria','City'] = 'uluberia'
+cities_cleaned.loc[cities_cleaned['Accentcity'] == 'ulubaria','AccentCity'] = 'Uluberia'
+
+# add alternative lat, lng coordinates
+cities_cleaned['Lng_alt'] = np.nan
+cities_cleaned['Lat_alt'] = np.nan
+for idx, row in cities_cleaned.iterrows():
+    time.sleep(1)
+    print('\r {}'.format(idx), end='')
+    place = placenameToCoordinates(row.City)
+    if place == None:
+        continue
+    cities_cleaned.loc[idx,'Lat_alt'] = place.latitude
+    cities_cleaned.loc[idx,'Lng_alt'] = place.longitude
+
+# delete cities that are not found in the OSM database
+cities_cleaned = cities_cleaned.dropna(subset = ['Lng_alt', 'Lat_alt'])
+
+# save
+cities_cleaned.to_csv(os.path.join(data_dir,'cities_cleaned.csv'), index=False)
+
+
 #%%
-from ee_functions import filterOnCities, eeToNumpy
-import time
+from data_download_functions import filterOnCities, eeToNumpy
 import csv
 
 # init gee session
 #ee.Authenticate()
 ee.Initialize()
 
-cities = pd.read_csv(os.path.join(data_dir, 'cities_cleaned.csv'))
-cities = cities[cities['Population'] >= minPop]
-cities_full = cities
-cities = cities_full.iloc[:3]
+#cities = pd.read_csv(os.path.join(data_dir, 'cities_cleaned.csv'))
+#cities = cities[cities['Population'] >= minPop]
+#cities_full = cities
+#cities = cities_merge
+#cities = cities.iloc[:10]
 
 # create features
 features = []
 for i in range(len(cities)):
-    p = ee.Geometry.Point((cities.iloc[i].Longitude, cities.iloc[i].Latitude))
+    #p = ee.Geometry.Point((cities.iloc[i].Longitude, cities.iloc[i].Latitude))
+    p = ee.Geometry.Point((cities.iloc[i].Lng_alt, cities.iloc[i].Lat_alt))
     f = ee.Feature(p) \
-          .set({'city': cities.iloc[i].City, 'population':cities.iloc[i].Population})
+          .set({'city': cities.iloc[i].city, 'population':cities.iloc[i].population})
     features.append(f)
 
 # create feature collection
@@ -76,7 +192,7 @@ cityList = cityCollection.toList(cityCollection.size().getInfo()) #List of image
 
 print('cityCollection size: ', cityCollection.size().getInfo())
 
-imageList = []
+#imageList = []
 #bands = ["B1", "B2", "B3", "B4"]
 for im in range(len(cityList.getInfo())): 
     
@@ -101,20 +217,27 @@ for im in range(len(cityList.getInfo())):
         B = ee.Image(B.median())
         
         # covert to numpy array
-        np_image = eeToNumpy(B, area, bands)
-        # save
-        np.save(data_out+im_id+'.npy', np_image)
+        try: 
+            np_image = eeToNumpy(B, area, bands)
+            # save
+            np.save(data_out+im_id+'.npy', np_image)
+        except:
+            im_id = 'ERROR'
         
         # save some info in csv-file
         with open(csv_file, 'a') as file:
             writer = csv.writer(file, delimiter = ",")
             writer.writerow([im_id, system_idx, city, date, time_im])   
         
+        #imageList.append(np_image)
         print("1 image: ", time.time() - start)
     print("1 city: ", time.time() - start_city)
 
-testim = np.load(data_out+'0_'+chr(ord('a')+i)+'.npy')
-
+i = 1
+testim = np.load(data_out+'9_'+chr(ord('a')+i)+'.npy')
+for i in range(testim.shape[2]):
+    testim[:,:,i] = testim[:,:,i]/np.max(testim[:,:,i])
+plt.imshow(testim[:,:,[3,2,1]])
 #%%
 # =============================================================================
 # def new_test(feature):
@@ -362,5 +485,6 @@ def imagesPerCity(item):
 
 example = cityCollection.map(imagesPerCity)
 print(example.getInfo())
+
 
 

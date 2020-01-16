@@ -9,6 +9,41 @@ import ee
 import numpy as np
 
 
+
+
+def placenameToCoordinates(placename):
+    """
+    Get the location information from OpenStreetMap (OSM)
+
+    Parameters
+    ----------
+    placename : string
+        city to get location information 
+
+    Returns
+    -------
+    geopy.location.Location
+        locaton object with adress, altitude, longitude and latitude
+
+    """
+    
+    # inner function to catch exceptions
+    def getLocation(placename):
+        from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
+    
+        try:
+            return nom.geocode(placename)
+        except GeocoderTimedOut:
+            return getLocation(placename)
+        except GeocoderUnavailable:
+            return getLocation(placename)
+    
+    from geopy.geocoders import Nominatim
+    nom = Nominatim(user_agent="data_download")
+    
+    return getLocation(placename)
+
+
 def clipImage(geom, label, size, resolution=10):
     """
     Clips an Image to specified size around a point
@@ -131,15 +166,24 @@ def eeToNumpy(img, area, bands=["B4","B3","B2"], resolution=10):
     lngs = np.array((ee.Array(img.get("longitude")).getInfo()))
     nrow = len(np.unique(lats))
     ncol = len(np.unique(lngs))
+    print(nrow*ncol)
 
     # convert image band-by-band to numpy array
     for i, band in enumerate(bands):
-        
+        print(band)
+        #import ipdb
+        #ipdb.set_trace()
         # call .get(band) until the right number of pixels is returned
         # (error in gee: sometimes the image is returned only partly)
         np_b = np.array(range(5), dtype=np.int32)
+        n_try = 0
         while np_b.shape[0] != nrow*ncol:
             np_b = np.array((ee.Array(img.get(band)).getInfo()), dtype=np.int32)
+            print(np_b.shape[0])
+            n_try += 1
+            if n_try > 5:
+                raise Exception('band {} does not have the correct shape'.format(band))
+            
         np_b = np_b.reshape(nrow, ncol)
         
         # normalize
