@@ -9,6 +9,11 @@ import ee
 import os
 import csv
 import numpy as np
+from plots import plot_detectedlines
+
+from skimage.feature import canny
+from skimage.transform import hough_line, hough_line_peaks
+
 
 
 def placenameToCoordinates(placename):
@@ -256,7 +261,7 @@ def filter_errors_folder(image_folder, threshold=0.5):
     ----------
     image_folder : string
         path to folder where images are located
-    threshold : float
+    threshold : float, optional
         threshold on standard deviation of angles, under this threshold the 
         images are considered erroneous. The default is 0.5.
 
@@ -274,7 +279,7 @@ def filter_errors_folder(image_folder, threshold=0.5):
     return errors
 
 
-def filter_errors(image_folder, image_list, threshold=0.5):
+def filter_errors(image_folder, image_list, threshold=0.5, plot = False):
     """
     This function filters errenous images out of an the image_list. It is based
     on the notion that erroneous images show slightly of horizontal bands over
@@ -291,11 +296,15 @@ def filter_errors(image_folder, image_list, threshold=0.5):
     threshold : float
         threshold on standard deviation of angles, under this threshold the 
         images are considered erroneous. The default is 0.5.
+    plot : boolean, optional
+        if true the detected lines are plotted. Only for 1 image.
 
     Returns
     -------
     errors : list
         list with the erroneous image filenames (strings)
+    fig : matplotlib Figure, only if plot = True
+        figure with the lines detected in the image
         
     Tested
     ------
@@ -305,10 +314,6 @@ def filter_errors(image_folder, image_list, threshold=0.5):
 
     """    
     
-    from skimage.feature import canny
-    from skimage.transform import hough_line, hough_line_peaks
-    
-
     errors = []
     for image in image_list:
         im = np.load((os.path.join(image_folder,image)))[:,:,0]
@@ -320,11 +325,18 @@ def filter_errors(image_folder, image_list, threshold=0.5):
         h, theta, d = hough_line(edges, theta=test_angles)
         accum, angle, dist = hough_line_peaks(h, theta, d)
 
+        if plot:
+            assert len(image_list) == 1, "plot can only be used for 1 image"
+            fig = plot_detectedlines(im, h, theta, d)
+
         std = np.std(angle)
         if std < threshold:
             errors.extend([image])
+    
+    if plot:
+        return errors, fig 
+    else:
+        return errors
         
-    return errors
-        
-
+    
 

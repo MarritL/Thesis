@@ -10,6 +10,7 @@ import numpy as np
 import os
 from random import sample
 from matplotlib import pyplot as plt
+from matplotlib import cm
      
 def plot_random_imagepairs(n_imagepairs, image_folder, bands, axis=False, normalize=True):
     """ 
@@ -161,3 +162,44 @@ def plot_image(image_folder, image_list, bands, axis = False, normalize=True):
             
     return fig
 
+def plot_detectedlines(image, h, theta, d):
+    """
+    plots lines detected in images
+
+    Parameters
+    ----------
+    image : numpy.ndarray. shape: (N,M) or (N,M,3)
+        numpy array of image. Either greyscale 2D-array or 3-band image.
+    h : numpy.ndarray. shape: (N,M)
+        Hough space returned by the hough_line function.
+    theta : numpy.ndarray. shpae: (N,)
+        Angles returned by the hough_line function. Assumed to be continuous. (angles[-1] - angles[0] == PI).
+    d : numpy.ndarray. shape: (N,)
+        Distances returned by the hough_line function.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        figure with the detected lines plotted over the image
+
+    """
+    from skimage.transform import hough_line_peaks
+    
+    assert len(image.shape) == 2 or image.shape[2] == 3, "only greyscale or 3-band images allowed"
+    
+    fig, ax = plt.subplots(1, 1, figsize=(15, 6))
+
+    ax.imshow(image, cmap=cm.gray)
+    origin = np.array((0, image.shape[1]))
+    for _, angle, dist in zip(*hough_line_peaks(h, theta, d)):
+        y0, y1 = (dist - origin * np.cos(angle)) / np.sin(angle)
+        ax.plot(origin, (y0, y1), '-r')
+    ax.set_xlim(origin)
+    ax.set_ylim((image.shape[0], 0))
+    ax.set_axis_off()
+    ax.set_title('Detected lines')
+    
+    return fig
+
+
+    
