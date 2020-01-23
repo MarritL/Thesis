@@ -13,6 +13,7 @@ from plots import plot_detectedlines
 
 from skimage.feature import canny
 from skimage.transform import hough_line, hough_line_peaks
+from osgeo import gdal
 
 
 
@@ -329,6 +330,7 @@ def filter_errors(image_folder, image_list, threshold=0.5, plot = False):
             assert len(image_list) == 1, "plot can only be used for 1 image"
             fig = plot_detectedlines(im, h, theta, d)
 
+        # filter based on standard deviation of angles
         std = np.std(angle)
         if std < threshold:
             errors.extend([image])
@@ -337,6 +339,69 @@ def filter_errors(image_folder, image_list, threshold=0.5, plot = False):
         return errors, fig 
     else:
         return errors
-        
     
+def tif_to_numpy(tif_folder, band_list, n_bands, n_rows=None, n_cols=None):
+    """
+    read tif images to numpy array. Assumed that all bands are stored in 
+    separate folder, described by band_list.
+    
+    Parameters
+    ----------
+    tif_folder : string
+        path to folder where tif-bands are located
+    band_list : list
+        list of band filenames (strings)
+    n_bands : int
+        number of bands in the final array
+    n_rows : int, optional
+        optional specify the number of rows, if image is different size the 
+        image will be resampled (using bilinear interpolation). Default is None,
+        in which case the number of rows of the first band will be used.
+    n_cols : int, optional
+        optional specify the number of columns, if image is different size the 
+        image will be resampled (using bilinear interpolation). Default is None,
+        in which case the number of columns of the first band will be used.
+
+    Returns
+    -------
+    image : numpy.ndarray
+        tif image casted to numpy array
+
+    """   
+    
+    for i, im_band in enumerate(band_list):
+        ds = gdal.Open(os.path.join(tif_folder, im_band), gdal.GA_ReadOnly)
+        
+        # initialize numpy array
+        if i == 0:
+            imageidx = 0
+            if n_cols == None:
+                n_cols = ds.RasterXSize
+            if n_rows == None:
+                n_rows = ds.RasterYSize 
+            image = np.zeros((n_rows, n_cols, n_bands))  
+        
+        # check if object has correct shape
+        if not ds.RasterXSize == n_cols or not ds.RasterYSize == n_rows:
+            print("resample... {}".format(im_band))
+            ds = gdal.Warp("", ds, format='mem', width=n_cols, height=n_rows, resampleAlg=1)
+        
+        # read values in tiff image
+        for b in range(ds.RasterCount):
+            band = b+1
+            srcband = ds.GetRasterBand(band)
+            if srcband is None:
+                continue
+        
+            # save values in numpy array
+            image[:,:,imageidx] = srcband.ReadAsArray()
+            imageidx += 1
+        
+        # reset
+        ds = None
+        
+    return image
+        
+
+            
 
