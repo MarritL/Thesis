@@ -170,6 +170,8 @@ class BaseDataset(Dataset):
             "Number of images too small. Specify from which image the patch \
                 should be extracted"
         
+        n_unique = len(np.unique(pair_idxs))
+        
         patches = dict()
         for i in range(len(patch_starts)):
             key = 'patch' +str(i)
@@ -178,12 +180,51 @@ class BaseDataset(Dataset):
                     [patch_starts[i][0]:patch_starts[i][0]+self.patch_size,
                      patch_starts[i][1]:patch_starts[i][1]+self.patch_size, :]
             else:
-                im_idx = ord(pair_idxs[i])-97
+                if n_unique == 1:
+                    im_idx = 0 
+                else: 
+                    im_idx = ord(pair_idxs[i])-97
                 patches[key] = images[im_idx]\
                     [patch_starts[i][0]:patch_starts[i][0]+self.patch_size,
                      patch_starts[i][1]:patch_starts[i][1]+self.patch_size, :]
                 
         return patches
+    
+    def to_categorical(self, y, num_classes=None, dtype='float32'):
+        """Converts a class vector (integers) to binary class matrix.
+        E.g. for use with categorical_crossentropy. source: keras.utils
+        
+        parameters
+        ----------
+        y : numpy.ndarray
+            class vector to be converted into a matrix
+            (integers from 0 to num_classes).
+        num_classes : int
+            total number of classes.
+        dtype: string
+            The data type expected by the input, as a string
+            (`float32`, `float64`, `int32`...)
+        
+        Returns
+        -------
+            A binary matrix representation of the input. The classes axis
+            is placed last.
+        
+        """
+    
+        y = np.array(y, dtype='int')
+        input_shape = y.shape
+        if input_shape and input_shape[-1] == 1 and len(input_shape) > 1:
+            input_shape = tuple(input_shape[:-1])
+        y = y.ravel()
+        if not num_classes:
+            num_classes = np.max(y) + 1
+        n = y.shape[0]
+        categorical = np.zeros((n, num_classes), dtype=dtype)
+        categorical[np.arange(n), y] = 1
+        output_shape = input_shape + (num_classes,)
+        categorical = np.reshape(categorical, output_shape)
+        return categorical
         
     
 class PairDataset(BaseDataset):
@@ -238,12 +279,14 @@ class PairDataset(BaseDataset):
 class TripletDataset(BaseDataset):
     
     def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
-                 percentile=99, min_overlap = 0.2, max_overlap = 0.5):
+                 percentile=99, min_overlap = 0.2, max_overlap = 0.5, 
+                 one_hot = True):
         super(TripletDataset, self).__init__(data_dir, indices, channels, 
                                              patch_size, percentile)
         
         self.min_overlap = min_overlap
         self.max_overlap = max_overlap
+        self.one_hot = one_hot
     
     def __getitem__(self, index):
         'Generates one patch triplet'
@@ -268,13 +311,16 @@ class TripletDataset(BaseDataset):
                     'Shape not matching in image pair {}'.format(im_idx)
 
         # sample start locations patches
-        patch_starts = sample_patchtriplet(images[0].shape, self.patch_sizse, 
+        patch_starts = sample_patchtriplet(images[0].shape, self.patch_size, 
             min_overlap=self.min_overlap, max_overlap = self.max_overlap)
         
         # get a random order
         lbl = np.random.randint(2)
         if lbl == 1:
             patch_starts[1],patch_starts[2] = patch_starts[2], patch_starts[1]
+        
+        if self.one_hot:
+            lbl = self.to_categorical(lbl, num_classes=2)
         
         # get patches
         patchtriplet = self.getPatches(patch_starts, images, triplet_pairidxs)
