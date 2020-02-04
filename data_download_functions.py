@@ -50,7 +50,105 @@ def placenameToCoordinates(placename):
     return getLocation(placename)
 
 
-def clipImage(geom, label, index, size, resolution=10):
+# =============================================================================
+# def clipImage(geom, label, index, size, resolution=10):
+#     """
+#     Clips an Image to specified size around a point
+# 
+#     Parameters
+#     ----------
+#     geom : ee.Geometry
+#         Central point of the output image
+#     label : string
+#         Name of central point (assumed to be a city)
+#     index : int
+#         identifier of city
+#     size : int
+#         size of output image in pixels
+#     resolution : int
+#         spatial resolution of input image. Default is 10 (Sentinel-2).
+# 
+#     Returns
+#     -------
+#     ee.Image
+#         Google earth engine image clipped around central point
+# 
+#     """
+#     def wrap(image):
+#         nonlocal geom
+#         nonlocal label
+#         nonlocal index
+#         nonlocal size
+#         
+#         #cast to ee objects
+#         geom = ee.Geometry(geom)
+#         image = ee.Image(image)
+#         
+#         # calculate aio
+#         aoi = geom.buffer((size/2*resolution)).bounds()
+#         
+#         #add label and clip to aoi
+#         image = image.set({'city': label}) \
+#                      .set({'city_idx': index})\
+#                      .clip(aoi) #\
+#         #             .select('B.+')
+#     
+#         return image
+#     return wrap
+# =============================================================================
+
+# =============================================================================
+# def filterOnCities(image_col, size, n=2): 
+#     """
+#     Filters an ImageCollection based on a FeatureCollection of city-points
+#     Should be used as a mapping function with a map over the FeatureCollection 
+#     of ee.Geometry() Points.
+# 
+#     Parameters
+#     ----------
+#     image_col : ee.ImageCollection
+#         google earth engine image collection, should contain multiple images for
+#         each city
+#     size : int
+#         approximage output size of final image (in pixels)
+#     n : int, optional
+#         Number of images per city. The default is 2.
+# 
+#     Returns
+#     -------
+#     ee.FeatureCollection
+#         Each feature in the google earth engine feature collection represents 
+#         1 city and contains an ee.ImageCollection of n images
+# 
+#     """
+#     def wrap(city):
+#         nonlocal image_col
+#         nonlocal size
+#         nonlocal n
+#         
+#         # get city info
+#         geometry = city.geometry();
+#         label = city.getString('city')
+#         idx = city.get('im_idx')
+#         
+#         # filter imges
+#         images = image_col.filterBounds(geometry) \
+#                          .randomColumn('random', 77) \
+#                          .sort('random') \
+#                          .limit(n) \
+#                          .set({'city': label}) \
+#                          .set({'geometry': geometry}) \
+#                          .set({'city_idx': idx}) \
+#                          .map(clipImage(geometry, label, idx, size))  
+#          
+#         #checksize = images.size().getInfo()    
+#         #assert checksize == n
+#         #assert images.size().getInfo() >2, "collection is 2"
+#         return ee.ImageCollection(images) 
+#     return wrap
+# =============================================================================
+
+def clipImage(geom, properties, size, resolution=10):
     """
     Clips an Image to specified size around a point
 
@@ -75,30 +173,28 @@ def clipImage(geom, label, index, size, resolution=10):
     """
     def wrap(image):
         nonlocal geom
-        nonlocal label
-        nonlocal index
+        nonlocal properties
         nonlocal size
         
-        #cast to ee objects
+        # cast to ee objects
         geom = ee.Geometry(geom)
         image = ee.Image(image)
         
         # calculate aio
         aoi = geom.buffer((size/2*resolution)).bounds()
         
-        #add label and clip to aoi
-        image = image.set({'city': label}) \
-                     .set({'city_idx': index})\
-                     .clip(aoi) #\
-        #             .select('B.+')
+        #clip to aoi
+        image = image.clip(aoi) 
+        
+        # add metadata
+        for prop in properties:
+            image = image.set({prop: properties[prop]})
     
         return image
     return wrap
 
 
-
-
-def filterOnCities(image_col, size, n=2): 
+def filterOnCities(image_col, property_keys, size, n=2): 
     """
     Filters an ImageCollection based on a FeatureCollection of city-points
     Should be used as a mapping function with a map over the FeatureCollection 
@@ -123,27 +219,28 @@ def filterOnCities(image_col, size, n=2):
     """
     def wrap(city):
         nonlocal image_col
+        nonlocal property_keys
         nonlocal size
         nonlocal n
         
-        # get city info
+        # get geometry
         geometry = city.geometry();
-        label = city.getString('city')
-        idx = city.get('city_idx')
         
         # filter imges
         images = image_col.filterBounds(geometry) \
                          .randomColumn('random', 77) \
                          .sort('random') \
                          .limit(n) \
-                         .set({'city': label}) \
-                         .set({'geometry': geometry}) \
-                         .set({'city_idx': idx}) \
-                         .map(clipImage(geometry, label, idx, size))  
+                         .set({'geometry': geometry}) 
          
-        #checksize = images.size().getInfo()    
-        #assert checksize == n
-        #assert images.size().getInfo() >2, "collection is 2"
+        # get metadata
+        properties = dict()
+        for prop in property_keys:
+            properties[prop] = city.get(prop)
+        
+        # clip images               
+        images = images.map(clipImage(geometry, properties, size))  
+        
         return ee.ImageCollection(images) 
     return wrap
 
@@ -182,20 +279,16 @@ def eeToNumpy(img, area, bands=["B4","B3","B2"], resolution=10, ntry=5):
     lngs = np.array((ee.Array(img.get("longitude")).getInfo()))
     nrow = len(np.unique(lats))
     ncol = len(np.unique(lngs))
-    #print(nrow*ncol)
 
     # convert image band-by-band to numpy array
     for i, band in enumerate(bands):
-       # print(band)
+
         # call .get(band) until the right number of pixels is returned
         # (error in gee: sometimes the image is returned only partly)
-        #np_b = np.array(range(5), dtype=np.int32)
         np_b = np.array(range(5), dtype=np.float)
         n_try = 0
         while np_b.shape[0] != nrow*ncol:
-            #np_b = np.array((ee.Array(img.get(band)).getInfo()), dtype=np.int32)
             np_b = np.array((ee.Array(img.get(band)).getInfo()))
-            #print(np_b.shape[0])
             n_try += 1
             if n_try > ntry:
                 raise Exception('band {} does not have the correct shape'.format(band))
@@ -209,7 +302,7 @@ def eeToNumpy(img, area, bands=["B4","B3","B2"], resolution=10, ntry=5):
     return np_img
 
 
-def create_featurecollection(df, coords, properties, columns):
+def create_featurecollection(df, coords, properties):
     """
     create a ee.FeatureCollection of point features out of a dataframe. Note
     google earth engine should be initialized with account.
@@ -219,16 +312,12 @@ def create_featurecollection(df, coords, properties, columns):
     df : pd.dataframe
         Dataframe with information about the point features. Should contain at 
         least the column names specified in coords and columns.
-    coords : tuple
-        tuple or list with the column names for the longitude and latitude in the
-        dataframe.
-    properties : list
-        list of properties (names) for the features. The first feature should be
-        always an index.
-    columns : list
-        list with the column names for the properties specified in 'properties'
-        the first column represents the second property (first property is
-        always the index)
+    coords : dict
+        dictionary with two keys, 'lng' and 'lat' specifying the column names 
+        for the longitude and latitude in the dataframe.
+    properties : dict
+        dict of properties for the features. The values in the dict should
+        correspond to columnnames in the df.
 
     Returns
     -------
@@ -240,10 +329,18 @@ def create_featurecollection(df, coords, properties, columns):
     features = []
     for idx, row in df.iterrows():
         # create geometry
-        p = ee.Geometry.Point((df.loc[idx,coords[0]], df.loc[idx,coords[1]]))
+        p = ee.Geometry.Point((df.loc[idx,coords['lng']], df.loc[idx,coords['lat']]))
         # create feature with metadata
-        f = ee.Feature(p) \
-              .set({properties[0]: str(idx), properties[1]:df.loc[idx,columns[0]], properties[2]:df.loc[idx,columns[1]]})
+        f = ee.Feature(p) 
+            
+        for prop in properties:
+            if properties[prop] == None:
+                f = f.set({prop: str(idx)})
+            elif type(df.loc[idx,properties[prop]]) == np.int64:
+                f = f.set({prop: df.loc[idx,properties[prop]].astype('object')})
+            else: 
+                f = f.set({prop: df.loc[idx,properties[prop]]})
+        #.set({properties[0]: str(idx), properties[1]:df.loc[idx,columns[0]], properties[2]:df.loc[idx,columns[1]]})
 
         features.append(f)
 
@@ -403,5 +500,5 @@ def tif_to_numpy(tif_folder, band_list, n_bands, n_rows=None, n_cols=None):
     return image
         
 
-            
+
 
