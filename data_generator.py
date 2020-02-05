@@ -321,6 +321,9 @@ class TripletDataset(BaseDataset):
         
         if self.one_hot:
             lbl = self.to_categorical(lbl, num_classes=2)
+            dtype = torch.float32
+        else: 
+            dtype = torch.int64
         
         # get patches
         patchtriplet = self.getPatches(patch_starts, images, triplet_pairidxs)
@@ -343,7 +346,7 @@ class TripletDataset(BaseDataset):
         patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
         patchtriplet['patch1'] = torch.as_tensor(patchtriplet['patch1'])
         patchtriplet['patch2'] = torch.as_tensor(patchtriplet['patch2'])
-        patchtriplet['label'] = torch.as_tensor(lbl, dtype=torch.int64)
+        patchtriplet['label'] = torch.as_tensor(lbl, dtype=dtype)
         
         return patchtriplet
     
@@ -493,5 +496,6 @@ def sample_patchtriplet(im1_shape, patch_size=96, min_overlap=0.2,
         patch2_options = patch2_options[~np.isin(patch2_options,patch2_not)]
         patch_starts[2][i] = np.random.choice(patch2_options)
     
-
+    # turn on if testing one patch
+    # patch_starts = [np.array([341,  82]), np.array([279,  51]), np.array([463, 360])]
     return patch_starts
