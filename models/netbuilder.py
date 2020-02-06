@@ -32,12 +32,35 @@ class NetBuilder:
         if classname.find('Conv') != -1 or classname.find('Linear') != -1:
             print(classname, '-', m.weight)
 
+# =============================================================================
+#     @staticmethod
+#     def build_network(net, weights='', n_channels=13, n_classes=8):
+#         
+#         if net == 'siamese':
+#             net = siamese_net.__dict__['siamese_net'](n_channels=n_channels, 
+#                                                       n_classes=n_classes)  
+#         else:
+#             raise Exception('Architecture undefined!')
+# 
+#         # initiate weighs 
+#         if len(weights) > 0:
+#             print('Loading weights for network')
+#             net.load_state_dict(
+#                 torch.load(weights, map_location=lambda storage, loc: storage), strict=False)
+#         else:
+#             net.apply(NetBuilder.init_weight)
+#         
+#         return net
+# =============================================================================
     @staticmethod
-    def build_network(net, weights='', n_channels=13, n_classes=8):
+    def build_network(net, cfg, weights='', n_channels=13,n_classes=8, 
+                      patch_size=96, batch_norm=False):
         
         if net == 'siamese':
-            net = siamese_net.__dict__['siamese_net'](n_channels=n_channels, 
-                                                      n_classes=n_classes)  
+            net = siamese_net.__dict__['siamese_net'](cfg=cfg, n_channels=n_channels, 
+                                                      n_classes=n_classes, 
+                                                      patch_size=patch_size,
+                                                      batch_norm = batch_norm)  
         else:
             raise Exception('Architecture undefined!')
 
@@ -50,6 +73,7 @@ class NetBuilder:
             net.apply(NetBuilder.init_weight)
         
         return net
+
 
 def create_loss_function(lossfunction):
     
@@ -65,17 +89,17 @@ def create_loss_function(lossfunction):
         loss_func = nn.BCEWithLogitsLoss()
         acc_func = acc_functions['accuracy_onehot']
     else:
-        raise Exception('loss function not implemented! \
+        raise Exception('loss function not implemented! \n \
                         Choose one of: "cross_entropy", "bce_sigmoid"')
         
     return loss_func, acc_func, one_hot
 
-def create_optimizer(optimizer_string, params, lr):
+def create_optimizer(optimizer_string, params, lr, weight_decay=0):
        
     if optimizer_string == 'adam':
-        optimizer = optim.Adam(params, lr=lr)
+        optimizer = optim.Adam(params, lr=lr, weight_decay=weight_decay)
     else:
-        raise Exception('optimizer not implemented! \
+        raise Exception('optimizer not implemented! \n \
                         Choose one of: "adam"')
         
     return optimizer

@@ -27,12 +27,15 @@ def train(directories, dataset_settings, network_settings, train_settings):
     # build network
     net = NetBuilder.build_network(
         net=network_settings['network'],
+        cfg=network_settings['cfg'],
         n_channels=len(dataset_settings['channels']), 
-        n_classes=network_settings['n_classes'])    
+        n_classes=network_settings['n_classes'])  
+    ## TODO: load net into GPU (also the data): NOTE: should be done before 
+    # constructing optimizer https://pytorch.org/docs/stable/optim.html
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'])
-    # TODO: add regularization
     optim = create_optimizer(network_settings['optimizer'], net.parameters(), 
-                             network_settings['lr'])
+                             network_settings['lr'], 
+                             weight_decay=network_settings['weight_decay'])
 
     # Datasets
     if dataset_settings['dataset_type'] == 'pair':
@@ -67,9 +70,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
         batch_size=train_settings['batch_size'], 
         shuffle=False,
         num_workers = 1)
-     
-    ## TODO: load net into GPU (also the data)
-    
+         
     # save history?
     history = {'train': {'epoch': [], 'loss': [], 'acc': []}, 
                'val':{'epoch': [], 'loss': [], 'acc': []}}
@@ -130,7 +131,7 @@ def train_epoch(network, dataloader, optimizer, loss_func, acc_func, history,
     ave_loss = AverageMeter()
     ave_acc = AverageMeter()
     
-    network = network.train() 
+    network.train() 
     
     iterator = iter(dataloader)
 
