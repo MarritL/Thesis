@@ -22,10 +22,20 @@ directories['data_path'] = os.path.join(
     directories['intermediate_dir_training'], 
     directories['data_dir_S21C'])
 
+# network cofiguration:
+# number denotes number of output channels of 3x3 conv layer
+# 'M' denotes max-pooling layer (2x2), stride=2
+# note: first number of top should be 2* lasy conv layer of branch 
+cfg = {
+       'branch': np.array([64, 'M']), 
+       'top': np.array([128])}
+
 network_settings = {
     'network': 'siamese',
+    'cfg': cfg,
     'optimizer': 'adam',
     'lr': 0.001,
+    'weight_decay':0,
     'loss': 'bce_sigmoid',
     'n_classes': 2}
 
@@ -52,6 +62,7 @@ dataset_settings['indices_val'] = np.repeat(dataset, 20)
 
 #%% 
 """ Train """
+
 train(directories, dataset_settings, network_settings, train_settings)
 
 #%%
