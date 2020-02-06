@@ -422,6 +422,12 @@ def sample_patchpair(im1_shape, patch_size=96, gap=0, maxjitter=0):
     patch2_lbl = np.random.randint(8)
     patch_starts.append(patch_starts[0] + patch2_options[patch2_lbl])
 
+# =============================================================================
+#     ## TODO: turn on if testing one patch
+#     patch_starts = [np.array([230, 370]), np.array([326, 466])]
+#     patch2_lbl = 7
+#     ##
+# =============================================================================
     return (patch_starts, patch2_lbl)
 
 def sample_patchtriplet(im1_shape, patch_size=96, min_overlap=0.2, 
@@ -496,6 +502,9 @@ def sample_patchtriplet(im1_shape, patch_size=96, min_overlap=0.2,
         patch2_options = patch2_options[~np.isin(patch2_options,patch2_not)]
         patch_starts[2][i] = np.random.choice(patch2_options)
     
-    # turn on if testing one patch
-    # patch_starts = [np.array([341,  82]), np.array([279,  51]), np.array([463, 360])]
+# =============================================================================
+#     ## TODO: turn on if testing one patch
+#     patch_starts = [np.array([341,  82]), np.array([279,  51]), np.array([463, 360])]
+#     ##
+# =============================================================================
     return patch_starts
