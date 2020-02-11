@@ -14,22 +14,45 @@ import torch
 from torch.utils.data import DataLoader
 import os
 import time
+import csv
+import copy
 
 def train(directories, dataset_settings, network_settings, train_settings):
     
     # init tensorboard
+    network_name = network_settings['network']
     outputtime = '{}'.format(time.strftime("%d%m%Y_%H%M%S", time.localtime()))
     tb_dir = os.path.join(directories['tb_dir'], 'network-{}_date-{}'
-                          .format(network_settings['network'], outputtime))
+                          .format(network_name, outputtime))
     writer = SummaryWriter(logdir=tb_dir)
     print("tensorboard --logdir {}".format(tb_dir))
     
+    # init save-file
+    fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', \
+                  'optimizer', 'lr', 'weight_decay', 'loss', 'n_classes', \
+                  'dataset', 'best_acc']
+    with open(os.path.join(directories['intermediate_dir'],directories['csv_models']), 'a') as file:
+        filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
+        filewriter.writeheader()
+            
     # build network
+    if network_settings['network'] == 'siamese':
+        n_branches = 2
+    elif network_settings['network'] == 'triplet':
+        print('n_branches = 3')
+        n_branches = 3
+        network_settings['network'] = 'siamese'
+    else:
+        raise Exception('Architecture undefined! \n \
+                        Choose one of: "siamese", "triplet"')
+        
+        
     net = NetBuilder.build_network(
         net=network_settings['network'],
         cfg=network_settings['cfg'],
         n_channels=len(dataset_settings['channels']), 
-        n_classes=network_settings['n_classes'])  
+        n_classes=network_settings['n_classes'],
+        n_branches=n_branches)  
     ## TODO: load net into GPU (also the data): NOTE: should be done before 
     # constructing optimizer https://pytorch.org/docs/stable/optim.html
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'])
@@ -78,38 +101,64 @@ def train(directories, dataset_settings, network_settings, train_settings):
     epoch_iters =  len(dataset_train) // train_settings['batch_size']
     val_epoch_iters = len(dataset_val) // train_settings['batch_size']
     
+    best_net_wts = copy.deepcopy(net.state_dict())
+    best_acc = 0.0
+    
     for epoch in range(train_settings['start_epoch'], 
                        train_settings['start_epoch']+train_settings['num_epoch']):
         
         #training epoch
         train_epoch(
-            net, 
-            dataloader_train, 
-            optim, 
-            loss_func,
-            acc_func,
-            history, 
-            epoch, 
-            writer,
-            epoch_iters, 
-            train_settings['disp_iter'])
+            network=net, 
+            n_branches=n_branches,
+            dataloader=dataloader_train, 
+            optimizer=optim, 
+            loss_func=loss_func,
+            acc_func=acc_func,
+            history=history, 
+            epoch=epoch, 
+            writer=writer,
+            epoch_iters=epoch_iters, 
+            disp_iter=train_settings['disp_iter'])
         
         # validation epoch
-        validate(
-            net, 
-            dataloader_val, 
-            loss_func,
-            acc_func,
-            history, 
-            epoch, 
-            writer,
-            val_epoch_iters) 
+        best_net_wts, best_acc = validate(
+            network=net, 
+            n_branches=n_branches,
+            dataloader=dataloader_val, 
+            loss_func=loss_func,
+            acc_func=acc_func,
+            history=history, 
+            epoch=epoch, 
+            writer=writer,
+            val_epoch_iters=val_epoch_iters,
+            best_net_wts=best_net_wts,
+            best_acc=best_acc) 
 
-       
         # save progress
         #checkpoint(nets, history, cfg, epoch+1, DIR) 
     
     # TODO: write info to csv-file
+    savedata = {'filename':os.path.join(directories['model_dir'],
+                        'network-{}_date-{}'.format(network_name, outputtime)), 
+               'networkname': network_name, 
+               'cfg_branch': network_settings['cfg']['branch'], 
+               'cfg_top': network_settings['cfg']['top'],
+               'optimizer': network_settings['optimizer'],
+               'lr': network_settings['lr'], 
+               'weight_decay': network_settings['weight_decay'],
+               'loss': network_settings['loss'],
+               'n_classes': network_settings['n_classes'], 
+               'dataset': dataset_settings['dataset_type'], 
+               'best_acc': best_acc}
+    with open(os.path.join(directories['intermediate_dir'], 
+                           directories['csv_models']), 'a') as file:
+            filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
+            filewriter.writerow(savedata)  
+    
+    # TODO: save model (make better, best model etc.)
+    torch.save(best_net_wts, savedata['filename'])
+        
     print('Training Done!')
     writer.close()
 
@@ -123,8 +172,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
 # i = 0
 # =============================================================================
     
-def train_epoch(network, dataloader, optimizer, loss_func, acc_func, history, 
-                epoch, writer, epoch_iters, disp_iter):
+def train_epoch(network, n_branches, dataloader, optimizer, loss_func, 
+                acc_func, history, epoch, writer, epoch_iters, disp_iter):
     
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -137,24 +186,32 @@ def train_epoch(network, dataloader, optimizer, loss_func, acc_func, history,
 
     # main loop
     tic = time.time()
-    for i in range(epoch_iters):
+    epoch_start = time.time()
+    #for i in range(epoch_iters):
+    for i, batch_data in enumerate(iterator):
         
         # load a batch of data
-        batch_data = next(iterator)
+        #batch_data = next(iterator)
         data_time.update(time.time() - tic)
         
         # set gradients to zero
         optimizer.zero_grad()
         
         # get the inputs
-        inputs = [batch_data['patch0'].float(), batch_data['patch1'].float()] 
+        if n_branches == 2:
+            inputs = [batch_data['patch0'].float(), 
+                      batch_data['patch1'].float()] 
+        elif n_branches == 3:
+            inputs = [batch_data['patch0'].float(), 
+                      batch_data['patch1'].float(),
+                      batch_data['patch2'].float()] 
         labels = batch_data['label']
     
         # TODO: to gpu
         #batch_data = {'img_data': batch_images.cuda(), 'seg_label':batch_segms.cuda()}
 
         # forward pass
-        outputs = network(inputs)
+        outputs = network(inputs, n_branches)
         loss = loss_func(outputs, labels)
         acc = acc_func(outputs, labels)
 
@@ -184,6 +241,8 @@ def train_epoch(network, dataloader, optimizer, loss_func, acc_func, history,
         history['train']['loss'].append(loss.data.item())
         history['train']['acc'].append(acc.item())
 
+    print('Train epoch: [{}], Time: {:.2f}' 
+          .format(epoch, (time.time()-epoch_start)))
         
     writer.add_scalar('Train/Loss', ave_loss.average(), epoch)
     writer.add_scalar('Train/Acc', ave_acc.average(), epoch)
@@ -197,8 +256,8 @@ def train_epoch(network, dataloader, optimizer, loss_func, acc_func, history,
 # i = 0
 # =============================================================================
     
-def validate(network, dataloader, loss_func, acc_func, history, epoch, writer, 
-             val_epoch_iters):    
+def validate(network, n_branches, dataloader, loss_func, acc_func, history, 
+             epoch, writer, val_epoch_iters, best_net_wts, best_acc):    
 
     ave_loss = AverageMeter()
     ave_acc = AverageMeter()
@@ -216,7 +275,14 @@ def validate(network, dataloader, loss_func, acc_func, history, epoch, writer,
         batch_data = next(iterator)
         
         # get the inputs
-        inputs = [batch_data['patch0'].float(), batch_data['patch1'].float()] 
+        if n_branches == 2:
+            inputs = [batch_data['patch0'].float(), 
+                      batch_data['patch1'].float()] 
+        elif n_branches == 3:
+            inputs = [batch_data['patch0'].float(), 
+                      batch_data['patch1'].float(),
+                      batch_data['patch2'].float()] 
+        labels = batch_data['label']
         labels = batch_data['label']
         
         # TODO: to GPU
@@ -224,7 +290,7 @@ def validate(network, dataloader, loss_func, acc_func, history, epoch, writer,
       
         with torch.no_grad():
             # forward pass
-            outputs = network(inputs)
+            outputs = network(inputs, n_branches)
             loss = loss_func(outputs, labels)
             acc = acc_func(outputs, labels)
         
@@ -245,10 +311,16 @@ def validate(network, dataloader, loss_func, acc_func, history, epoch, writer,
         history['val']['loss'].append(loss.data.item())
         history['val']['acc'].append(acc.item())
 
-    print('Epoch: [{}], Time: {:.2f}, ' 
+    print('Val epoch: [{}], Time: {:.2f}, ' 
           'Val_Loss: {:.4f}, Val_Accuracy: {:0.4f}'
-          .format(epoch, time_meter.average(),
+          .format(epoch, time_meter.value(),
                   ave_loss.average(), ave_acc.average()))
     
     writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
     writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
+    
+    if ave_acc.average() > best_acc:
+        best_acc = ave_acc.average()
+        best_net_wts = copy.deepcopy(network.state_dict())
+    
+    return(best_net_wts, best_acc)
