@@ -30,10 +30,12 @@ def train(directories, dataset_settings, network_settings, train_settings):
     # init save-file
     fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', \
                   'optimizer', 'lr', 'weight_decay', 'loss', 'n_classes', \
-                  'dataset', 'best_acc']
-    with open(os.path.join(directories['intermediate_dir'],directories['csv_models']), 'a') as file:
-        filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
-        filewriter.writeheader()
+                  'n_channels','patch_size','batch_norm','dataset', 'best_acc','best_epoch']
+# =============================================================================
+#     with open(os.path.join(directories['intermediate_dir'],directories['csv_models']), 'a') as file:
+#         filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
+#         filewriter.writeheader()
+# =============================================================================
             
     # build network
     if network_settings['network'] == 'siamese':
@@ -52,7 +54,11 @@ def train(directories, dataset_settings, network_settings, train_settings):
         cfg=network_settings['cfg'],
         n_channels=len(dataset_settings['channels']), 
         n_classes=network_settings['n_classes'],
+        patch_size=network_settings['patch_size'],
+        batch_norm=network_settings['batch_norm'],
         n_branches=n_branches)  
+       
+    
     ## TODO: load net into GPU (also the data): NOTE: should be done before 
     # constructing optimizer https://pytorch.org/docs/stable/optim.html
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'])
@@ -103,6 +109,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
     
     best_net_wts = copy.deepcopy(net.state_dict())
     best_acc = 0.0
+    best_epoch = 0
     
     for epoch in range(train_settings['start_epoch'], 
                        train_settings['start_epoch']+train_settings['num_epoch']):
@@ -122,7 +129,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
             disp_iter=train_settings['disp_iter'])
         
         # validation epoch
-        best_net_wts, best_acc = validate(
+        best_net_wts, best_acc, best_epoch = validate(
             network=net, 
             n_branches=n_branches,
             dataloader=dataloader_val, 
@@ -133,7 +140,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
             writer=writer,
             val_epoch_iters=val_epoch_iters,
             best_net_wts=best_net_wts,
-            best_acc=best_acc) 
+            best_acc=best_acc,
+            best_epoch=best_epoch) 
 
         # save progress
         #checkpoint(nets, history, cfg, epoch+1, DIR) 
@@ -142,15 +150,19 @@ def train(directories, dataset_settings, network_settings, train_settings):
     savedata = {'filename':os.path.join(directories['model_dir'],
                         'network-{}_date-{}'.format(network_name, outputtime)), 
                'networkname': network_name, 
-               'cfg_branch': network_settings['cfg']['branch'], 
-               'cfg_top': network_settings['cfg']['top'],
+               'cfg_branch': str(list(network_settings['cfg']['branch'])), 
+               'cfg_top': str(list(network_settings['cfg']['top'])),
                'optimizer': network_settings['optimizer'],
                'lr': network_settings['lr'], 
                'weight_decay': network_settings['weight_decay'],
                'loss': network_settings['loss'],
-               'n_classes': network_settings['n_classes'], 
+               'n_classes': network_settings['n_classes'],
+               'n_channels' : len(dataset_settings['channels']),
+               'patch_size': network_settings['patch_size'],
+               'batch_norm': network_settings['batch_norm'],
                'dataset': dataset_settings['dataset_type'], 
-               'best_acc': best_acc}
+               'best_acc': best_acc,
+               'best_epoch': best_epoch}
     with open(os.path.join(directories['intermediate_dir'], 
                            directories['csv_models']), 'a') as file:
             filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
@@ -162,15 +174,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
     print('Training Done!')
     writer.close()
 
-# =============================================================================
-# #training epoch
-# epoch = 0
-# network = net
-# #interator = iterator_train
-# epoch = epoch+1
-# dataloader = dataloader_train
-# i = 0
-# =============================================================================
+
     
 def train_epoch(network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter):
@@ -249,15 +253,10 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
  
     
 
-# =============================================================================
-# epoch = 0
-# network = net
-# dataloader = dataloader_train
-# i = 0
-# =============================================================================
+
     
 def validate(network, n_branches, dataloader, loss_func, acc_func, history, 
-             epoch, writer, val_epoch_iters, best_net_wts, best_acc):    
+             epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch):    
 
     ave_loss = AverageMeter()
     ave_acc = AverageMeter()
@@ -269,10 +268,11 @@ def validate(network, n_branches, dataloader, loss_func, acc_func, history,
 
     # main loop
     tic = time.time()
-    for i in range(val_epoch_iters):
+    #for i in range(val_epoch_iters):
+    for i, batch_data in enumerate(iterator):
         
         # load a batch of data
-        batch_data = next(iterator)
+        #batch_data = next(iterator)
         
         # get the inputs
         if n_branches == 2:
@@ -322,5 +322,6 @@ def validate(network, n_branches, dataloader, loss_func, acc_func, history,
     if ave_acc.average() > best_acc:
         best_acc = ave_acc.average()
         best_net_wts = copy.deepcopy(network.state_dict())
+        best_epoch = epoch
     
-    return(best_net_wts, best_acc)
+    return(best_net_wts, best_acc, best_epoch)
