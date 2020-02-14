@@ -12,16 +12,19 @@ import pandas as pd
 
 # init
 directories = {
-    'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
+    #'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
+    'intermediate_dir_training': '/media/cordolo/elements/results/training_S2',
     'intermediate_dir_cd': '/media/cordolo/elements/Intermediate/CD_OSCD',
     'intermediate_dir': '/media/cordolo/elements/Intermediate',
-    'csv_file_S21C_cleaned': 'S21C_dataset_cleaned.csv',
+    #'csv_file_S21C_cleaned': 'S21C_dataset_cleaned.csv',
+    'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
     'csv_file_oscd': 'OSCD_dataset.csv',
     'csv_file_train_oscd' : 'OSCD_train.csv',
     'csv_file_test_oscd': 'OSCD_test.csv',
     'csv_models': 'trained_models.csv',
     'data_dir_S21C': 'data_S21C',
     'data_dir_oscd': 'data_OSCD',
+    'labels_dir_oscd' : 'labels_OSCD',
     'tb_dir': '/media/cordolo/elements/Intermediate/tensorboard',
     'model_dir': '/media/cordolo/elements/Intermediate/trained_models'}
 
@@ -34,7 +37,7 @@ directories['data_path'] = os.path.join(
 # 'M' denotes max-pooling layer (2x2), stride=2
 # note: first number of top should be 2* lasy conv layer of branch 
 cfg = {
-       'branch': np.array([64,'M'], dtype='object'), 
+       'branch': np.array([64,'M',128,'M'], dtype='object'), 
        'top': np.array([192], dtype='object')}
 
 
@@ -53,13 +56,13 @@ network_settings = {
 
 train_settings = {
     'start_epoch': 0,
-    'num_epoch': 2,
-    'batch_size': 10,
+    'num_epoch': 10,
+    'batch_size': 50,
     'disp_iter': 2}
 
 dataset_settings = {
     'dataset_type' : 'triplet',
-    'perc_train': 0.9,
+    'perc_train': 0.8,
     'channels': np.arange(13)}
 
 #%% 
@@ -67,15 +70,19 @@ dataset_settings = {
 from train import train
 
 dataset = pd.read_csv(os.path.join(directories['intermediate_dir_training'],directories['csv_file_S21C_cleaned']))
+dataset = dataset.loc[dataset['pair_idx'] == 'a']
+np.random.seed(234)
+dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
 # =============================================================================
 # dataset = np.random.choice(dataset['im_idx'], 1, replace=False)
 # dataset_settings['indices_train'] = np.repeat(dataset, 80)
 # dataset_settings['indices_val'] = np.repeat(dataset, 20)
 # =============================================================================
-dataset = np.random.choice(dataset['im_idx'], 100, replace=False)
+#dataset = np.random.choice(dataset['im_idx'], 1000, replace=False)
 #dataset = dataset['im_idx'].values
 dataset_settings['indices_train'] = dataset[:int(dataset_settings['perc_train']*len(dataset))]
-dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):]
+dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):-100]
+dataset_settings['indices_test'] = dataset[-100:]
 
 # train
 train(directories, dataset_settings, network_settings, train_settings)
@@ -84,6 +91,7 @@ train(directories, dataset_settings, network_settings, train_settings)
 """ Extract Features """
 
 from extract_features import extract_features, calculate_distancemap, calculate_changemap
+from metrics import compute_confusion_matrix, compute_matthews_corrcoef
 
 # get csv files
 oscd_train = pd.read_csv(os.path.join(directories['intermediate_dir_cd'], directories['csv_file_train_oscd']))
@@ -108,7 +116,10 @@ assert(features[0].shape == features[1].shape)
 distmap = calculate_distancemap(features[0], features[1])
 changemap = calculate_changemap(distmap, plot=True)
 
+# get labels
+label = str(randim)+'.npy'
+gt = np.load(os.path.join(directories['intermediate_dir_cd'], directories['labels_dir_oscd'],label))
 
-
-
+cm, fig, ax = compute_confusion_matrix(gt, changemap)
+mcc = compute_matthews_corrcoef(gt, changemap)
 
