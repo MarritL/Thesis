@@ -231,7 +231,7 @@ def plot_image(image_folder, image_list, bands, axis = False, normalize=True, ti
         cols = 1 if n_images < 2 else 2
     
     # prepare
-    fig = plt.figure(constrained_layout=constrainted_layout)
+    fig = plt.figure(constrained_layout=constrainted_layout, figsize=(5,5))
     gs = fig.add_gridspec(rows, cols)
     
     #fig, ax = plt.subplots(rows,cols, figsize = (10,10))
@@ -357,7 +357,7 @@ def plot_sampledpatches(image_folder, image_list, patch1_start, patch2_start, pa
                             
     return fig, ax
 
-def plot_sampled_triplets(image_folder, image_list, patch1_start, patch2_start, patch3_start, patch_size, bands, plot_patches=False, axis=False, normalize = True, titles = None):
+def plot_sampled_triplets(image_folder, image_list, patch1_start, patch2_start, patch3_start, patch_size, bands, plot_patches=False, axis=False, normalize = True, titles = None,constrained_layout=True):
     """
     
 
@@ -405,10 +405,14 @@ def plot_sampled_triplets(image_folder, image_list, patch1_start, patch2_start, 
     n_images = len(unique_images)
     assert n_images == 1 or n_images ==2, "only single images or image pairs allowed"
 
-    nrows = 2
-    ncols = 6
+    if plot_patches:
+        nrows = 2
+        ncols = 6
+    else:
+        nrows = 1
+        ncols = 6
     
-    fig = plt.figure(constrained_layout=True)
+    fig = plt.figure(constrained_layout=constrained_layout)
     gs = fig.add_gridspec(nrows, ncols)
     
     # create squars for the patches. Note: first columns than rows
@@ -477,8 +481,7 @@ def plot_sampled_triplets(image_folder, image_list, patch1_start, patch2_start, 
         assert len(titles) == len(ax), "Provide a title for each subplot"
         for i in range(len(ax)):
             ax[i].set_title(titles[i])
-            
-            
+                   
         
 
 def plot_image_old(image_folder, image_list, bands, axis = False, normalize=True, titles = None):
