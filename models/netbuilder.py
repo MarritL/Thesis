@@ -75,6 +75,7 @@ def create_loss_function(lossfunction, gpu):
         one_hot = True
         if gpu != None:
             loss_func = nn.BCEWithLogitsLoss().cuda()
+            print('loss to gpu')
         else:
             loss_func = nn.BCEWithLogitsLoss()
         acc_func = acc_functions['accuracy_onehot']

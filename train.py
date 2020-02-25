@@ -64,6 +64,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
     if train_settings['gpu'] != None:
         torch.cuda.set_device(train_settings['gpu'])
         net.cuda()
+        print("net to gpu")
         #loss_func.cuda()
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], train_settings['gpu'])
     optim = create_optimizer(network_settings['optimizer'], net.parameters(), 
@@ -223,6 +224,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
                 inputs = [batch_data['patch0'].float().cuda(), 
                           batch_data['patch1'].float().cuda(),
                           batch_data['patch2'].float().cuda()] 
+                print("inputs to gpu")
             else:
                 inputs = [batch_data['patch0'].float(), 
                           batch_data['patch1'].float(),
@@ -231,6 +233,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
     
         # TODO: to gpu
         if gpu != None:
+            print('labels to gpu')
             #for patch in inputs:
             #    patch.cuda()
             labels.cuda()
