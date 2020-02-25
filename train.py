@@ -242,6 +242,8 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
 
         # forward pass
         outputs = network(inputs, n_branches)
+        print("outputs ", outputs)
+        print("lables: ", labels)
         loss = loss_func(outputs, labels)
         acc = acc_func(outputs, labels)
 
