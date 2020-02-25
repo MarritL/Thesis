@@ -216,9 +216,11 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
             if gpu != None:
                 inputs = [batch_data['patch0'].float().cuda(), 
                           batch_data['patch1'].float().cuda()] 
+                print("inputs to gpu")
             else:
                 inputs = [batch_data['patch0'].float(), 
                           batch_data['patch1'].float()] 
+
         elif n_branches == 3:
             if gpu != None:
                 inputs = [batch_data['patch0'].float().cuda(), 
