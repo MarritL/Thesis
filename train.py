@@ -61,11 +61,11 @@ def train(directories, dataset_settings, network_settings, train_settings):
     
     ## TODO: load net into GPU (also the data): NOTE: should be done before 
     # constructing optimizer https://pytorch.org/docs/stable/optim.html    
-    loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'])
+    loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], train_settings['gpu'])
     if train_settings['gpu'] != None:
         torch.cuda.set_device(train_settings['gpu'])
         net.cuda()
-        loss_func.cuda()
+        #loss_func.cuda()
     optim = create_optimizer(network_settings['optimizer'], net.parameters(), 
                              network_settings['lr'], 
                              weight_decay=network_settings['weight_decay'])

@@ -59,18 +59,24 @@ class NetBuilder:
         return net
 
 
-def create_loss_function(lossfunction):
+def create_loss_function(lossfunction, gpu):
     
     acc_functions = {'accuracy': accuracy,
                     'accuracy_onehot':accuracy_onehot}
     
     if lossfunction == 'cross_entropy':
         one_hot = False
-        loss_func = nn.CrossEntropyLoss() 
+        if gpu != None:
+            loss_func = nn.CrossEntropyLoss().cuda()
+        else:
+            loss_func = nn.CrossEntropyLoss() 
         acc_func = acc_functions['accuracy']
     elif lossfunction == 'bce_sigmoid':
         one_hot = True
-        loss_func = nn.BCEWithLogitsLoss()
+        if gpu != None:
+            loss_func = nn.BCEWithLogitsLoss().cuda()
+        else:
+            loss_func = nn.BCEWithLogitsLoss()
         acc_func = acc_functions['accuracy_onehot']
     else:
         raise Exception('loss function not implemented! \n \
