@@ -298,18 +298,25 @@ def validate(network, n_branches, dataloader, loss_func, acc_func, history,
         
         # get the inputs
         if n_branches == 2:
-            inputs = [batch_data['patch0'].float(), 
-                      batch_data['patch1'].float()] 
+            if gpu != None:
+                inputs = [batch_data['patch0'].float().cuda(), 
+                          batch_data['patch1'].float().cuda()] 
+            else:
+                inputs = [batch_data['patch0'].float(), 
+                          batch_data['patch1'].float()] 
         elif n_branches == 3:
-            inputs = [batch_data['patch0'].float(), 
-                      batch_data['patch1'].float(),
-                      batch_data['patch2'].float()] 
-        labels = batch_data['label']
+            if gpu != None:
+                inputs = [batch_data['patch0'].float().cuda(), 
+                          batch_data['patch1'].float().cuda(),
+                          batch_data['patch2'].float().cuda()] 
+            else:
+                inputs = [batch_data['patch0'].float(), 
+                          batch_data['patch1'].float(),
+                          batch_data['patch2'].float()] 
         labels = batch_data['label']
         
         # TODO: to GPU
         if gpu != None:
-            inputs.cuda()
             labels.cuda()
       
         with torch.no_grad():

@@ -10,7 +10,7 @@ import os
 import numpy as np
 import pandas as pd
 
-computer = 'desktop'
+computer = 'optimus'
 
 
 # init
@@ -76,9 +76,9 @@ network_settings = {
 train_settings = {
     'start_epoch': 0,
     'num_epoch': 10,
-    'batch_size': 50,
+    'batch_size': 10,
     'disp_iter': 2,
-    'gpu': None}
+    'gpu': 0}
 
 dataset_settings = {
     'dataset_type' : 'triplet',
@@ -94,7 +94,7 @@ from train import train
 dataset = pd.read_csv(os.path.join(directories['results_dir_training'],directories['csv_file_S21C']))
 dataset = dataset.loc[dataset['pair_idx'] == 'a']
 np.random.seed(234)
-dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)[:300]
+dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)[:100]
 
 # =============================================================================
 # dataset = np.random.choice(dataset['im_idx'], 1, replace=False)
@@ -104,8 +104,8 @@ dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)[:300]
 #dataset = np.random.choice(dataset['im_idx'], 1000, replace=False)
 #dataset = dataset['im_idx'].values
 dataset_settings['indices_train'] = dataset[:int(dataset_settings['perc_train']*len(dataset))]
-dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):-50]
-dataset_settings['indices_test'] = dataset[-50:]
+dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):-10]
+dataset_settings['indices_test'] = dataset[-10:]
 
 # train
 train(directories, dataset_settings, network_settings, train_settings)
