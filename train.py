@@ -238,7 +238,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
             print('labels to gpu')
             #for patch in inputs:
             #    patch.cuda()
-            labels.cuda()
+            labels = labels.cuda()
 
         # forward pass
         outputs = network(inputs, n_branches)
