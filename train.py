@@ -188,7 +188,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
 def train_epoch(network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
                 gpu):
-    
+    print("gpu ", gpu)
     batch_time = AverageMeter()
     data_time = AverageMeter()
     ave_loss = AverageMeter()
