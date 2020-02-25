@@ -9,6 +9,7 @@ import ee
 import os
 import csv
 import numpy as np
+import pandas as pd
 from plots import plot_detectedlines
 
 from skimage.feature import canny
@@ -499,6 +500,157 @@ def tif_to_numpy(tif_folder, band_list, n_bands, n_rows=None, n_cols=None):
         
     return image
         
+def sample_patches_from_image(images_csv, images_dir, patches_csv, patch_size=96, 
+                              overlap = 0.8):   
+    """
+    Sample pairs of partly overlapping patches from the input images. The first
+    patch is taken in grid-like manner from one of the two images. The second 
+    patch partly overlaps and is randomly from either of the images in the pair.     
 
+    Parameters
+    ----------
+    images_csv : string
+        full path to dataset csv-file
+    images_dir : string
+        full path to images data-folder
+    patches_csv : string
+        full path to output location to save csv of patch start locations
+    patch_size : int, optional
+        Size of patches (squared). The default is 96.
+    overlap : float, optional
+        proportion of overlap between the 2 patches. The default is 0.8.
+
+    Returns
+    -------
+    Saved starting locations of patches in the patches_csv -file
+    
+    """
+
+    # get dataset and unique image and pair ids
+    dataset = pd.read_csv(images_csv)
+    unique_im_idx = np.unique(dataset['im_idx'])
+    pair_idxs = np.unique(dataset.loc[:,'pair_idx'])
+    
+    # init
+    pixels_per_patch = patch_size*patch_size
+    
+    # prepare csv file
+    fieldnames = ['row','col','im_idx', 'impair_idx','patchpair_idx', 'patch_idx',\
+                  'patch_id','filename','overlap_0','city_ascii', 'country', \
+                  'geonameid', 'lng', 'lat', 'date']
+    with open(patches_csv, 'a') as file:
+        writer = csv.DictWriter(file, fieldnames, delimiter = ",")
+        writer.writeheader()
+    
+    # loop over each imagepair in dataset
+    for i in range(len(unique_im_idx)):
+        #i = 0
+        dataset[dataset['im_idx'] == unique_im_idx[i]]
+        
+        # get a random order of iamge 1 and 2
+        pairidx = np.random.choice(pair_idxs, size=2, replace=False)
+        
+        # load the first image
+        im1 = np.load(os.path.join(images_dir,str(unique_im_idx[i]) + '_' + pairidx[0] + '.npy'))
+        #im2 = np.load(os.path.join(image_folder,str(unique_im_idx[i]) + '_' + pairidx[1] + '.npy'))
+        
+        # find starting points for first patch of pair in grid like fashin
+        p = np.argwhere(im1[:,:,0]!=872957239293) # all pixels
+        p_starts = pd.DataFrame(p, columns=['row', 'col'])
+        p_starts = p_starts.divide(patch_size).astype(int) # only every patch_sizeth pixel
+        start_locs = p_starts.groupby(['row','col']).size().reset_index() # remove duplicates
+        df_starts_patch0 = start_locs[start_locs[0] >= pixels_per_patch].copy() #only complete patches
+        
+        # add other information to df
+        df_starts_patch0['im_idx'] = unique_im_idx[i]
+        df_starts_patch0['impair_idx'] = pairidx[0]
+        df_starts_patch0['patchpair_idx'] = 0
+        df_starts_patch0 =df_starts_patch0.drop(0, axis=1).reset_index().drop('index', axis=1)
+        df_starts_patch0['patch_idx'] = df_starts_patch0.index
+        df_starts_patch0['row'] = df_starts_patch0['row']*patch_size
+        df_starts_patch0['col'] = df_starts_patch0['col']*patch_size
+        df_starts_patch0['patch_id'] = np.nan
+        df_starts_patch0['filename'] = np.nan
+        df_starts_patch0['overlap_0'] = 100
+        df_starts_patch0['city_ascii'] = dataset['city_ascii'][i]
+        df_starts_patch0['country'] = dataset['country'][i]
+        df_starts_patch0['geonameid'] = dataset['geonameid'][i]
+        df_starts_patch0['lng'] = dataset['lng'][i]
+        df_starts_patch0['lat'] = dataset['lat'][i]
+        df_starts_patch0['date'] = dataset['date'][i]
+       # n_patches = len(df_starts_patch0)
+        for idx, row in df_starts_patch0.iterrows():
+            df_starts_patch0.loc[idx,'patch_id'] = str(row.im_idx) + '_' + \
+                str(row.impair_idx) + '_' + str(row.patch_idx) + '_' + \
+                str(row.patchpair_idx)
+            df_starts_patch0.loc[idx,'filename'] = str(row.im_idx) + '_' + \
+                str(row.impair_idx) + '_' + str(row.patch_idx) + '_' + \
+                str(row.patchpair_idx) + '.npy'
+         
+        # write to csv
+        df_starts_patch0.to_csv(patches_csv, mode='a', header=False, index=False)
+        
+        # get location of second patch with approximately specified overlap
+        for j in range(len(df_starts_patch0)):
+            
+            # specify overlap
+            shift_pix = patch_size - (patch_size*overlap)
+            
+            # random sample of left - right shift
+            shift_lr = np.random.randint(-shift_pix, shift_pix)
+            
+            # check if the the patch is not outside image
+            start_row2 = df_starts_patch0.loc[j,'row'] + shift_lr
+            if start_row2 < 0:
+                shift_lr = shift_lr - start_row2
+            elif start_row2+patch_size > im1.shape[0]:
+                shift_lr = shift_lr - (start_row2+patch_size - im1.shape[0])
+            start_row2 = df_starts_patch0.loc[j,'row'] + shift_lr
+            
+            # random sample of up - down shift
+            shift_ud = np.floor(np.sqrt(shift_pix**2 - shift_lr**2)) 
+            random_ud = np.random.choice([-1,1])
+            shift_ud = shift_ud*random_ud
+            
+            # check if the the patch is not outside image    
+            start_col2 = df_starts_patch0.loc[j,'col'] + shift_ud
+            if start_col2 < 0:
+                shift_ud = shift_ud*-1 
+            elif start_col2+patch_size > im1.shape[1]:
+                shift_ud = shift_ud*-1
+            start_col2 = int(df_starts_patch0.loc[j,'col'] + shift_ud)
+            overlap_pix = (patch_size - abs(shift_lr)) * (patch_size - abs(shift_ud))
+            impair_idx2 = np.random.choice(pair_idxs, size=1, replace=False)[0]
+            
+            patch1 = {'row':start_row2, 
+                      'col':start_col2, 
+                      'im_idx':df_starts_patch0.loc[j,'im_idx'],
+                      'impair_idx': impair_idx2,
+                      'patch_idx':int(df_starts_patch0.loc[j,'patch_idx']), 
+                      'patchpair_idx':1,
+                      'patch_id':str(df_starts_patch0.loc[j, 'im_idx']) + '_' + \
+                          impair_idx2 + '_' + \
+                          str(df_starts_patch0.loc[j,'patch_idx']) + '_' + \
+                          str(1),
+                      'filename':str(df_starts_patch0.loc[j, 'im_idx']) + '_' + \
+                          impair_idx2 + '_' + \
+                          str(df_starts_patch0.loc[j,'patch_idx']) + '_' + \
+                          str(1) + '.npy',
+                      'overlap_0':overlap_pix/(patch_size*patch_size),
+                      'city_ascii':df_starts_patch0.loc[j,'city_ascii'], 
+                      'country':df_starts_patch0.loc[j,'country'], 
+                      'geonameid':df_starts_patch0.loc[j,'geonameid'], 
+                      'lng':df_starts_patch0.loc[j,'lng'], 
+                      'lat':df_starts_patch0.loc[j,'lat'], 
+                      'date':df_starts_patch0.loc[j,'date']
+                      }
+        
+            # save some info in csv-file
+            with open(patches_csv, 'a') as file:
+                writer = csv.DictWriter(file, fieldnames, delimiter = ",")
+                writer.writerow(patch1)  
+                
+        if i+1 % 50 == 0:
+            print("\r imagepair {}/{}".format(i+1,len(unique_im_idx)), end='')
 
 
