@@ -110,8 +110,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
     history = {'train': {'epoch': [], 'loss': [], 'acc': []}, 
                'val':{'epoch': [], 'loss': [], 'acc': []}}
     
-    epoch_iters =  len(dataset_train) // train_settings['batch_size']
-    val_epoch_iters = len(dataset_val) // train_settings['batch_size']
+    epoch_iters =  max(len(dataset_train) // train_settings['batch_size'],1)
+    val_epoch_iters = max(len(dataset_val) // train_settings['batch_size'],1)
     
     best_net_wts = copy.deepcopy(net.state_dict())
     best_acc = 0.0
@@ -222,7 +222,8 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
     
         # TODO: to gpu
         if gpu != None:
-            inputs.cuda()
+            for patch in inputs:
+                patch.cuda()
             labels.cuda()
 
         # forward pass
