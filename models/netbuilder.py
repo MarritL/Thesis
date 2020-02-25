@@ -59,8 +59,8 @@ class NetBuilder:
         return net
 
 
-def create_loss_function(lossfunction, gpu):
-    
+def create_loss_function(lossfunction):
+    gpu = None
     acc_functions = {'accuracy': accuracy,
                     'accuracy_onehot':accuracy_onehot}
     
