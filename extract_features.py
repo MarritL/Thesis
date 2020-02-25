@@ -60,9 +60,9 @@ def extract_features(directories, imagelist, model_settings, layers):
                                'top': np.array(top,dtype='object')}
     
     # batch_norm saved as string cast back to bool
-    if model_settings['batch_norm'] == 'False': 
+    if model_settings['batch_norm'] == 'False' : 
         model_settings['batch_norm'] = False
-    else:
+    elif model_settings['batch_norm'] == 'True' : 
         model_settings['batch_norm'] = True
           
     # build network

@@ -25,7 +25,11 @@ class SiameseNet(nn.Module):
         self.branches = branches    
         self.joint = joint
         
-        self.interpol = nn.Upsample(size=(patch_size,patch_size), mode='bilinear', align_corners=True)
+# =============================================================================
+#         self.interpol = nn.Upsample(size=(patch_size,patch_size), mode='bilinear', align_corners=True)
+#         #self.interpol = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+#         #self.interpol = nn.Upsample(size=(799,785), mode='bilinear', align_corners=True)
+# =============================================================================
         
         self.avgpool = nn.AdaptiveAvgPool2d((patch_size_lin, patch_size_lin))
         self.classifier = nn.Sequential(
@@ -78,11 +82,10 @@ class SiameseNet(nn.Module):
                         activations[names[i]] = l(x)
                     else:
                         activations[names[i]] = l(activations[names[i-1]])
-            
-                #Construct hypercolumn
-                feature_layers = torch.cat(
-                    [self.interpol(activations[names[i]]) for i in extract_features],1)
-                features = torch.cat((x, feature_layers), 1)
+                            
+                # return a list of features
+                features = [x]
+                features.extend([activations[names[i]] for i in extract_features])
             
                 return features
                 
@@ -105,7 +108,7 @@ class SiameseNet(nn.Module):
     
 def make_layers(cfg, n_channels, batch_norm=False):
     layers = []
-    in_channels = n_channels
+    in_channels = int(n_channels)
     for v in cfg:
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
@@ -138,7 +141,7 @@ def siamese_net(cfg, n_channels=13,n_classes=8, patch_size=96, batch_norm=False,
     # determine number of max-pool layers
     n_mpool = np.sum(cfg['branch'] == 'M') + np.sum(cfg['top'] == 'M')    
 
-    if cfg['top'] is not None: 
+    if cfg['top'] is not None:
         n_channels_lin = int(cfg['top'][cfg['top'] != 'M'][-1])
     else:
         n_channels_lin = int(cfg['branch'][cfg['branch'] != 'M'][-1])*n_branches
