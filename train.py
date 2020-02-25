@@ -40,6 +40,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
     # build network
     if network_settings['network'] == 'siamese':
         n_branches = 2
+        print('n_branches = 2')
     elif network_settings['network'] == 'triplet':
         print('n_branches = 3')
         n_branches = 3
@@ -60,8 +61,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
        
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'])
     
-    ## TODO: load net into GPU (also the data): NOTE: should be done before 
-    # constructing optimizer https://pytorch.org/docs/stable/optim.html    
+    # load net to GPU     
     if train_settings['gpu'] != None:
         torch.cuda.set_device(train_settings['gpu'])
         net.cuda()
@@ -188,7 +188,6 @@ def train(directories, dataset_settings, network_settings, train_settings):
 def train_epoch(network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
                 gpu):
-    print("gpu ", gpu)
     batch_time = AverageMeter()
     data_time = AverageMeter()
     ave_loss = AverageMeter()
@@ -213,37 +212,38 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
         
         # get the inputs
         if n_branches == 2:
-            if gpu != None:
-                inputs = [batch_data['patch0'].float().cuda(), 
-                          batch_data['patch1'].float().cuda()] 
-                print("inputs to gpu")
-            else:
-                inputs = [batch_data['patch0'].float(), 
-                          batch_data['patch1'].float()] 
+# =============================================================================
+#             if gpu != None:
+#                 inputs = [batch_data['patch0'].float().cuda(), 
+#                           batch_data['patch1'].float().cuda()] 
+#                 print("inputs to gpu")
+#             else:
+# =============================================================================
+            inputs = [batch_data['patch0'].float(), 
+                      batch_data['patch1'].float()] 
 
         elif n_branches == 3:
-            if gpu != None:
-                inputs = [batch_data['patch0'].float().cuda(), 
-                          batch_data['patch1'].float().cuda(),
-                          batch_data['patch2'].float().cuda()] 
-                print("inputs to gpu")
-            else:
-                inputs = [batch_data['patch0'].float(), 
-                          batch_data['patch1'].float(),
-                          batch_data['patch2'].float()] 
+# =============================================================================
+#             if gpu != None:
+#                 inputs = [batch_data['patch0'].float().cuda(), 
+#                           batch_data['patch1'].float().cuda(),
+#                           batch_data['patch2'].float().cuda()] 
+#                 print("inputs to gpu")
+#             else:
+# =============================================================================
+            inputs = [batch_data['patch0'].float(), 
+                      batch_data['patch1'].float(),
+                      batch_data['patch2'].float()] 
         labels = batch_data['label']
     
-        # TODO: to gpu
+        # to gpu
         if gpu != None:
-            print('labels to gpu')
-            #for patch in inputs:
-            #    patch.cuda()
+            for p_i, patch in enumerate(inputs):
+                inputs[i] = patch.cuda()
             labels = labels.cuda()
 
         # forward pass
         outputs = network(inputs, n_branches)
-        print("outputs ", outputs)
-        print("lables: ", labels)
         loss = loss_func(outputs, labels)
         acc = acc_func(outputs, labels)
 
@@ -305,26 +305,32 @@ def validate(network, n_branches, dataloader, loss_func, acc_func, history,
         
         # get the inputs
         if n_branches == 2:
-            if gpu != None:
-                inputs = [batch_data['patch0'].float().cuda(), 
-                          batch_data['patch1'].float().cuda()] 
-            else:
-                inputs = [batch_data['patch0'].float(), 
-                          batch_data['patch1'].float()] 
+# =============================================================================
+#             if gpu != None:
+#                 inputs = [batch_data['patch0'].float().cuda(), 
+#                           batch_data['patch1'].float().cuda()] 
+#             else:
+# =============================================================================
+            inputs = [batch_data['patch0'].float(), 
+                      batch_data['patch1'].float()] 
         elif n_branches == 3:
-            if gpu != None:
-                inputs = [batch_data['patch0'].float().cuda(), 
-                          batch_data['patch1'].float().cuda(),
-                          batch_data['patch2'].float().cuda()] 
-            else:
-                inputs = [batch_data['patch0'].float(), 
-                          batch_data['patch1'].float(),
-                          batch_data['patch2'].float()] 
+# =============================================================================
+#             if gpu != None:
+#                 inputs = [batch_data['patch0'].float().cuda(), 
+#                           batch_data['patch1'].float().cuda(),
+#                           batch_data['patch2'].float().cuda()] 
+#             else:
+# =============================================================================
+            inputs = [batch_data['patch0'].float(), 
+                      batch_data['patch1'].float(),
+                      batch_data['patch2'].float()] 
         labels = batch_data['label']
         
-        # TODO: to GPU
+        # to GPU
         if gpu != None:
-            labels.cuda()
+            for p_i, patch in enumerate(inputs):
+                inputs[i] = patch.cuda()
+            labels = labels.cuda()
       
         with torch.no_grad():
             # forward pass
