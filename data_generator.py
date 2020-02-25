@@ -22,7 +22,9 @@ class BaseDataset(Dataset):
         self.n_channels = len(channels)
         self.patch_size = patch_size
         self.percentile = percentile
-        self.pair_indices = ['a','b']
+        # TODO: put back to ['a', 'b']
+        #self.pair_indices = ['a','b']
+        self.pair_indices = ['a','a']
 
         assert len(self.indices) > 0
         print('# images: {}'.format(len(self.indices)))
@@ -333,7 +335,9 @@ class TripletDataset(BaseDataset):
                              
         assert patchtriplet['patch0'].shape == patchtriplet['patch1'].shape \
             == patchtriplet['patch2'].shape, \
-            "Shape not matching in patch triplet {}".format(im_idx)
+            "Shape not matching in patch triplet {}, shape: 0:{} 1:{} 2:{}"\
+            .format(im_idx, patchtriplet['patch0'].shape,patchtriplet['patch1'].shape,
+            patchtriplet['patch2'].shape)
         assert np.any(~np.isnan(patchtriplet['patch0'])) \
             & np.any(~np.isnan(patchtriplet['patch1'])) \
             & np.any(~np.isnan(patchtriplet['patch2'])), \
@@ -470,9 +474,13 @@ def sample_patchtriplet(im1_shape, patch_size=96, min_overlap=0.2,
     max_shift_pix = patch_size - patch_size*min_overlap
  
     # sample starting point of the central patch = patch1
-    patch_starts.append(np.random.randint(np.ceil(max_shift_pix), 
+    patch0_row = np.random.randint(np.ceil(max_shift_pix), 
                         im1_shape[0]-patch_size-np.ceil(max_shift_pix), 
-                        size =2))
+                        size = 1)
+    patch0_col = np.random.randint(np.ceil(max_shift_pix), 
+                        im1_shape[1]-patch_size-np.ceil(max_shift_pix), 
+                        size = 1)
+    patch_starts.append(np.concatenate([patch0_row,patch0_col]))
     
     # sample shift of patch2 w.r.t patch1, constraind by defined overlap percentage
     shift_lr = np.random.randint(-max_shift_pix, max_shift_pix)
@@ -494,14 +502,21 @@ def sample_patchtriplet(im1_shape, patch_size=96, min_overlap=0.2,
         
     
     # sample starting point of the 3th patch
-    patch_starts.append(np.zeros((2,), dtype=np.int64))
+    patch3_options = np.ones((im1_shape[0]-patch_size, im1_shape[1]-patch_size),dtype=np.bool)
+    # make sure overlapping regions with patch 1 and 2 are excluded
     for i in range(2):
-        patch2_options = np.arange(0,im1_shape[i]-patch_size)
-        patch2_not = range(min(patch_starts[0][i], patch_starts[1][i])-patch_size,
-                           max(patch_starts[0][i], patch_starts[1][i])+patch_size)
-        patch2_options = patch2_options[~np.isin(patch2_options,patch2_not)]
-        patch_starts[2][i] = np.random.choice(patch2_options)
-    
+        not_start_row = max(patch_starts[i][0]-patch_size,0)
+        not_start_col = max(patch_starts[i][1]-patch_size,0)   
+        patch3_options[not_start_row:patch_starts[i][0]+patch_size,
+                       not_start_col:patch_starts[i][1]+patch_size] = False
+
+   
+    idx = np.random.randint(np.where(patch3_options)[0].shape[0])
+    patch3_row = np.where(patch3_options)[0][idx]    
+    patch3_col = np.where(patch3_options)[1][idx]      
+
+    patch_starts.append(np.array([patch3_row, patch3_col]))
+        
 # =============================================================================
 #     ## TODO: turn on if testing one patch
 #     patch_starts = [np.array([341,  82]), np.array([279,  51]), np.array([463, 360])]
