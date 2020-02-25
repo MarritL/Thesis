@@ -61,6 +61,10 @@ def train(directories, dataset_settings, network_settings, train_settings):
     
     ## TODO: load net into GPU (also the data): NOTE: should be done before 
     # constructing optimizer https://pytorch.org/docs/stable/optim.html
+    if train_settings['gpu'] != None:
+        torch.cuda.set_device(train_settings['gpu'])
+        net.cuda()
+    
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'])
     optim = create_optimizer(network_settings['optimizer'], net.parameters(), 
                              network_settings['lr'], 
@@ -86,14 +90,16 @@ def train(directories, dataset_settings, network_settings, train_settings):
             data_dir=directories['data_path'], 
             indices=dataset_settings['indices_val'], 
             channels=dataset_settings['channels'], 
-            one_hot=one_hot)  
+            one_hot=one_hot,
+            min_overlap = dataset_settings['min_overlap'],
+            max_overlap = dataset_settings['max_overlap'])  
     
     # Data loaders
     dataloader_train = DataLoader(
         dataset_train, 
         batch_size=train_settings['batch_size'], 
         shuffle=True,
-        num_workers = 1)
+        num_workers = 2)
     dataloader_val = DataLoader(
         dataset_val, 
         batch_size=train_settings['batch_size'], 
@@ -126,7 +132,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
             epoch=epoch, 
             writer=writer,
             epoch_iters=epoch_iters, 
-            disp_iter=train_settings['disp_iter'])
+            disp_iter=train_settings['disp_iter'],
+            gpu = train_settings['gpu'])
         
         # validation epoch
         best_net_wts, best_acc, best_epoch = validate(
@@ -141,7 +148,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
             val_epoch_iters=val_epoch_iters,
             best_net_wts=best_net_wts,
             best_acc=best_acc,
-            best_epoch=best_epoch) 
+            best_epoch=best_epoch,
+            gpu = train_settings['gpu']) 
 
         # save progress
         #checkpoint(nets, history, cfg, epoch+1, DIR) 
@@ -177,7 +185,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
 
     
 def train_epoch(network, n_branches, dataloader, optimizer, loss_func, 
-                acc_func, history, epoch, writer, epoch_iters, disp_iter):
+                acc_func, history, epoch, writer, epoch_iters, disp_iter,
+                gpu):
     
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -212,7 +221,9 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
         labels = batch_data['label']
     
         # TODO: to gpu
-        #batch_data = {'img_data': batch_images.cuda(), 'seg_label':batch_segms.cuda()}
+        if gpu != None:
+            inputs.cuda()
+            labels.cuda()
 
         # forward pass
         outputs = network(inputs, n_branches)
@@ -256,7 +267,8 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
 
     
 def validate(network, n_branches, dataloader, loss_func, acc_func, history, 
-             epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch):    
+             epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
+             gpu):    
 
     ave_loss = AverageMeter()
     ave_acc = AverageMeter()
@@ -286,7 +298,9 @@ def validate(network, n_branches, dataloader, loss_func, acc_func, history,
         labels = batch_data['label']
         
         # TODO: to GPU
-        #batch_data = {'img_data': batch_images.cuda(), 'seg_label':batch_segms.cuda()}
+        if gpu != None:
+            inputs.cuda()
+            labels.cuda()
       
         with torch.no_grad():
             # forward pass
