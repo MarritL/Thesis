@@ -10,26 +10,47 @@ import os
 import numpy as np
 import pandas as pd
 
+computer = 'desktop'
+
+
 # init
-directories = {
-    #'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
-    'intermediate_dir_training': '/media/cordolo/elements/results/training_S2',
-    'intermediate_dir_cd': '/media/cordolo/elements/Intermediate/CD_OSCD',
-    'intermediate_dir': '/media/cordolo/elements/Intermediate',
-    #'csv_file_S21C_cleaned': 'S21C_dataset_cleaned.csv',
-    'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
-    'csv_file_oscd': 'OSCD_dataset.csv',
-    'csv_file_train_oscd' : 'OSCD_train.csv',
-    'csv_file_test_oscd': 'OSCD_test.csv',
-    'csv_models': 'trained_models.csv',
-    'data_dir_S21C': 'data_S21C',
-    'data_dir_oscd': 'data_OSCD',
-    'labels_dir_oscd' : 'labels_OSCD',
-    'tb_dir': '/media/cordolo/elements/Intermediate/tensorboard',
-    'model_dir': '/media/cordolo/elements/Intermediate/trained_models'}
+if computer == 'desktop':
+    directories = {
+        #'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
+        'results_dir_training': '/media/cordolo/elements/results/training_S2',
+        'intermediate_dir_cd': '/media/cordolo/elements/Intermediate/CD_OSCD',
+        'intermediate_dir': '/media/cordolo/elements/Intermediate',
+        'csv_file_S21C': 'S21C_dataset.csv',
+        'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
+        'csv_file_oscd': 'OSCD_dataset.csv',
+        'csv_file_train_oscd' : 'OSCD_train.csv',
+        'csv_file_test_oscd': 'OSCD_test.csv',
+        'csv_models': 'trained_models.csv',
+        'data_dir_S21C': 'data_S21C',
+        'data_dir_oscd': 'data_OSCD',
+        'labels_dir_oscd' : 'labels_OSCD',
+        'tb_dir': '/media/cordolo/elements/Intermediate/tensorboard',
+        'model_dir': '/media/cordolo/elements/Intermediate/trained_models'}
+elif computer == 'optimus':
+    directories = {
+        #'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
+        'results_dir_training': '/media/marrit/results/training_S2',
+        'intermediate_dir_cd': '/media/marrit/Intermediate/CD_OSCD',
+        'intermediate_dir': '/media/marrit/Intermediate',
+        'csv_file_S21C': 'S21C_dataset.csv',
+        'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
+        'csv_file_oscd': 'OSCD_dataset.csv',
+        'csv_file_train_oscd' : 'OSCD_train.csv',
+        'csv_file_test_oscd': 'OSCD_test.csv',
+        'csv_models': 'trained_models.csv',
+        'data_dir_S21C': 'data_S21C',
+        'data_dir_oscd': 'data_OSCD',
+        'labels_dir_oscd' : 'labels_OSCD',
+        'tb_dir': '/media/marrit/Intermediate/tensorboard',
+        'model_dir': '/media/marrit/Intermediate/trained_models'}
 
 directories['data_path'] = os.path.join(
-    directories['intermediate_dir_training'], 
+    directories['results_dir_training'], 
     directories['data_dir_S21C'])
 
 # network cofiguration:
@@ -39,8 +60,6 @@ directories['data_path'] = os.path.join(
 cfg = {
        'branch': np.array([64,'M',128,'M'], dtype='object'), 
        'top': np.array([192], dtype='object')}
-
-
 
 
 network_settings = {
@@ -58,21 +77,25 @@ train_settings = {
     'start_epoch': 0,
     'num_epoch': 10,
     'batch_size': 50,
-    'disp_iter': 2}
+    'disp_iter': 2,
+    'gpu': None}
 
 dataset_settings = {
     'dataset_type' : 'triplet',
     'perc_train': 0.8,
-    'channels': np.arange(13)}
+    'channels': np.arange(13),
+    'min_overlap': 0.7, 
+    'max_overlap':  1}
 
 #%% 
 """ Train """
 from train import train
 
-dataset = pd.read_csv(os.path.join(directories['intermediate_dir_training'],directories['csv_file_S21C_cleaned']))
+dataset = pd.read_csv(os.path.join(directories['results_dir_training'],directories['csv_file_S21C']))
 dataset = dataset.loc[dataset['pair_idx'] == 'a']
 np.random.seed(234)
-dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
+dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)[:300]
+
 # =============================================================================
 # dataset = np.random.choice(dataset['im_idx'], 1, replace=False)
 # dataset_settings['indices_train'] = np.repeat(dataset, 80)
@@ -81,8 +104,8 @@ dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
 #dataset = np.random.choice(dataset['im_idx'], 1000, replace=False)
 #dataset = dataset['im_idx'].values
 dataset_settings['indices_train'] = dataset[:int(dataset_settings['perc_train']*len(dataset))]
-dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):-100]
-dataset_settings['indices_test'] = dataset[-100:]
+dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):-50]
+dataset_settings['indices_test'] = dataset[-50:]
 
 # train
 train(directories, dataset_settings, network_settings, train_settings)
