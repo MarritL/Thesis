@@ -826,6 +826,59 @@ for im in dataset2['filename']:
     src = os.path.join(intermediate_dir_training, 'data_S21C_repeat2', im)
     dst = os.path.join(results_dir_training, data_dir_S21C, im)
     shutil.copy(src, dst)    
+    
+#%%
+""" Save some patches for faster training """
+
+from data_download_functions import sample_patches_from_image,save_patches
+
+# dirs
+intermediate_dir_training= '/media/cordolo/elements/Intermediate/training_S2'
+results_dir_training = '/media/cordolo/elements/results/training_S2'
+csv_file_S21C = 'S21C_dataset.csv'
+csv_file_patches = 'S21C_patches_overlap90-100.csv'
+data_dir_S21C = 'data_S21C'
+patches_dir_S21C = 'patches_S21C_overlap90-100'
+# combinations of dirs
+images_csv=os.path.join(results_dir_training, csv_file_S21C)
+images_dir=os.path.join(results_dir_training,data_dir_S21C)
+patches_csv=os.path.join(intermediate_dir_training, csv_file_patches)
+patches_dir=os.path.join(intermediate_dir_training,patches_dir_S21C)
+
+# sample start locations of patche and store in csv
+sample_patches_from_image(images_csv, images_dir, patches_csv, patch_size=96, 
+                          min_overlap = 0.9, max_overlap = 1)
+
+if not os.path.isdir(os.path.join(intermediate_dir_training, patches_dir_S21C)):
+    os.makedirs(os.path.join(intermediate_dir_training, patches_dir_S21C)) 
+
+
+patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
+read_patches = patches_df[patches_df['impair_idx'] == 'a']
+patch_size = 96
+
+# save patches from the 'a' images
+save_patches(patches_df=read_patches, images_dir=images_dir, patches_dir=patches_dir, patch_size=patch_size)
+
+# I changed my mind about the filenames, so i have to change the df
+patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
+patches_df['im_patch_idx'] = 'NA'
+patches_df['filename_alt'] = 'NA'
+for i, row in patches_df.iterrows():
+   patches_df.loc[i,'im_patch_idx'] = str(row.im_idx) + '_' + str(row.patch_idx) 
+   patches_df.loc[i,'filename_alt'] = str(row.im_idx) + '_' + str(row.patch_idx) + '_' + str(row.patchpair_idx) + '.npy' 
+   if (i+1) % 100 == 0:
+        print("\r row {}/{}".format(i+1,len(patches_df)), end='')
+
+patches_df.to_csv(os.path.join(intermediate_dir_training, csv_file_patches), index=False)
+patches_df= patches_df[patches_df['impair_idx'] == 'a']
+
+for i, row in patches_df.iterrows():
+    os.rename(os.path.join(patches_dir, row.filename), os.path.join(patches_dir, row.filename_alt)) 
+    if (i+1) % 100 == 0:
+        print("\r row {}/{}".format(i+1,len(patches_df)), end='')
+
+
 
 #%%
 """ Preprocess OSCD labels """
