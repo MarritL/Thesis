@@ -517,9 +517,7 @@ def sample_patchtriplet(im1_shape, patch_size=96, min_overlap=0.2,
 
     patch_starts.append(np.array([patch3_row, patch3_col]))
         
-# =============================================================================
-#     ## TODO: turn on if testing one patch
-#     patch_starts = [np.array([341,  82]), np.array([279,  51]), np.array([463, 360])]
-#     ##
-# =============================================================================
+    ## TODO: turn on if testing one patch
+    patch_starts = [np.array([341,  82]), np.array([279,  51]), np.array([463, 360])]
+    ##
     return patch_starts
