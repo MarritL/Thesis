@@ -54,7 +54,7 @@ class BaseDataset(Dataset):
         # 'reconstruct' the image filenames 
         filenames = []
         for pair_idx in pair_idxs:
-            filenames.append(str(im_idx) + '_' + pair_idx + '.npy')
+            filenames.append(str(im_idx) + '_' + str(pair_idx) + '.npy')
         
         return filenames
     
@@ -345,6 +345,90 @@ class TripletDataset(BaseDataset):
         
         # add image info
         patchtriplet['im_idx'] = im_idx
+        
+        # cast to tensors
+        patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
+        patchtriplet['patch1'] = torch.as_tensor(patchtriplet['patch1'])
+        patchtriplet['patch2'] = torch.as_tensor(patchtriplet['patch2'])
+        patchtriplet['label'] = torch.as_tensor(lbl, dtype=dtype)
+        
+        return patchtriplet
+    
+class TripletDatasetPreSaved(BaseDataset):
+    
+    def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
+                 percentile=99, one_hot = True):
+        super(TripletDatasetPreSaved, self).__init__(data_dir, indices, channels, 
+                                             patch_size, percentile)
+        
+        self.one_hot = one_hot
+    
+    def __getitem__(self, index):
+        'Generates one patch triplet'
+        # Select sample
+        im_patch_idx = self.indices[index]
+            
+        # get patch_pair_idxs
+        pairidxs = np.arange(2)
+
+        # 'reconstruct' the filenames
+        filenames = self.getFilenames(im_patch_idx, pairidxs)
+    
+        # load image
+        images = self.getImages(filenames)
+
+        # check if all images have the same shape
+        assert images[0].shape == images[1].shape,\
+                    'Shape not matching in image pair {}'.format(im_patch_idx)
+
+        # sample third patch
+        options_for2 = list()
+        for index in self.indices:
+            if index.split('_')[0] == im_patch_idx.split('_')[0] \
+                and index.split('_')[1] != im_patch_idx.split('_')[1]:
+                options_for2.append(index)
+        
+        im_patch_idx2 =  np.random.choice(options_for2, 1)       
+        pairidxs2 = np.random.choice([0,1], size=1) 
+        
+        # 'reconstruct' filename
+        filename = self.getFilenames(im_patch_idx2[0], pairidxs2)
+
+        # load third patch
+        images.extend(self.getImages(filename))
+        
+        # get a random order
+        lbl = np.random.randint(2)
+        if lbl == 1:
+            images[1],images[2] = images[2], images[1]
+        
+        if self.one_hot:
+            lbl = self.to_categorical(lbl, num_classes=2)
+            dtype = torch.float32
+        else: 
+            dtype = torch.int64
+        
+        # get patches
+        patchtriplet = dict()
+        patchtriplet['patch0'] = images[0]
+        patchtriplet['patch1'] = images[1]
+        patchtriplet['patch2'] = images[2]
+
+        # rearange axis (channels first)
+        patchtriplet = self.channelsfirst(patchtriplet)
+                             
+        assert patchtriplet['patch0'].shape == patchtriplet['patch1'].shape \
+            == patchtriplet['patch2'].shape, \
+            "Shape not matching in patch triplet {}, shape: 0:{} 1:{} 2:{}"\
+            .format(im_patch_idx, patchtriplet['patch0'].shape,patchtriplet['patch1'].shape,
+            patchtriplet['patch2'].shape)
+        assert np.any(~np.isnan(patchtriplet['patch0'])) \
+            & np.any(~np.isnan(patchtriplet['patch1'])) \
+            & np.any(~np.isnan(patchtriplet['patch2'])), \
+            "Nans in patch triplet {}".format(im_patch_idx)  
+        
+        # add image info
+        patchtriplet['im_idx'] = im_patch_idx
         
         # cast to tensors
         patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
