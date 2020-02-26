@@ -253,7 +253,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
         
 
         # calculate accuracy, and display
-        if i+1 % disp_iter == 0:
+        if (i+1) % disp_iter == 0:
             print('Epoch: [{}][{}/{}], Batch-time: {:.2f}, Data-time: {:.2f}, '
                   'Loss: {:.4f}, Acc: {:.4f}'
                   .format(epoch, i, epoch_iters,
