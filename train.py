@@ -80,13 +80,16 @@ def train(directories, dataset_settings, network_settings, train_settings):
         dataset_val = PairDataset(
             data_dir=directories['data_path'], 
             indices=dataset_settings['indices_val'], 
-            channels=dataset_settings['channels'])       
+            channels=dataset_settings['channels'],
+            )       
     elif dataset_settings['dataset_type'] == 'triplet':
         dataset_train = TripletDataset(
             data_dir=directories['data_path'], 
             indices=dataset_settings['indices_train'], 
             channels=dataset_settings['channels'], 
-            one_hot=one_hot)           
+            one_hot=one_hot,
+            min_overlap = dataset_settings['min_overlap'],
+            max_overlap = dataset_settings['max_overlap'])           
         dataset_val = TripletDataset(
             data_dir=directories['data_path'], 
             indices=dataset_settings['indices_val'], 
