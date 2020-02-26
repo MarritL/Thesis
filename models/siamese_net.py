@@ -24,13 +24,7 @@ class SiameseNet(nn.Module):
         
         self.branches = branches    
         self.joint = joint
-        
-# =============================================================================
-#         self.interpol = nn.Upsample(size=(patch_size,patch_size), mode='bilinear', align_corners=True)
-#         #self.interpol = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-#         #self.interpol = nn.Upsample(size=(799,785), mode='bilinear', align_corners=True)
-# =============================================================================
-        
+                
         self.avgpool = nn.AdaptiveAvgPool2d((patch_size_lin, patch_size_lin))
         self.classifier = nn.Sequential(
             nn.Linear(n_channels_lin * patch_size_lin * patch_size_lin, 256),
@@ -135,8 +129,35 @@ def conv_bn_relu(in_channels, out_channels, stride=1, padding=1, batch_norm=Fals
     return nn.Sequential(*layers)
 
 
-def siamese_net(cfg, n_channels=13,n_classes=8, patch_size=96, batch_norm=False, n_branches=2):
-    #cfg = {'branch': np.array([64, 'M', 128, 'M']), 'top': np.array([256, 'M'])}
+def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False, n_branches=2):
+    """
+    Create network
+
+    Parameters
+    ----------
+    cfg : dictionary
+        dictionairy specifying architecture of branches and top of network. 
+        example: {'branch': np.array([64, 'M', 128, 'M']), 'top': np.array([256])}
+        integers for number of filters in conv-layers, 'M' for maxpool. 
+        ReLU is added after each conv-layer, batch-norm optional.
+    n_channels : int, optional
+        number of input channels. The default is 13.
+    n_classes : int, optional
+        number of output classes. The default is 2.
+    patch_size : int, optional
+        input size of patch (squared). The default is 96.
+    batch_norm : boolean, optional
+        whether to use batch norm are not. The default is False.
+    n_branches : int, optional
+        number of branches to use in network. The default is 2.
+
+    Returns
+    -------
+    net : nn.Module
+        deep learning network.
+
+    """
+    #
     
     # determine number of max-pool layers
     n_mpool = np.sum(cfg['branch'] == 'M') + np.sum(cfg['top'] == 'M')    
