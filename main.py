@@ -10,7 +10,7 @@ import os
 import numpy as np
 import pandas as pd
 
-computer = 'optimus'
+computer = 'desktop'
 
 
 # init
@@ -56,17 +56,17 @@ directories['data_path'] = os.path.join(
 # network cofiguration:
 # number denotes number of output channels of 3x3 conv layer
 # 'M' denotes max-pooling layer (2x2), stride=2
-# note: first number of top should be 2* lasy conv layer of branch 
+# note: first number of top should be 2* or 3* las4 conv layer of branch 
 cfg = {
-       'branch': np.array([64,'M',128,'M'], dtype='object'), 
-       'top': np.array([192], dtype='object')}
+       'branch': np.array([32,32,'M',64,64,'M',128,128,'M'], dtype='object'), 
+       'top': np.array([384], dtype='object')}
 
 
 network_settings = {
     'network': 'triplet',
     'cfg': cfg,
     'optimizer': 'adam',
-    'lr': 0.001,
+    'lr':1e-6,
     'weight_decay':0,
     'loss': 'bce_sigmoid',
     'n_classes': 2,
@@ -75,16 +75,16 @@ network_settings = {
 
 train_settings = {
     'start_epoch': 0,
-    'num_epoch': 10,
-    'batch_size': 10,
-    'disp_iter': 2,
-    'gpu': 0}
+    'num_epoch': 20,
+    'batch_size': 50,
+    'disp_iter': 5,
+    'gpu': None}
 
 dataset_settings = {
     'dataset_type' : 'triplet',
     'perc_train': 0.8,
     'channels': np.arange(13),
-    'min_overlap': 0.7, 
+    'min_overlap': 0.9, 
     'max_overlap':  1}
 
 #%% 
@@ -94,18 +94,20 @@ from train import train
 dataset = pd.read_csv(os.path.join(directories['results_dir_training'],directories['csv_file_S21C']))
 dataset = dataset.loc[dataset['pair_idx'] == 'a']
 np.random.seed(234)
-dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)[:100]
+dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
 
+#dataset = np.random.choice(dataset['im_idx'], 1, replace=False)
 # =============================================================================
-# dataset = np.random.choice(dataset['im_idx'], 1, replace=False)
-# dataset_settings['indices_train'] = np.repeat(dataset, 80)
-# dataset_settings['indices_val'] = np.repeat(dataset, 20)
+# dataset_settings['indices_train'] = np.repeat(dataset[0], 1000)
+# dataset_settings['indices_val'] = np.repeat(dataset[0], 25)
+# dataset_settings['indices_test'] = np.repeat(dataset[2], 25)
 # =============================================================================
 #dataset = np.random.choice(dataset['im_idx'], 1000, replace=False)
 #dataset = dataset['im_idx'].values
+
 dataset_settings['indices_train'] = dataset[:int(dataset_settings['perc_train']*len(dataset))]
-dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):-10]
-dataset_settings['indices_test'] = dataset[-10:]
+dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):-100]
+dataset_settings['indices_test'] = dataset[-100:]
 
 # train
 train(directories, dataset_settings, network_settings, train_settings)

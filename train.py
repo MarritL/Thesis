@@ -8,7 +8,7 @@ Created on Tue Feb  4 16:21:16 2020
 
 from tensorboardX import SummaryWriter
 from models.netbuilder import NetBuilder, create_loss_function, create_optimizer
-from data_generator import PairDataset, TripletDataset
+from data_generator import PairDataset, TripletDataset,TripletDatasetPreSaved
 from utils import AverageMeter
 import torch
 from torch.utils.data import DataLoader
@@ -80,8 +80,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
         dataset_val = PairDataset(
             data_dir=directories['data_path'], 
             indices=dataset_settings['indices_val'], 
-            channels=dataset_settings['channels'],
-            )       
+            channels=dataset_settings['channels'])       
     elif dataset_settings['dataset_type'] == 'triplet':
         dataset_train = TripletDataset(
             data_dir=directories['data_path'], 
@@ -97,6 +96,20 @@ def train(directories, dataset_settings, network_settings, train_settings):
             one_hot=one_hot,
             min_overlap = dataset_settings['min_overlap'],
             max_overlap = dataset_settings['max_overlap'])  
+    elif dataset_settings['dataset_type'] == 'triplet_saved':
+        dataset_train = TripletDatasetPreSaved(
+            data_dir=directories['data_path'], 
+            indices=dataset_settings['indices_train'], 
+            channels=dataset_settings['channels'], 
+            one_hot=one_hot)           
+        dataset_val = TripletDatasetPreSaved(
+            data_dir=directories['data_path'], 
+            indices=dataset_settings['indices_val'], 
+            channels=dataset_settings['channels'], 
+            one_hot=one_hot)  
+    else:
+        raise Exception('dataset_type undefined! \n \
+                        Choose one of: "pair", "triplet", "triplet_saved"')
     
     # Data loaders
     dataloader_train = DataLoader(
@@ -110,9 +123,11 @@ def train(directories, dataset_settings, network_settings, train_settings):
         shuffle=False,
         num_workers = 1)
          
-    # save history?
-    history = {'train': {'epoch': [], 'loss': [], 'acc': []}, 
-               'val':{'epoch': [], 'loss': [], 'acc': []}}
+# =============================================================================
+#     # save history?
+#     history = {'train': {'epoch': [], 'loss': [], 'acc': []}, 
+#                'val':{'epoch': [], 'loss': [], 'acc': []}}
+# =============================================================================
     
     epoch_iters =  max(len(dataset_train) // train_settings['batch_size'],1)
     val_epoch_iters = max(len(dataset_val) // train_settings['batch_size'],1)
@@ -121,42 +136,45 @@ def train(directories, dataset_settings, network_settings, train_settings):
     best_acc = 0.0
     best_epoch = 0
     
-    for epoch in range(train_settings['start_epoch'], 
-                       train_settings['start_epoch']+train_settings['num_epoch']):
+    try:
+        for epoch in range(train_settings['start_epoch'], 
+                           train_settings['start_epoch']+train_settings['num_epoch']):
+            
+            #training epoch
+            train_epoch(
+                network=net, 
+                n_branches=n_branches,
+                dataloader=dataloader_train, 
+                optimizer=optim, 
+                loss_func=loss_func,
+                acc_func=acc_func,
+                history=None, 
+                epoch=epoch, 
+                writer=writer,
+                epoch_iters=epoch_iters, 
+                disp_iter=train_settings['disp_iter'],
+                gpu = train_settings['gpu'])
+            
+            # validation epoch
+            best_net_wts, best_acc, best_epoch = validate(
+                network=net, 
+                n_branches=n_branches,
+                dataloader=dataloader_val, 
+                loss_func=loss_func,
+                acc_func=acc_func,
+                history=None, 
+                epoch=epoch, 
+                writer=writer,
+                val_epoch_iters=val_epoch_iters,
+                best_net_wts=best_net_wts,
+                best_acc=best_acc,
+                best_epoch=best_epoch,
+                gpu = train_settings['gpu']) 
+    
+    # on keyboard interupt continue the script: saves the best model until interrupt
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt. Saving progress...")
         
-        #training epoch
-        train_epoch(
-            network=net, 
-            n_branches=n_branches,
-            dataloader=dataloader_train, 
-            optimizer=optim, 
-            loss_func=loss_func,
-            acc_func=acc_func,
-            history=history, 
-            epoch=epoch, 
-            writer=writer,
-            epoch_iters=epoch_iters, 
-            disp_iter=train_settings['disp_iter'],
-            gpu = train_settings['gpu'])
-        
-        # validation epoch
-        best_net_wts, best_acc, best_epoch = validate(
-            network=net, 
-            n_branches=n_branches,
-            dataloader=dataloader_val, 
-            loss_func=loss_func,
-            acc_func=acc_func,
-            history=history, 
-            epoch=epoch, 
-            writer=writer,
-            val_epoch_iters=val_epoch_iters,
-            best_net_wts=best_net_wts,
-            best_acc=best_acc,
-            best_epoch=best_epoch,
-            gpu = train_settings['gpu']) 
-
-        # save progress
-        #checkpoint(nets, history, cfg, epoch+1, DIR) 
     
     # TODO: write info to csv-file
     savedata = {'filename':os.path.join(directories['model_dir'],
@@ -180,7 +198,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
             filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
             filewriter.writerow(savedata)  
     
-    # TODO: save model (make better, best model etc.)
+    # save best model's weights
     torch.save(best_net_wts, savedata['filename'])
         
     print('Training Done!')
@@ -263,10 +281,12 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
                           batch_time.average(), data_time.average(),
                           ave_loss.average(), ave_acc.average()))
 
-        fractional_epoch = epoch + 1. * i / epoch_iters
-        history['train']['epoch'].append(fractional_epoch)
-        history['train']['loss'].append(loss.data.item())
-        history['train']['acc'].append(acc.item())
+# =============================================================================
+#         fractional_epoch = epoch + 1. * i / epoch_iters
+#         history['train']['epoch'].append(fractional_epoch)
+#         history['train']['loss'].append(loss.data.item())
+#         history['train']['acc'].append(acc.item())
+# =============================================================================
 
     print('Train epoch: [{}], Time: {:.2f}' 
           .format(epoch, (time.time()-epoch_start)))
@@ -338,11 +358,13 @@ def validate(network, n_branches, dataloader, loss_func, acc_func, history,
         time_meter.update(time.time() - tic)
         tic = time.time()
 
-        # calculate accuracy, and display
-        fractional_epoch = epoch + 1. * i / val_epoch_iters
-        history['val']['epoch'].append(fractional_epoch)
-        history['val']['loss'].append(loss.data.item())
-        history['val']['acc'].append(acc.item())
+# =============================================================================
+#         # calculate accuracy, and display
+#         fractional_epoch = epoch + 1. * i / val_epoch_iters
+#         history['val']['epoch'].append(fractional_epoch)
+#         history['val']['loss'].append(loss.data.item())
+#         history['val']['acc'].append(acc.item())
+# =============================================================================
 
     print('Val epoch: [{}], Time: {:.2f}, ' 
           'Val_Loss: {:.4f}, Val_Accuracy: {:0.4f}'
