@@ -81,9 +81,13 @@ def create_optimizer(optimizer_string, params, lr, weight_decay=0):
        
     if optimizer_string == 'adam':
         optimizer = optim.Adam(params, lr=lr, weight_decay=weight_decay)
+    elif optimizer_string == 'rmsprop':
+        optimizer = optim.RMSprop(params, lr=lr, alpha=0.99, eps=1e-08, 
+                                  weight_decay=weight_decay, momentum=0, 
+                                  centered=False)
     else:
         raise Exception('optimizer not implemented! \n \
-                        Choose one of: "adam"')
+                        Choose one of: "adam", "rmsprop"')
         
     return optimizer
 

@@ -30,7 +30,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
     # init save-file
     fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', \
                   'optimizer', 'lr', 'weight_decay', 'loss', 'n_classes', \
-                  'n_channels','patch_size','batch_norm','dataset', 'best_acc','best_epoch']
+                  'n_channels','patch_size','batch_norm','dataset', 'best_acc',\
+                  'best_epoch', 'best_loss']
 # =============================================================================
 #     with open(os.path.join(directories['intermediate_dir'],directories['csv_models']), 'a') as file:
 #         filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
@@ -97,14 +98,17 @@ def train(directories, dataset_settings, network_settings, train_settings):
             min_overlap = dataset_settings['min_overlap'],
             max_overlap = dataset_settings['max_overlap'])  
     elif dataset_settings['dataset_type'] == 'triplet_saved':
+        print("construct from presaved dataset")
         dataset_train = TripletDatasetPreSaved(
             data_dir=directories['data_path'], 
             indices=dataset_settings['indices_train'], 
+            indices_patch2 = dataset_settings['indices_patch2'],
             channels=dataset_settings['channels'], 
             one_hot=one_hot)           
         dataset_val = TripletDatasetPreSaved(
             data_dir=directories['data_path'], 
             indices=dataset_settings['indices_val'], 
+            indices_patch2 = dataset_settings['indices_patch2'],
             channels=dataset_settings['channels'], 
             one_hot=one_hot)  
     else:
@@ -135,6 +139,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
     best_net_wts = copy.deepcopy(net.state_dict())
     best_acc = 0.0
     best_epoch = 0
+    best_loss = 99999
     
     try:
         for epoch in range(train_settings['start_epoch'], 
@@ -156,7 +161,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 gpu = train_settings['gpu'])
             
             # validation epoch
-            best_net_wts, best_acc, best_epoch = validate(
+            best_net_wts, best_acc, best_epoch, best_loss = validate(
                 network=net, 
                 n_branches=n_branches,
                 dataloader=dataloader_val, 
@@ -169,6 +174,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 best_net_wts=best_net_wts,
                 best_acc=best_acc,
                 best_epoch=best_epoch,
+                best_loss=best_loss,
                 gpu = train_settings['gpu']) 
     
     # on keyboard interupt continue the script: saves the best model until interrupt
@@ -192,7 +198,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
                'batch_norm': network_settings['batch_norm'],
                'dataset': dataset_settings['dataset_type'], 
                'best_acc': best_acc,
-               'best_epoch': best_epoch}
+               'best_epoch': best_epoch, 
+               'best_loss': best_loss}
     with open(os.path.join(directories['intermediate_dir'], 
                            directories['csv_models']), 'a') as file:
             filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
@@ -277,7 +284,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
         if (i+1) % disp_iter == 0:
             print('Epoch: [{}][{}/{}], Batch-time: {:.2f}, Data-time: {:.2f}, '
                   'Loss: {:.4f}, Acc: {:.4f}'
-                  .format(epoch, i, epoch_iters,
+                  .format(epoch, i+1, epoch_iters,
                           batch_time.average(), data_time.average(),
                           ave_loss.average(), ave_acc.average()))
 
@@ -300,7 +307,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
     
 def validate(network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
-             gpu):    
+             best_loss, gpu):    
 
     ave_loss = AverageMeter()
     ave_acc = AverageMeter()
@@ -374,9 +381,10 @@ def validate(network, n_branches, dataloader, loss_func, acc_func, history,
     writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
     writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
     
-    if ave_acc.average() > best_acc:
+    if ave_loss.average() < best_loss:
         best_acc = ave_acc.average()
         best_net_wts = copy.deepcopy(network.state_dict())
         best_epoch = epoch
+        best_loss = ave_loss.average()
     
-    return(best_net_wts, best_acc, best_epoch)
+    return(best_net_wts, best_acc, best_epoch, best_loss)
