@@ -152,7 +152,7 @@ def plot_detectedlines(image, h, theta, d):
     
     return fig, ax
 
-def normalize2plot(image, percentile = 98):
+def normalize2plot(image, percentile = 99):
     """
     normalizes images for plotting purpose
 
@@ -178,7 +178,10 @@ def normalize2plot(image, percentile = 98):
                 np.percentile(image[:,:,i],percentile)-image[:,:,i].min()+1E-8)
     else:
         image = np.divide(image-image.min(),
-                          np.percentile(image,percentile)-image.min())
+                          np.percentile(image,percentile)-image.min()+1E-8)
+    
+    image[image>1]=1
+    image[image<0]=0
         
     return image
 
