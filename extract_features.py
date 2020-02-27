@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 from skimage.filters import threshold_otsu
 
 
+
+
 def extract_features(directories, imagelist, model_settings, layers):
     """
     extract features from specified layers (in branch) using trained model 
@@ -165,6 +167,7 @@ def calculate_changemap(distmap, plot=False):
         
         ax[1].hist(distmap.ravel(), bins=256)
         ax[1].set_title('Histogram')
+        ax[1].axvline(thresh, color='r')
         
         ax[2].imshow(binary, cmap=plt.cm.gray)
         ax[2].set_title('Change map')
