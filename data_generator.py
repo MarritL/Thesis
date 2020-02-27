@@ -10,7 +10,6 @@ import torch
 from torch.utils.data import Dataset
 import os
 import numpy as np
-import warnings
 
 class BaseDataset(Dataset):
 
@@ -117,6 +116,9 @@ class BaseDataset(Dataset):
         else:
             image = np.divide(image-image.min(),
                               np.percentile(image,percentile)-image.min()+1E-8)
+            
+        image[image>1]=1
+        image[image<0]=0
             
         return image
     
@@ -356,11 +358,12 @@ class TripletDataset(BaseDataset):
     
 class TripletDatasetPreSaved(BaseDataset):
     
-    def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
-                 percentile=99, one_hot = True):
+    def __init__(self, data_dir, indices, indices_patch2, channels=np.arange(14), 
+                 patch_size=96, percentile=99, one_hot = True):
         super(TripletDatasetPreSaved, self).__init__(data_dir, indices, channels, 
                                              patch_size, percentile)
         
+        self.indices_patch2 =  indices_patch2
         self.one_hot = one_hot
     
     def __getitem__(self, index):
@@ -383,7 +386,7 @@ class TripletDatasetPreSaved(BaseDataset):
 
         # sample third patch
         options_for2 = list()
-        for index in self.indices:
+        for index in self.indices_patch2:
             if index.split('_')[0] == im_patch_idx.split('_')[0] \
                 and index.split('_')[1] != im_patch_idx.split('_')[1]:
                 options_for2.append(index)
