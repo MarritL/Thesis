@@ -18,7 +18,7 @@ import csv
 import copy
 
 def train(directories, dataset_settings, network_settings, train_settings):
-    
+
     # init tensorboard
     network_name = network_settings['network']
     outputtime = '{}'.format(time.strftime("%d%m%Y_%H%M%S", time.localtime()))
@@ -58,7 +58,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
         n_classes=network_settings['n_classes'],
         patch_size=network_settings['patch_size'],
         batch_norm=network_settings['batch_norm'],
-        n_branches=n_branches)  
+        n_branches=n_branches,
+        weights=network_settings['weights_file'])  
        
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'])
     
@@ -102,13 +103,11 @@ def train(directories, dataset_settings, network_settings, train_settings):
         dataset_train = TripletDatasetPreSaved(
             data_dir=directories['data_path'], 
             indices=dataset_settings['indices_train'], 
-            indices_patch2 = dataset_settings['indices_patch2'],
             channels=dataset_settings['channels'], 
             one_hot=one_hot)           
         dataset_val = TripletDatasetPreSaved(
             data_dir=directories['data_path'], 
             indices=dataset_settings['indices_val'], 
-            indices_patch2 = dataset_settings['indices_patch2'],
             channels=dataset_settings['channels'], 
             one_hot=one_hot)  
     else:
