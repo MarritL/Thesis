@@ -50,9 +50,9 @@ class NetBuilder:
 
         # initiate weighs 
         if len(weights) > 0:
-            print('Loading weights for network')
+            print('Loading weights for network...')
             net.load_state_dict(
-                torch.load(weights, map_location=lambda storage, loc: storage), strict=False)
+                torch.load(weights), strict=False)
         else:
             net.apply(NetBuilder.init_weight)
         
