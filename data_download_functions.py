@@ -700,7 +700,7 @@ def save_patches(patches_df, images_dir, patches_dir, patch_size = 96):
         
             r = df_row.row
             c = df_row.col
-            file = df_row.filename
+            file = df_row.filename_alt
             np_patch = im[r:r+patch_size, c:c+patch_size]
             # save
             np.save(os.path.join(patches_dir, file), np_patch)
