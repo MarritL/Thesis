@@ -484,8 +484,93 @@ def plot_sampled_triplets(image_folder, image_list, patch1_start, patch2_start, 
         assert len(titles) == len(ax), "Provide a title for each subplot"
         for i in range(len(ax)):
             ax[i].set_title(titles[i])
-                   
+ 
+def plot_imagepair_plus_gt(image1, image2, gt, bands = [3,2,1], axis=False):
+    """
+    plot two images plus the ground truth
+
+    Parameters
+    ----------
+    image1 : np.ndarray of shape N,M,D
+        unnormalized numpy array of image1, D must be >= 3
+    image2 : np.nadarray of shape N,M,D
+        unnormalzied numpy array of iamge2, D must be >= 3
+    gt : np.ndarray of shape N,M
+        ground truth of the image pair
+    bands : lsit, optional
+        which bands should be plotted. The default is [3,2,1].
+    axis : boolean, optional
+        whether or not to plot the axis. The default is False.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        figure
+    axes : list
+        list of axes in the figure
+
+    """
+    
+    fig, axes = plt.subplots(ncols=3, figsize=(10, 5))
+    ax = axes.ravel()
+    ax[0] = plt.subplot(1, 3, 1)
+    ax[1] = plt.subplot(1, 3, 2)
+    ax[2] = plt.subplot(1, 3, 3)
+    
+    ax[0].imshow(normalize2plot(image1[:,:,bands]))
+    ax[0].set_title('Image T1')
+    if not axis:
+        ax[0].axis('off')
+    
+    ax[1].imshow(normalize2plot(image2[:,:,bands]))
+    ax[1].set_title('Image T2')
+    if not axis:
+        ax[1].axis('off')
+    
+    ax[2].imshow(gt, cmap=plt.cm.gray)
+    ax[2].set_title('Ground truth')
+    if not axis:
+        ax[2].axis('off')
+    
+    return fig, axes
+    
+def plot_changemap_plus_gt(changemap, gt, axis=True):
+    """
+    plot the calculated change map with the gt
+
+    Parameters
+    ----------
+    changemap : numpy ndarray of shape (N,M)
+        binary change map.
+    gt : numpy ndarray of shape (N,M)
+        ground truth
+    axis : boolean, optional
+        whether or not to plot the axis. The default is True.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        figure
+    axes : list
+        list of axes in the figure
+
+    """
+    fig, axes = plt.subplots(ncols=2, figsize=(10, 5))
+    ax = axes.ravel()
+    ax[0] = plt.subplot(1, 2, 1)
+    ax[1] = plt.subplot(1, 2, 2)
+    
+    ax[0].imshow(changemap, cmap=plt.cm.gray)
+    ax[0].set_title('Change map')
+    if not axis:
+        ax[0].axis('off')
+    
+    ax[1].imshow(gt, cmap=plt.cm.gray)
+    ax[1].set_title('Ground truth')
+    if not axis:
+        ax[1].axis('off')
         
+    return fig, axes 
 
 def plot_image_old(image_folder, image_list, bands, axis = False, normalize=True, titles = None):
     """ 
