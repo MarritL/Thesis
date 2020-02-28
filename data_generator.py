@@ -22,8 +22,8 @@ class BaseDataset(Dataset):
         self.patch_size = patch_size
         self.percentile = percentile
         # TODO: put back to ['a', 'b']
-        #self.pair_indices = ['a','b']
-        self.pair_indices = ['a','a']
+        self.pair_indices = ['a','b']
+        #self.pair_indices = ['a','a']
 
         assert len(self.indices) > 0
         print('# images: {}'.format(len(self.indices)))
@@ -358,12 +358,11 @@ class TripletDataset(BaseDataset):
     
 class TripletDatasetPreSaved(BaseDataset):
     
-    def __init__(self, data_dir, indices, indices_patch2, channels=np.arange(14), 
+    def __init__(self, data_dir, indices, channels=np.arange(14), 
                  patch_size=96, percentile=99, one_hot = True):
         super(TripletDatasetPreSaved, self).__init__(data_dir, indices, channels, 
                                              patch_size, percentile)
         
-        self.indices_patch2 =  indices_patch2
         self.one_hot = one_hot
     
     def __getitem__(self, index):
@@ -386,7 +385,7 @@ class TripletDatasetPreSaved(BaseDataset):
 
         # sample third patch
         options_for2 = list()
-        for index in self.indices_patch2:
+        for index in self.indices:
             if index.split('_')[0] == im_patch_idx.split('_')[0] \
                 and index.split('_')[1] != im_patch_idx.split('_')[1]:
                 options_for2.append(index)

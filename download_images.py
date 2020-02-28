@@ -833,8 +833,8 @@ for im in dataset2['filename']:
 from data_download_functions import sample_patches_from_image,save_patches
 
 # dirs
-intermediate_dir_training= '/media/cordolo/elements/Intermediate/training_S2'
-results_dir_training = '/media/cordolo/elements/results/training_S2'
+intermediate_dir_training= '/media/marrit/Intermediate/training_S2'
+results_dir_training = '/media/marrit/results/training_S2'
 csv_file_S21C = 'S21C_dataset.csv'
 csv_file_patches = 'S21C_patches_overlap90-100.csv'
 data_dir_S21C = 'data_S21C'
@@ -854,7 +854,7 @@ if not os.path.isdir(os.path.join(intermediate_dir_training, patches_dir_S21C)):
 
 
 patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
-read_patches = patches_df[patches_df['impair_idx'] == 'a']
+read_patches = patches_df[patches_df['impair_idx'] == 'b']
 patch_size = 96
 
 # save patches from the 'a' images
