@@ -65,22 +65,23 @@ network_settings = {
     'cfg': cfg,
     'optimizer': 'adam',
     'lr':1e-3,
-    'weight_decay':1e-4,
+    'weight_decay':0,
     'loss': 'bce_sigmoid',
     'n_classes': 2,
     'patch_size': 96,
-    'batch_norm': False}
+    'batch_norm': True,
+    'weights_file': '' }
 
 train_settings = {
     'start_epoch': 0,
     'num_epoch': 20,
-    'batch_size': 50,
-    'disp_iter': 5,
+    'batch_size': 25,
+    'disp_iter': 10,
     'gpu': None}
 
 dataset_settings = {
-    'dataset_type' : 'triplet',
-    'perc_train': 0.8,
+    'dataset_type' : 'triplet_saved',
+    'perc_train': 0.7,
     'channels': np.arange(13),
     'min_overlap': 0.9, 
     'max_overlap':  1}
@@ -97,32 +98,47 @@ directories['data_path'] = os.path.join(
 dataset = pd.read_csv(os.path.join(directories['intermediate_dir'], 'training_S2',directories['csv_file_patches90-100']))
 dataset = dataset.loc[dataset['impair_idx'] == 'a']
 dataset = dataset[dataset.duplicated(['im_patch_idx'], keep=False)]
-dataset = dataset.loc[dataset['patchpair_idx'] == 0]
-# ====================================================================
+#dataset = dataset.loc[dataset['patchpair_idx'] == 0]
 
+# train on the complete dataset
+# =============================================================================
 # np.random.seed(234)
 # dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
 # =============================================================================
 
-np.random.seed(234)
-random_image = np.random.choice(dataset['im_idx'], 1, replace=False)
-dataset = dataset[dataset['im_idx'] == random_image[0]]['im_patch_idx'].values
+# train on only 1 image
+# =============================================================================
+# np.random.seed(234)
+# random_image = np.random.choice(dataset['im_idx'], 1, replace=False)
+# dataset = dataset[dataset['im_idx'] == random_image[0]]['im_patch_idx'].values
+# 
+# =============================================================================
 
+# train on image 0 only
 #random_pair = [0]
 
-
-
-
+# for 1 image only
 # =============================================================================
-# np.random.seed(234)
-# dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
+# dataset_settings['indices_train'] = np.repeat(dataset, 25)
+# dataset_settings['indices_val'] = dataset
+# dataset_settings['indices_test'] = dataset
+# dataset_settings['indices_patch2'] = dataset
 # =============================================================================
 
-dataset_settings['indices_train'] = np.repeat(dataset, 25)
-dataset_settings['indices_val'] = dataset
-dataset_settings['indices_test'] = dataset
-dataset_settings['indices_patch2'] = dataset
-#dataset = np.random.choice(dataset['im_idx'], 1000, replace=False)
+# train on n images (part kept apart for val and test)
+n = 25
+n_test = 4
+np.random.seed(234)
+random_im_idx = np.random.choice(dataset['im_idx'], n, replace=False)
+# defide over train val and test
+train_im_idx = random_im_idx[:int(dataset_settings['perc_train']*len(random_im_idx))]
+val_im_idx = random_im_idx[int(dataset_settings['perc_train']*len(random_im_idx)):-n_test]
+test_im_idx = random_im_idx[-n_test:]
+# get the patch_indices
+dataset_settings['indices_train'] = dataset[dataset['im_idx'].isin(train_im_idx)]['im_patch_idx'].values
+dataset_settings['indices_val'] = dataset[dataset['im_idx'].isin(val_im_idx)]['im_patch_idx'].values
+dataset_settings['indices_test'] = dataset[dataset['im_idx'].isin(test_im_idx)]['im_patch_idx'].values
+
 #dataset = dataset['im_idx'].values
 
 # =============================================================================
@@ -185,6 +201,11 @@ dataset_settings['indices_train'] = np.repeat(dataset[0], 1000)
 dataset_settings['indices_val'] = np.repeat(dataset[0], 25)
 dataset_settings['indices_test'] = np.repeat(dataset[0], 25)
 
+# continue training
+trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], directories['csv_models']))
+model_settings = trained_models.iloc[24]
+network_settings['weights_file'] = model_settings['filename']
+
 # train
 train(directories, dataset_settings, network_settings, train_settings)
 
@@ -194,8 +215,7 @@ train(directories, dataset_settings, network_settings, train_settings)
 
 from extract_features import extract_features, calculate_distancemap, calculate_changemap
 from metrics import compute_confusion_matrix, compute_matthews_corrcoef
-import matplotlib.pyplot as plt
-from plots import normalize2plot
+from plots import plot_imagepair_plus_gt, plot_changemap_plus_gt
 
 # get csv files
 oscd_train = pd.read_csv(os.path.join(directories['intermediate_dir_cd'], directories['csv_file_train_oscd']))
@@ -203,21 +223,55 @@ oscd_test = pd.read_csv(os.path.join(directories['intermediate_dir_cd'], directo
 trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], directories['csv_models']))
 
 #model_settings = trained_models.sort_values('best_acc',ascending=False).iloc[0]
-model_settings = trained_models.iloc[-1]
-extract_layers = [1,4,7]
+model_settings = trained_models.iloc[24]
+print("MODEL SETTINGS: \n", model_settings)
+extract_layers = None # for manual setting which layers to use
+
+if extract_layers == None:
+    # cfgs are saved as strings, cast back to list
+    branch = model_settings['cfg_branch'].split("[" )[1]
+    branch = branch.split("]" )[0]
+    branch = branch.replace("'", "")
+    branch = branch.replace(" ", "")
+    branch = branch.split(",")
+    
+    # extract the features from all activation layers
+    extract_layers = list()
+    layer_i = -1
+    if model_settings['batch_norm']:
+        for layer in branch:
+            if layer == 'M':
+                layer_i += 1
+            else:
+                layer_i += 3
+                extract_layers.append(layer_i)
+    else:
+        for layer in branch:
+            if layer == 'M':
+                layer_i += 1
+            else:
+                layer_i += 2
+                extract_layers.append(layer_i)
+                   
 
 # get image
 np.random.seed(789)
 randim = np.random.choice(oscd_train.im_idx.values)
-#randim = dataset[0]
+randim = 0
 randim_a = str(randim)+'_a.npy'
 randim_b = str(randim)+'_b.npy'
 im_a = np.load(os.path.join(directories['intermediate_dir_cd'], directories['data_dir_oscd'],randim_a))
 im_b = np.load(os.path.join(directories['intermediate_dir_cd'], directories['data_dir_oscd'],randim_b))
 
 # extract features
-features = extract_features(directories=directories, imagelist=[im_a, im_b], model_settings=model_settings,  layers=extract_layers)
+features = extract_features(
+    directories=directories, 
+    imagelist=[im_a, im_b], 
+    model_settings=model_settings,  
+    layers=extract_layers)
+
 assert(features[0].shape == features[1].shape)
+#plt.imshow(features[0][:,:,40], cmap=plt.cm.gray)
 
 # calculate change map
 distmap = calculate_distancemap(features[0], features[1])
@@ -227,52 +281,25 @@ changemap = calculate_changemap(distmap, plot=True)
 label = str(randim)+'.npy'
 gt = np.load(os.path.join(directories['intermediate_dir_cd'], directories['labels_dir_oscd'],label))
 
-fig1, axes1 = plt.subplots(ncols=3, figsize=(10, 5))
-ax = axes1.ravel()
-ax[0] = plt.subplot(1, 3, 1)
-ax[1] = plt.subplot(1, 3, 2)
-ax[2] = plt.subplot(1, 3, 3)
+#plots
+fig1, ax1 = plot_imagepair_plus_gt(im_a, im_b, gt)  
+fig2, ax2 = plot_changemap_plus_gt(changemap, gt, axis=True)
 
-ax[0].imshow(normalize2plot(im_a[:,:,[3,2,1]]))
-ax[0].set_title('Image a')
-ax[0].axis('off')
-
-ax[1].imshow(normalize2plot(im_b[:,:,[3,2,1]]))
-ax[1].set_title('Image b')
-ax[1].axis('off')
-
-ax[2].imshow(gt, cmap=plt.cm.gray)
-ax[2].set_title('Ground truth')
-ax[2].axis('off')
-plt.show() 
-
-fig2, axes2 = plt.subplots(ncols=2, figsize=(10, 5))
-ax = axes2.ravel()
-ax[0] = plt.subplot(1, 2, 1)
-ax[1] = plt.subplot(1, 2, 2)
-
-ax[0].imshow(changemap, cmap=plt.cm.gray)
-ax[0].set_title('Change map')
-#ax[0].axis('off')
-
-ax[1].imshow(gt, cmap=plt.cm.gray)
-ax[1].set_title('Ground truth')
-#ax[1].axis('off')
-plt.show() 
-
+# confusion matrix
 cm, fig3, axes3 = compute_confusion_matrix(gt, changemap, normalize=False)
-mcc = compute_matthews_corrcoef(gt, changemap)
-print("mcc: ", mcc)
 
+# compute metrics
+mcc = compute_matthews_corrcoef(gt, changemap)
 tp = cm[1,1]
 tn = cm[0,0]
 fp = cm[0,1]
 fn = cm[1,0]
-
 sensitivity = tp/(tp+fn) # prop of correctly identified changed pixels = recall
 specificity = tn/(tn+fp) # prop of correctly identified unchanged pixels
 precision = tp/(tp+fp) # prop of changed pixels that are truly changed
 
+# print metrics
+print("mcc: ", mcc)
 print("sensitivity: ", sensitivity)
 print("specificity: ", specificity)
 print("recall: ", sensitivity)
