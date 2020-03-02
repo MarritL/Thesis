@@ -541,14 +541,14 @@ def sample_patches_from_image(images_csv, images_dir, patches_csv, patch_size=96
     # prepare csv file
     fieldnames = ['row','col','im_idx', 'impair_idx','patchpair_idx', 'patch_idx',\
                   'patch_id','filename','overlap_0','city_ascii', 'country', \
-                  'geonameid', 'lng', 'lat', 'date']
+                  'geonameid', 'lng', 'lat', 'date','im_patch_idx', 'filename_alt']
     with open(patches_csv, 'a') as file:
         writer = csv.DictWriter(file, fieldnames, delimiter = ",")
         writer.writeheader()
     
     # loop over each imagepair in dataset
     for i in range(len(unique_im_idx)):
-        #i = 0
+    
         dataset[dataset['im_idx'] == unique_im_idx[i]]
        
         # get a random order of iamge 1 and 2
@@ -582,6 +582,9 @@ def sample_patches_from_image(images_csv, images_dir, patches_csv, patch_size=96
         df_starts_patch0['lng'] = dataset['lng'][i]
         df_starts_patch0['lat'] = dataset['lat'][i]
         df_starts_patch0['date'] = dataset['date'][i]
+        df_starts_patch0['im_patch_idx']  = 'NA'
+        df_starts_patch0['filename_alt'] = 'NA'
+
         # n_patches = len(df_starts_patch0)
         for idx, row in df_starts_patch0.iterrows():
             df_starts_patch0.loc[idx,'patch_id'] = str(row.im_idx) + '_' + \
@@ -590,6 +593,8 @@ def sample_patches_from_image(images_csv, images_dir, patches_csv, patch_size=96
             df_starts_patch0.loc[idx,'filename'] = str(row.im_idx) + '_' + \
                 str(row.impair_idx) + '_' + str(row.patch_idx) + '_' + \
                 str(row.patchpair_idx) + '.npy'
+            df_starts_patch0.loc[idx,'im_patch_idx'] = str(row.im_idx) + '_' + str(row.patch_idx) 
+            df_starts_patch0.loc[idx,'filename_alt'] = str(row.im_idx) + '_' + str(row.patch_idx) + '_' + str(row.patchpair_idx) + '.npy' 
          
         # write to csv
         df_starts_patch0.to_csv(patches_csv, mode='a', header=False, index=False)
@@ -654,7 +659,12 @@ def sample_patches_from_image(images_csv, images_dir, patches_csv, patch_size=96
                       'geonameid':df_starts_patch0.loc[j,'geonameid'], 
                       'lng':df_starts_patch0.loc[j,'lng'], 
                       'lat':df_starts_patch0.loc[j,'lat'], 
-                      'date':df_starts_patch0.loc[j,'date']
+                      'date':df_starts_patch0.loc[j,'date'],
+                      'im_patch_idx': str(df_starts_patch0.loc[j,'im_idx'])+'_'+\
+                          str(df_starts_patch0.loc[j,'patch_idx']),
+                      'filename_alt': str(df_starts_patch0.loc[j,'im_idx'])+ \
+                          '_' + str(df_starts_patch0.loc[j,'patch_idx'])+'_'+\
+                          str(1) + '.npy'         
                       }
             
             
@@ -691,19 +701,35 @@ def save_patches(patches_df, images_dir, patches_dir, patch_size = 96):
 
     for i, unique_im in enumerate(unique_im_idx): 
 
-        im = np.load(os.path.join(images_dir, str(unique_im) + '_a.npy'))
-        
         # find all patches from an image
         im_group =patches_df[patches_df['im_idx'] == unique_im]  
         
-        for j, df_row in im_group.iterrows():
+        # find all patches from image 'a'
+        patches_a = im_group[im_group['impair_idx'] == 'a']
+        if len(patches_a) > 0: 
+            im_a = np.load(os.path.join(images_dir, str(unique_im) + '_a.npy'))
         
-            r = df_row.row
-            c = df_row.col
-            file = df_row.filename_alt
-            np_patch = im[r:r+patch_size, c:c+patch_size]
-            # save
-            np.save(os.path.join(patches_dir, file), np_patch)
+            for j, df_row in patches_a.iterrows():        
+                r = df_row.row
+                c = df_row.col
+                file = df_row.filename_alt
+                np_patch = im_a[r:r+patch_size, c:c+patch_size]
+                # save
+                np.save(os.path.join(patches_dir, file), np_patch)
+        
+        # find all patches from image 'b'
+        patches_b = im_group[im_group['impair_idx'] == 'b']
+        if len(patches_b) > 0: 
+            im_b = np.load(os.path.join(images_dir, str(unique_im) + '_b.npy'))
+        
+            for j, df_row in patches_b.iterrows():        
+                r = df_row.row
+                c = df_row.col
+                file = df_row.filename_alt
+                np_patch = im_b[r:r+patch_size, c:c+patch_size]
+                # save
+                np.save(os.path.join(patches_dir, file), np_patch)
+            
         
         if (i+1) % 1 == 0:
             print("\r imagepair {}/{}".format(i+1,len(unique_im_idx)), end='')

@@ -832,9 +832,50 @@ for im in dataset2['filename']:
 
 from data_download_functions import sample_patches_from_image,save_patches
 
+computer = 'desktop'
+# init
+if computer == 'desktop':
+    directories = {
+        'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
+        'results_dir_training': '/media/cordolo/elements/results/training_S2',
+        'intermediate_dir_cd': '/media/cordolo/elements/Intermediate/CD_OSCD',
+        'intermediate_dir': '/media/cordolo/elements/Intermediate',
+        'csv_file_S21C': 'S21C_dataset.csv',
+        'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
+        'csv_file_oscd': 'OSCD_dataset.csv',
+        'csv_file_train_oscd' : 'OSCD_train.csv',
+        'csv_file_test_oscd': 'OSCD_test.csv',
+        'csv_file_patches90-100': 'S21C_patches_overlap90-100.csv',
+        'csv_models': 'trained_models.csv',
+        'data_dir_S21C': 'data_S21C',
+        'data_dir_oscd': 'data_OSCD',
+        'data_dir_patches90-100': 'patches_S21C_overlap90-100',
+        'labels_dir_oscd' : 'labels_OSCD',
+        'tb_dir': '/media/cordolo/elements/Intermediate/tensorboard',
+        'model_dir': '/media/cordolo/elements/Intermediate/trained_models'}
+elif computer == 'optimus':
+    directories = {
+        #'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
+        'results_dir_training': '/media/marrit/results/training_S2',
+        'intermediate_dir_cd': '/media/marrit/Intermediate/CD_OSCD',
+        'intermediate_dir': '/media/marrit/Intermediate',
+        'csv_file_S21C': 'S21C_dataset.csv',
+        'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
+        'csv_file_oscd': 'OSCD_dataset.csv',
+        'csv_file_train_oscd' : 'OSCD_train.csv',
+        'csv_file_test_oscd': 'OSCD_test.csv',
+        'csv_file_patches90-100': 'S21C_patches_overlap90-100.csv',
+        'csv_models': 'trained_models.csv',
+        'data_dir_S21C': 'data_S21C',
+        'data_dir_oscd': 'data_OSCD',
+        'labels_dir_oscd' : 'labels_OSCD',
+        'data_dir_patches90-100': 'patches_S21C_overlap90-100',
+        'tb_dir': '/media/marrit/Intermediate/tensorboard',
+        'model_dir': '/media/marrit/Intermediate/trained_models'}
+
 # dirs
-intermediate_dir_training= '/media/marrit/Intermediate/training_S2'
-results_dir_training = '/media/marrit/results/training_S2'
+intermediate_dir_training= directories['intermediate_dir_training']
+results_dir_training = directories['results_dir_training'] #'/media/marrit/results/training_S2'
 csv_file_S21C = 'S21C_dataset.csv'
 csv_file_patches = 'S21C_patches_overlap90-100.csv'
 data_dir_S21C = 'data_S21C'
@@ -871,7 +912,8 @@ for i, row in patches_df.iterrows():
         print("\r row {}/{}".format(i+1,len(patches_df)), end='')
 
 patches_df.to_csv(os.path.join(intermediate_dir_training, csv_file_patches), index=False)
-patches_df= patches_df[patches_df['impair_idx'] == 'a']
+patches_df= patches_df[patches_df['impair_idx'] == 'b']
+
 
 for i, row in patches_df.iterrows():
     os.rename(os.path.join(patches_dir, row.filename), os.path.join(patches_dir, row.filename_alt)) 
