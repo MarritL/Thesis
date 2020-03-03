@@ -11,7 +11,6 @@ import ee
 import numpy as np
 import os
 import pandas as pd
-import numpy as np
 from shapely.geometry import Point
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -855,7 +854,7 @@ if computer == 'desktop':
         'model_dir': '/media/cordolo/elements/Intermediate/trained_models'}
 elif computer == 'optimus':
     directories = {
-        #'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
+        'intermediate_dir_training': '/media/marrit/Intermediate/training_S2',
         'results_dir_training': '/media/marrit/results/training_S2',
         'intermediate_dir_cd': '/media/marrit/Intermediate/CD_OSCD',
         'intermediate_dir': '/media/marrit/Intermediate',
@@ -895,6 +894,7 @@ if not os.path.isdir(os.path.join(intermediate_dir_training, patches_dir_S21C)):
 
 
 patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
+patches_a = patches_df[patches_df['impair_idx'] == 'a']
 read_patches = patches_df[patches_df['impair_idx'] == 'b']
 patch_size = 96
 
@@ -921,6 +921,14 @@ for i, row in patches_df.iterrows():
         print("\r row {}/{}".format(i+1,len(patches_df)), end='')
 
 
+# =============================================================================
+# patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
+# read_patches = patches_df[patches_df['impair_idx'] == 'b']
+# for i, row in read_patches.iterrows():
+#     os.remove(os.path.join(patches_dir, row.filename_alt))
+#     if (i+1) % 100 == 0:
+#         print("\r row {}/{}".format(i+1,len(read_patches)), end='')
+# =============================================================================
 
 #%%
 """ Preprocess OSCD labels """
@@ -1413,12 +1421,15 @@ from plots import plot_random_imagepairs, plot_random_images, plot_image
 
 fig, ax = plot_random_imagepairs(2, os.path.join(result_dir_test, data_dir_OSCD), [4,3,2], rows = 4)
 fig, ax = plot_random_images(7, os.path.join(intermediate_dir_test, data_dir_OSCD), [4,3,2], cols = 4, axis= True)
-fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['336_a.npy', '336_b.npy', '337_a.npy', '337_b.npy'], [4,3,2], titles = ['336_a.npy', '336_b.npy', '337_a.npy', '337_b.npy'], axis=True)
-fig, ax = plot_image(os.path.join(intermediate_dir_training, data_dir_S21C), ['1420_a.npy', '1420_b.npy','1700_a.npy','1700_b.npy'], [3,2,1], titles = ['Sambalpur 21/02/2019', 'Sambalpur 14/11/2018', 'Yokohama 08/05/2019', 'Yokohama 14/12/2029'], axis=False)
+fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['833_a.npy', '833_b.npy', '337_a.npy', '337_b.npy'], [4,3,2], titles = ['336_a.npy', '336_b.npy', '337_a.npy', '337_b.npy'], axis=True)
+fig, ax = plot_image(os.path.join(intermediate_dir_training, data_dir_S21C), ['833_a.npy', '833_b.npy'], [3,2,1], titles = ['Sambalpur 21/02/2019', 'Sambalpur 14/11/2018', 'Yokohama 08/05/2019', 'Yokohama 14/12/2029'], axis=False)
 fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['1001_a.npy', '1001_b.npy','516_a.npy', '516_b.npy', '517_a.npy', '517_b.npy'], [4,3,2], rows=6, cols=0, titles = ['1001_a.npy', '1001_b.npy','516_a.npy', '516_b.npy', '517_a.npy', '517_b.npy'], axis=True)
 fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['1811_a.npy', '1811_b.npy'], [4,3,2], titles = ['1811_a.npy', '1811_b.npy'], axis=True)
 fig, ax = plot_random_imagepairs(2, os.path.join(results_dir_training, data_dir_S21C), [4,3,2])
 fig, ax = plot_image(os.path.join(results_dir_training, data_dir_S21C), ['0_a.npy', '0_b.npy', '1_a.npy', '1_b.npy'], [3,2,1])
+fig, ax = plot_image(os.path.join(patches_dir), ['0_15_1.npy', '0_15_0.npy'], [3,2,1], titles = ['a', 'b'], axis=False)
+
+
 
 im1 = np.load(os.path.join(intermediate_dir_training, data_dir_S21C, '337_a.npy'))
 im2 = np.load(os.path.join(intermediate_dir_training, data_dir_S21C, '337_b.npy'))

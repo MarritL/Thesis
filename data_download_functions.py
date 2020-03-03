@@ -720,9 +720,11 @@ def save_patches(patches_df, images_dir, patches_dir, patch_size = 96):
         # find all patches from image 'b'
         patches_b = im_group[im_group['impair_idx'] == 'b']
         if len(patches_b) > 0: 
+            if i < 5: 
+                print('b')
             im_b = np.load(os.path.join(images_dir, str(unique_im) + '_b.npy'))
         
-            for j, df_row in patches_b.iterrows():        
+            for j, df_row in patches_b.iterrows():       
                 r = df_row.row
                 c = df_row.col
                 file = df_row.filename_alt
