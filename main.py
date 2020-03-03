@@ -12,11 +12,10 @@ import pandas as pd
 
 computer = 'desktop'
 
-
 # init
 if computer == 'desktop':
     directories = {
-        #'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
+        'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
         'results_dir_training': '/media/cordolo/elements/results/training_S2',
         'intermediate_dir_cd': '/media/cordolo/elements/Intermediate/CD_OSCD',
         'intermediate_dir': '/media/cordolo/elements/Intermediate',
@@ -44,10 +43,12 @@ elif computer == 'optimus':
         'csv_file_oscd': 'OSCD_dataset.csv',
         'csv_file_train_oscd' : 'OSCD_train.csv',
         'csv_file_test_oscd': 'OSCD_test.csv',
+        'csv_file_patches90-100': 'S21C_patches_overlap90-100.csv',
         'csv_models': 'trained_models.csv',
         'data_dir_S21C': 'data_S21C',
         'data_dir_oscd': 'data_OSCD',
         'labels_dir_oscd' : 'labels_OSCD',
+        'data_dir_patches90-100': 'patches_S21C_overlap90-100',
         'tb_dir': '/media/marrit/Intermediate/tensorboard',
         'model_dir': '/media/marrit/Intermediate/trained_models'}
 
@@ -76,12 +77,12 @@ train_settings = {
     'start_epoch': 0,
     'num_epoch': 20,
     'batch_size': 25,
-    'disp_iter': 10,
+    'disp_iter': 25,
     'gpu': None}
 
 dataset_settings = {
     'dataset_type' : 'triplet_saved',
-    'perc_train': 0.7,
+    'perc_train': 0.85,
     'channels': np.arange(13),
     'min_overlap': 0.9, 
     'max_overlap':  1}
@@ -96,15 +97,33 @@ directories['data_path'] = os.path.join(
     directories['data_dir_patches90-100'])
 
 dataset = pd.read_csv(os.path.join(directories['intermediate_dir'], 'training_S2',directories['csv_file_patches90-100']))
-dataset = dataset.loc[dataset['impair_idx'] == 'a']
-dataset = dataset[dataset.duplicated(['im_patch_idx'], keep=False)]
+dataset = dataset.loc[dataset['patchpair_idx'] == 0]
+#dataset = dataset[dataset.duplicated(['im_patch_idx'])]
 #dataset = dataset.loc[dataset['patchpair_idx'] == 0]
 
+
 # train on the complete dataset
-# =============================================================================
-# np.random.seed(234)
-# dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
-# =============================================================================
+dataset_ims = np.unique(dataset['im_idx'])
+np.random.seed(234)
+dataset_ims = np.random.choice(dataset_ims, len(dataset_ims), replace=False)
+dataset_settings['indices_train'] = dataset[dataset['im_idx'].isin(
+    dataset_ims[:int(dataset_settings['perc_train']*len(dataset_ims))])]['im_patch_idx'].values
+dataset_settings['indices_val'] = dataset[dataset['im_idx'].isin(
+    dataset_ims[int(dataset_settings['perc_train']*len(dataset_ims)):-100])]['im_patch_idx'].values
+dataset_settings['indices_test'] = dataset[dataset['im_idx'].isin(
+    dataset_ims[-100:])]['im_patch_idx'].values
+
+np.random.seed(234)
+dataset_settings['indices_train'] = np.random.choice(
+    dataset_settings['indices_train'], 
+    len(dataset_settings['indices_train']), 
+    replace=False)[:20000]
+np.random.seed(234)
+dataset_settings['indices_val'] = np.random.choice(
+    dataset_settings['indices_val'], 
+    len(dataset_settings['indices_val']), 
+    replace=False)[:2000]
+
 
 # train on only 1 image
 # =============================================================================
@@ -126,26 +145,24 @@ dataset = dataset[dataset.duplicated(['im_patch_idx'], keep=False)]
 # =============================================================================
 
 # train on n images (part kept apart for val and test)
-n = 25
-n_test = 4
-np.random.seed(234)
-random_im_idx = np.random.choice(dataset['im_idx'], n, replace=False)
-# defide over train val and test
-train_im_idx = random_im_idx[:int(dataset_settings['perc_train']*len(random_im_idx))]
-val_im_idx = random_im_idx[int(dataset_settings['perc_train']*len(random_im_idx)):-n_test]
-test_im_idx = random_im_idx[-n_test:]
-# get the patch_indices
-dataset_settings['indices_train'] = dataset[dataset['im_idx'].isin(train_im_idx)]['im_patch_idx'].values
-dataset_settings['indices_val'] = dataset[dataset['im_idx'].isin(val_im_idx)]['im_patch_idx'].values
-dataset_settings['indices_test'] = dataset[dataset['im_idx'].isin(test_im_idx)]['im_patch_idx'].values
-
+# =============================================================================
+# n = 25
+# n_test = 4
+# np.random.seed(234)
+# random_im_idx = np.random.choice(dataset['im_idx'], n, replace=False)
+# # defide over train val and test
+# train_im_idx = random_im_idx[:int(dataset_settings['perc_train']*len(random_im_idx))]
+# val_im_idx = random_im_idx[int(dataset_settings['perc_train']*len(random_im_idx)):-n_test]
+# test_im_idx = random_im_idx[-n_test:]
+# # get the patch_indices
+# dataset_settings['indices_train'] = dataset[dataset['im_idx'].isin(train_im_idx)]['im_patch_idx'].values
+# dataset_settings['indices_val'] = dataset[dataset['im_idx'].isin(val_im_idx)]['im_patch_idx'].values
+# dataset_settings['indices_test'] = dataset[dataset['im_idx'].isin(test_im_idx)]['im_patch_idx'].values
+# 
+# =============================================================================
 #dataset = dataset['im_idx'].values
 
-# =============================================================================
-# dataset_settings['indices_train'] = dataset[:int(dataset_settings['perc_train']*len(dataset))]
-# dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):-100]
-# dataset_settings['indices_test'] = dataset[-100:]
-# =============================================================================
+
 
 # train
 train(directories, dataset_settings, network_settings, train_settings)
@@ -213,7 +230,7 @@ train(directories, dataset_settings, network_settings, train_settings)
 #%%
 """ Extract Features """
 
-from extract_features import extract_features, calculate_distancemap, calculate_changemap
+from extract_features import extract_features, calculate_distancemap, calculate_differencemaps, calculate_changemap
 from metrics import compute_confusion_matrix, compute_matthews_corrcoef
 from plots import plot_imagepair_plus_gt, plot_changemap_plus_gt
 
@@ -223,7 +240,7 @@ oscd_test = pd.read_csv(os.path.join(directories['intermediate_dir_cd'], directo
 trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], directories['csv_models']))
 
 #model_settings = trained_models.sort_values('best_acc',ascending=False).iloc[0]
-model_settings = trained_models.iloc[24]
+model_settings = trained_models.iloc[-1]
 print("MODEL SETTINGS: \n", model_settings)
 extract_layers = None # for manual setting which layers to use
 
@@ -274,7 +291,14 @@ assert(features[0].shape == features[1].shape)
 #plt.imshow(features[0][:,:,40], cmap=plt.cm.gray)
 
 # calculate change map
-distmap = calculate_distancemap(features[0], features[1])
+diffmaps = calculate_differencemaps(features[0], features[1])
+variance = [(i,np.var(diffmap)) for i, diffmap in enumerate(diffmaps)]
+variance.sort(key=lambda tup: tup[1], reverse=True)
+n=50
+var_layers = [l[0] for l in variance[:n]]
+
+distmap = calculate_distancemap(features[0][:,:,var_layers], features[1][:,:,var_layers])
+
 changemap = calculate_changemap(distmap, plot=True)
 
 # get labels

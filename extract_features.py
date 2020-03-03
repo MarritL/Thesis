@@ -133,7 +133,29 @@ def calculate_distancemap(f1, f2):
 
     """
     dist_per_fmap= [(f1[:,:,i]-f2[:,:,i])**2 for i in range(f1.shape[2])]
+    
     return np.sqrt(sum(dist_per_fmap))
+
+def calculate_differencemaps(f1, f2):
+    """
+    calcualtes pixelwise difference between images with multiple imput channels
+
+    Parameters
+    ----------
+    f1 : np.ndarray of shape (N,M,D)
+        image 1 with the channels in the third dimension 
+    f2 : np.ndarray of shape (N,M,D)
+        image 2 with the channels in the third dimension 
+        
+    Returns
+    -------
+    np.ndarray of shape(N,M)
+        pixelwise difference between image 1 and image 2
+
+    """
+    diff_per_fmap= [(f1[:,:,i]-f2[:,:,i]) for i in range(f1.shape[2])]
+    
+    return diff_per_fmap
 
 def calculate_changemap(distmap, plot=False):
     """
