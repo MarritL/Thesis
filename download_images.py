@@ -829,7 +829,7 @@ for im in dataset2['filename']:
 #%%
 """ Save some patches for faster training """
 
-from data_download_functions import sample_patches_from_image,save_patches
+from data_download_functions import sample_patches_from_image,save_patches,generate_gt_overlap
 
 computer = 'desktop'
 # init
@@ -879,46 +879,57 @@ csv_file_S21C = 'S21C_dataset.csv'
 csv_file_patches = 'S21C_patches_overlap90-100.csv'
 data_dir_S21C = 'data_S21C'
 patches_dir_S21C = 'patches_S21C_overlap90-100'
+gt_dir_S21C = 'gt_S21C_overlap90-100'
 # combinations of dirs
 images_csv=os.path.join(results_dir_training, csv_file_S21C)
 images_dir=os.path.join(results_dir_training,data_dir_S21C)
 patches_csv=os.path.join(intermediate_dir_training, csv_file_patches)
 patches_dir=os.path.join(intermediate_dir_training,patches_dir_S21C)
+gt_dir = os.path.join(intermediate_dir_training, gt_dir_S21C)
 
 # sample start locations of patche and store in csv
 sample_patches_from_image(images_csv, images_dir, patches_csv, patch_size=96, 
                           min_overlap = 0.9, max_overlap = 1)
 
+# create dirs
 if not os.path.isdir(os.path.join(intermediate_dir_training, patches_dir_S21C)):
     os.makedirs(os.path.join(intermediate_dir_training, patches_dir_S21C)) 
-
+if not os.path.isdir(os.path.join(intermediate_dir_training, gt_dir_S21C)):
+    os.makedirs(os.path.join(intermediate_dir_training, gt_dir_S21C)) 
 
 patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
-patches_a = patches_df[patches_df['impair_idx'] == 'a']
-read_patches = patches_df[patches_df['impair_idx'] == 'b']
+# =============================================================================
+# patches_a = patches_df[patches_df['impair_idx'] == 'a']
+# patches_b = patches_df[patches_df['impair_idx'] == 'b']
+# =============================================================================
 patch_size = 96
 
 # save patches from the 'a' images
-save_patches(patches_df=read_patches, images_dir=images_dir, patches_dir=patches_dir, patch_size=patch_size)
+save_patches(patches_df=patches_df, images_dir=images_dir, patches_dir=patches_dir, patch_size=patch_size)
 
-# I changed my mind about the filenames, so i have to change the df
-patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
-patches_df['im_patch_idx'] = 'NA'
-patches_df['filename_alt'] = 'NA'
-for i, row in patches_df.iterrows():
-   patches_df.loc[i,'im_patch_idx'] = str(row.im_idx) + '_' + str(row.patch_idx) 
-   patches_df.loc[i,'filename_alt'] = str(row.im_idx) + '_' + str(row.patch_idx) + '_' + str(row.patchpair_idx) + '.npy' 
-   if (i+1) % 100 == 0:
-        print("\r row {}/{}".format(i+1,len(patches_df)), end='')
+# save a gt of the overlap
+generate_gt_overlap(patches_df, gt_dir, patch_size)
 
-patches_df.to_csv(os.path.join(intermediate_dir_training, csv_file_patches), index=False)
-patches_df= patches_df[patches_df['impair_idx'] == 'b']
-
-
-for i, row in patches_df.iterrows():
-    os.rename(os.path.join(patches_dir, row.filename), os.path.join(patches_dir, row.filename_alt)) 
-    if (i+1) % 100 == 0:
-        print("\r row {}/{}".format(i+1,len(patches_df)), end='')
+# =============================================================================
+# # I changed my mind about the filenames, so i have to change the df
+# patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
+# patches_df['im_patch_idx'] = 'NA'
+# patches_df['filename_alt'] = 'NA'
+# for i, row in patches_df.iterrows():
+#    patches_df.loc[i,'im_patch_idx'] = str(row.im_idx) + '_' + str(row.patch_idx) 
+#    patches_df.loc[i,'filename_alt'] = str(row.im_idx) + '_' + str(row.patch_idx) + '_' + str(row.patchpair_idx) + '.npy' 
+#    if (i+1) % 100 == 0:
+#         print("\r row {}/{}".format(i+1,len(patches_df)), end='')
+# 
+# patches_df.to_csv(os.path.join(intermediate_dir_training, csv_file_patches), index=False)
+# patches_df= patches_df[patches_df['impair_idx'] == 'b']
+# 
+# 
+# for i, row in patches_df.iterrows():
+#     os.rename(os.path.join(patches_dir, row.filename), os.path.join(patches_dir, row.filename_alt)) 
+#     if (i+1) % 100 == 0:
+#         print("\r row {}/{}".format(i+1,len(patches_df)), end='')
+# =============================================================================
 
 
 # =============================================================================
@@ -1427,7 +1438,7 @@ fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['
 fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['1811_a.npy', '1811_b.npy'], [4,3,2], titles = ['1811_a.npy', '1811_b.npy'], axis=True)
 fig, ax = plot_random_imagepairs(2, os.path.join(results_dir_training, data_dir_S21C), [4,3,2])
 fig, ax = plot_image(os.path.join(results_dir_training, data_dir_S21C), ['0_a.npy', '0_b.npy', '1_a.npy', '1_b.npy'], [3,2,1])
-fig, ax = plot_image(os.path.join(patches_dir), ['0_15_1.npy', '0_15_0.npy'], [3,2,1], titles = ['a', 'b'], axis=False)
+fig, ax = plot_image(os.path.join(patches_dir), ['1466_22_0.npy', '1466_22_1.npy'], [3,2,1], titles = ['a', 'b'], axis=True)
 
 
 

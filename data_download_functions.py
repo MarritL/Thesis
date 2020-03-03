@@ -735,3 +735,37 @@ def save_patches(patches_df, images_dir, patches_dir, patch_size = 96):
         
         if (i+1) % 1 == 0:
             print("\r imagepair {}/{}".format(i+1,len(unique_im_idx)), end='')
+            
+def generate_gt_overlap(patches_df, gt_dir, patch_size):
+    
+    # find unique patch pairs
+    unique_patch_pairs = np.unique(patches_df['im_patch_idx'])
+    
+    # iterate over unique patch pairs and determine area overlap w.r.t. patch0
+    for i, unique_pair_idx in enumerate(unique_patch_pairs):
+
+        unique_pair_df = patches_df[patches_df['im_patch_idx'] == unique_pair_idx]
+        patch_starts = [(unique_pair_df.iloc[0]['row'],unique_pair_df.iloc[0]['col']),
+                        (unique_pair_df.iloc[1]['row'],unique_pair_df.iloc[1]['col'])]
+    
+        gt = np.zeros(shape=(patch_size,patch_size))
+        
+        if patch_starts[1][0] > patch_starts[0][0]:
+            row_start = patch_starts[1][0] - patch_starts[0][0]
+            row_end = patch_size
+        else:
+            row_start = 0
+            row_end = patch_size + (patch_starts[1][0] - patch_starts[0][0])
+        if patch_starts[1][1] > patch_starts[0][1]:
+            col_start = patch_starts[1][1] - patch_starts[0][1]
+            col_end = patch_size
+        else:
+            col_start = 0
+            col_end = patch_size + (patch_starts[1][1] - patch_starts[0][1])
+        gt[row_start:row_end,col_start:col_end] = 1
+        
+        # save binary gt-patch with overlapping area
+        np.save(os.path.join(gt_dir, unique_pair_idx), gt)
+        
+        # print progress
+        print("\r imagepair {}/{}".format(i+1,len(unique_patch_pairs)), end='')
