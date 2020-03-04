@@ -385,6 +385,76 @@ class TripletDatasetPreSaved(BaseDataset):
         patchtriplet['label'] = torch.as_tensor(lbl, dtype=dtype)
         
         return patchtriplet
+    
+class PartlyOverlapDataset(BaseDataset):
+    """ Generate dataset of patch pairs with binary gt of overlapping part """   
+    def __init__(self, data_dir, indices, channels=np.arange(14), 
+                 patch_size=96, percentile=99, one_hot=True):
+        super(PartlyOverlapDataset, self).__init__(
+            data_dir, indices, channels, patch_size, percentile)
+        
+        self.one_hot = one_hot
+    
+    def __getitem__(self, index):
+        'Generates one patch triplet'
+        # Select sample
+        im_patch_idx = self.indices[index]
+            
+        # get patch_pair_idxs
+        pairidxs = np.arange(2)
+
+        # 'reconstruct' the filenames
+        filenames = get_filenames(im_patch_idx, pairidxs)
+    
+        # load image
+        images = self.get_images(filenames)
+
+        # check if all images have the same shape
+        assert images[0].shape == images[1].shape,\
+                    'Shape not matching in image pair {}'.format(im_patch_idx)
+
+        # get gt
+        gt = np.load(os.path.join(
+            self.data_dir,
+            'gt_S21C_' + self.data_dir.split('/')[-1].split('_')[-1], 
+            im_patch_idx + '.npy'))
+      
+        if self.one_hot:
+            gt = to_categorical(gt, num_classes=2)
+            dtype = torch.float32
+        else: 
+            dtype = torch.int64
+        
+        # get patches
+        patchpair = dict()
+        patchpair['patch0'] = images[0]
+        patchpair['patch1'] = images[1]
+        patchpair['label'] = gt
+
+        # rearange axis (channels first)
+        patchpair = channelsfirst(patchpair)
+                             
+        assert patchpair['patch0'].shape == \
+            patchpair['patch1'].shape, \
+            "Shape not matching in patch pair {}, shape: 0:{} 1:{}"\
+            .format(
+                im_patch_idx, 
+                patchpair['patch0'].shape, 
+                patchpair['patch1'].shape)
+        assert np.any(~np.isnan(patchpair['patch0'])) \
+            & np.any(~np.isnan(patchpair['patch1'])) \
+            & np.any(~np.isnan(patchpair['label'])), \
+            "Nans in patch pair {}".format(im_patch_idx)  
+        
+        # add image info
+        patchpair['im_idx'] = im_patch_idx
+        
+        # cast to tensors
+        patchpair['patch0'] = torch.as_tensor(patchpair['patch0'])
+        patchpair['patch1'] = torch.as_tensor(patchpair['patch1'])
+        patchpair['label'] = torch.as_tensor(patchpair['label'],dtype=dtype)
+        
+        return patchpair
 
 def get_filenames(im_idx, pair_idxs):
     """

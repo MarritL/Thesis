@@ -8,7 +8,8 @@ Created on Tue Feb  4 16:21:16 2020
 
 from tensorboardX import SummaryWriter
 from models.netbuilder import NetBuilder, create_loss_function, create_optimizer
-from data_generator import PairDataset, TripletDataset,TripletDatasetPreSaved
+from data_generator import PairDataset, TripletDataset, TripletDatasetPreSaved
+from data_generator import PartlyOverlapDataset
 from utils import AverageMeter
 import torch
 from torch.utils.data import DataLoader
@@ -16,6 +17,7 @@ import os
 import time
 import csv
 import copy
+import numpy as np
 
 def train(directories, dataset_settings, network_settings, train_settings):
 
@@ -40,15 +42,25 @@ def train(directories, dataset_settings, network_settings, train_settings):
             
     # build network
     if network_settings['network'] == 'siamese':
-        n_branches = 2
         print('n_branches = 2')
+        n_branches = 2
+        pos_weight = 1
+        network_settings['im_size'] = (1,1)
     elif network_settings['network'] == 'triplet':
         print('n_branches = 3')
         n_branches = 3
+        pos_weight=1
         network_settings['network'] = 'siamese'
+        network_settings['im_size'] = (1,1)        
+    elif network_settings['network'] == 'hypercolumn':
+        print('n_branches = 2')
+        n_branches = 2
+        mean_overlap = np.mean([dataset_settings['min_overlap'], 
+                                dataset_settings['max_overlap']])
+        pos_weight = (1-mean_overlap)/mean_overlap
     else:
         raise Exception('Architecture undefined! \n \
-                        Choose one of: "siamese", "triplet"')
+                        Choose one of: "siamese", "triplet", "hypercolumn"')
         
         
     net = NetBuilder.build_network(
@@ -57,11 +69,12 @@ def train(directories, dataset_settings, network_settings, train_settings):
         n_channels=len(dataset_settings['channels']), 
         n_classes=network_settings['n_classes'],
         patch_size=network_settings['patch_size'],
+        im_size=network_settings['im_size'],
         batch_norm=network_settings['batch_norm'],
         n_branches=n_branches,
         weights=network_settings['weights_file'])  
        
-    loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'])
+    loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], pos_weight=pos_weight)
     
     # load net to GPU     
     if train_settings['gpu'] != None:
@@ -110,9 +123,21 @@ def train(directories, dataset_settings, network_settings, train_settings):
             indices=dataset_settings['indices_val'], 
             channels=dataset_settings['channels'], 
             one_hot=one_hot)  
+    elif dataset_settings['dataset_type'] == 'overlap':
+        dataset_train = PartlyOverlapDataset(
+            data_dir=directories['data_path'], 
+            indices=dataset_settings['indices_train'], 
+            channels=dataset_settings['channels'], 
+            one_hot=one_hot)           
+        dataset_val = PartlyOverlapDataset(
+            data_dir=directories['data_path'], 
+            indices=dataset_settings['indices_val'], 
+            channels=dataset_settings['channels'], 
+            one_hot=one_hot)  
     else:
         raise Exception('dataset_type undefined! \n \
-                        Choose one of: "pair", "triplet", "triplet_saved"')
+                        Choose one of: "pair", "triplet", "triplet_saved",\
+                        "overlap"')
     
     # Data loaders
     dataloader_train = DataLoader(
@@ -157,7 +182,9 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 writer=writer,
                 epoch_iters=epoch_iters, 
                 disp_iter=train_settings['disp_iter'],
-                gpu = train_settings['gpu'])
+                gpu = train_settings['gpu'],
+                im_size = network_settings['im_size'],
+                extract_features=network_settings['extract_features'])
             
             # validation epoch
             best_net_wts, best_acc, best_epoch, best_loss = validate(
@@ -174,7 +201,9 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 best_acc=best_acc,
                 best_epoch=best_epoch,
                 best_loss=best_loss,
-                gpu = train_settings['gpu']) 
+                gpu = train_settings['gpu'],
+                im_size = network_settings['im_size'],
+                extract_features=network_settings['extract_features'])
     
     # on keyboard interupt continue the script: saves the best model until interrupt
     except KeyboardInterrupt:
@@ -214,7 +243,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
     
 def train_epoch(network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
-                gpu):
+                gpu, im_size, extract_features=None):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     ave_loss = AverageMeter()
@@ -228,7 +257,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
     tic = time.time()
     epoch_start = time.time()
     #for i in range(epoch_iters):
-    for i, batch_data in enumerate(iterator):
+    for i, batch_data in enumerate(iterator): 
         
         # load a batch of data
         #batch_data = next(iterator)
@@ -262,9 +291,9 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
             labels = labels.cuda()
 
         # forward pass
-        outputs = network(inputs, n_branches)
+        outputs = network(inputs, n_branches, extract_features=extract_features)
         loss = loss_func(outputs, labels)
-        acc = acc_func(outputs, labels)
+        acc = acc_func(outputs, labels, im_size)
 
         # Backward
         loss.backward()
@@ -306,7 +335,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
     
 def validate(network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
-             best_loss, gpu):    
+             best_loss, gpu, im_size, extract_features=None):    
 
     ave_loss = AverageMeter()
     ave_acc = AverageMeter()
@@ -349,9 +378,9 @@ def validate(network, n_branches, dataloader, loss_func, acc_func, history,
       
         with torch.no_grad():
             # forward pass
-            outputs = network(inputs, n_branches)
+            outputs = network(inputs, n_branches, extract_features)
             loss = loss_func(outputs, labels)
-            acc = acc_func(outputs, labels)
+            acc = acc_func(outputs, labels, im_size)
         
         loss = loss.mean()
         acc = acc.mean()

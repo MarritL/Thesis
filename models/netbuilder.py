@@ -11,7 +11,7 @@ from torch import nn
 from torch import optim
 
 
-from models import siamese_net
+from models import siamese_net, hypercolumn_net
 
 class NetBuilder:
     # custom weights initialization
@@ -35,7 +35,8 @@ class NetBuilder:
 
     @staticmethod
     def build_network(net, cfg, weights='', n_channels=13,n_classes=8, 
-                      patch_size=96, batch_norm=False,n_branches=2):
+                      patch_size=96, batch_norm=False, n_branches=2,
+                      im_size=(96,96)):
         
         if net == 'siamese':
             net = siamese_net.__dict__['siamese_net'](
@@ -45,8 +46,17 @@ class NetBuilder:
                 patch_size=patch_size,
                 batch_norm=batch_norm,
                 n_branches=n_branches) 
+        elif net == 'hypercolumn':
+            net = hypercolumn_net.__dict__['hypercolumn_net'](
+                cfg=cfg,
+                n_channels=n_channels,
+                n_classes=n_classes,
+                im_size=im_size,
+                batch_norm=batch_norm, 
+                n_branches=n_branches)
         else:
-            raise Exception('Architecture undefined!')
+            raise Exception('Architecture undefined!\n \
+                        Choose one of: "siamese", "hypercolumn"')
 
         # initiate weighs 
         if len(weights) > 0:
@@ -59,7 +69,7 @@ class NetBuilder:
         return net
 
 
-def create_loss_function(lossfunction):
+def create_loss_function(lossfunction, pos_weight=1):
     acc_functions = {'accuracy': accuracy,
                     'accuracy_onehot':accuracy_onehot}
     
@@ -68,8 +78,9 @@ def create_loss_function(lossfunction):
         loss_func = nn.CrossEntropyLoss() 
         acc_func = acc_functions['accuracy']
     elif lossfunction == 'bce_sigmoid':
+        pos_weight = torch.tensor(pos_weight)
         one_hot = True
-        loss_func = nn.BCEWithLogitsLoss()
+        loss_func = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         acc_func = acc_functions['accuracy_onehot']
     else:
         raise Exception('loss function not implemented! \n \
@@ -98,10 +109,16 @@ def accuracy(outputs, labels):
     acc = acc_sum.float() / (len(labels) + 1e-10)
     return acc
 
-def accuracy_onehot(outputs, labels):
+def accuracy_onehot(outputs, labels, im_size=(1,1)):
     _, preds = torch.max(outputs, dim=1)
     _, labs = torch.max(labels, dim=1)
     acc_sum = torch.sum(preds == labs)
-    acc = acc_sum.float() / (len(labels) + 1e-10)
+    acc = acc_sum.float() / (len(labels) + 1e-10) / (im_size[0]*im_size[1])
     return acc
-    
+
+def accuracy_segm(outputs, labels):
+    _, preds = torch.max(outputs, dim=1)
+    _, labs = torch.max(labels, dim=1)
+    acc_sum = torch.sum(preds == labs)
+    acc = acc_sum.float() / (len(labels) + 1e-10) 
+    return acc    
