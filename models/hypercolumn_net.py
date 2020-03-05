@@ -115,7 +115,7 @@ def hypercolumn_net(cfg, n_channels=13, n_classes=2, im_size=(96,96), batch_norm
     # create layers
     branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm)
     
-    n_channels_classifier = (sum(cfg['branch'][cfg['branch'] != 'M']) + n_channels)*n_branches
+    n_channels_classifier = (sum(cfg['branch'][cfg['branch'] != 'M'].astype(np.int)) + n_channels)*n_branches
     classifier = make_layers(cfg['classifier'], n_channels=n_channels_classifier, batch_norm=batch_norm, kernel_size=1)
     
     upsample_size = im_size
