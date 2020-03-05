@@ -30,10 +30,10 @@ def train(directories, dataset_settings, network_settings, train_settings):
     print("tensorboard --logdir {}".format(tb_dir))
     
     # init save-file
-    fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', 'cfg_classifier' \
+    fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', 'cfg_classifier', \
                   'optimizer', 'lr', 'weight_decay', 'loss', 'n_classes', \
-                  'n_channels','patch_size','batch_norm','dataset', 'best_acc',\
-                  'best_epoch', 'best_loss']
+                  'n_channels','patch_size','batch_norm','dataset','min_overlap',\
+                  'max_overlap', 'best_acc','best_epoch', 'best_loss']
 # =============================================================================
 #     with open(os.path.join(directories['intermediate_dir'],directories['csv_models']), 'a') as file:
 #         filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
@@ -226,6 +226,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
                'patch_size': network_settings['patch_size'],
                'batch_norm': network_settings['batch_norm'],
                'dataset': dataset_settings['dataset_type'], 
+               'min_overlap': dataset_settings['min_overlap'],
+               'max_overlap': dataset_settings['max_overlap'],
                'best_acc': best_acc,
                'best_epoch': best_epoch, 
                'best_loss': best_loss}
