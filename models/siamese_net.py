@@ -11,30 +11,42 @@ import numpy as np
 
 __all__ = ['siamese_net']
 
+# =============================================================================
+# class SiameseNet(nn.Module):
+# 
+#     def __init__(self, branches, joint, n_channels_lin, n_classes, n_mpool, 
+#                  patch_size):
+#         super(SiameseNet, self).__init__()
+#         
+#         # determine input sizes for input classification layers
+#         patch_size_lin = patch_size
+#         for i in range(n_mpool):
+#             patch_size_lin = int(patch_size_lin/2)
+#         
+#         self.branches = branches    
+#         self.joint = joint
+#                 
+#         self.avgpool = nn.AdaptiveAvgPool2d((patch_size_lin, patch_size_lin))
+#         self.classifier = nn.Sequential(
+#             nn.Linear(n_channels_lin * patch_size_lin * patch_size_lin, 256),
+#             nn.ReLU(True),
+#             #nn.Dropout(),
+#             nn.Linear(256, 128),
+#             nn.ReLU(True),
+#             #nn.Dropout(),
+#             nn.Linear(128, n_classes),
+#         )
+# =============================================================================
+        
 class SiameseNet(nn.Module):
-
-    def __init__(self, branches, joint, n_channels_lin, n_classes, n_mpool, 
-                 patch_size):
+    def __init__(self, branches, joint, classifier, patch_size_lin):
         super(SiameseNet, self).__init__()
-        
-        # determine input sizes for input classification layers
-        patch_size_lin = patch_size
-        for i in range(n_mpool):
-            patch_size_lin = int(patch_size_lin/2)
-        
+                
         self.branches = branches    
         self.joint = joint
                 
         self.avgpool = nn.AdaptiveAvgPool2d((patch_size_lin, patch_size_lin))
-        self.classifier = nn.Sequential(
-            nn.Linear(n_channels_lin * patch_size_lin * patch_size_lin, 256),
-            nn.ReLU(True),
-            #nn.Dropout(),
-            nn.Linear(256, 128),
-            nn.ReLU(True),
-            #nn.Dropout(),
-            nn.Linear(128, n_classes),
-        )
+        self.classifier = classifier
 
 
     def forward(self, data, n_branches, extract_features=None):
@@ -59,9 +71,7 @@ class SiameseNet(nn.Module):
         features : torch array
             specified featuremaps from the branch, upsampled to original patchsize
             used for feature extraction
-
         """
-
         res = list()
         for i in range(n_branches): # Siamese/triplet nets; sharing weights
             x = data[i]
@@ -102,7 +112,8 @@ class SiameseNet(nn.Module):
     
 def make_layers(cfg, n_channels, batch_norm=False):
     layers = []
-    in_channels = int(n_channels)
+    in_channels = int(n_channels)    
+    # iterate over layers and add to sequential
     for v in cfg:
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
@@ -116,17 +127,38 @@ def make_layers(cfg, n_channels, batch_norm=False):
             in_channels = v
     return nn.Sequential(*layers)
 
-def conv_bn_relu(in_channels, out_channels, stride=1, padding=1, batch_norm=False):
-    "3x3 convolution + BN + relu"
+def make_classifier(cfg, n_channels):
     layers = []
-    conv2d = nn.Conv2d(in_channels, out_channels, kernel_size=3,
-                      stride=stride, padding=padding)
-    if batch_norm:
-        layers += [conv2d, nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True)]
-    else:
-        layers += [conv2d, nn.ReLU(inplace=True)]
-
+    in_channels = int(n_channels)    
+    # iterate over layers and add to sequential
+    for v in cfg[:-1]:
+        if v == 'D':
+            layers += [nn.Dropout()]
+        else:
+            v = int(v)
+            linear = nn.Linear(in_channels, v)
+            layers += [linear, nn.ReLU(inplace=True)]
+        in_channels = v
+    
+    # last layer no ReLU
+    v = int(cfg[-1])
+    linear = nn.Linear(in_channels, v)
+    layers += [linear]        
     return nn.Sequential(*layers)
+
+# =============================================================================
+# def conv_bn_relu(in_channels, out_channels, stride=1, padding=1, batch_norm=False):
+#     "3x3 convolution + BN + relu"
+#     layers = []
+#     conv2d = nn.Conv2d(in_channels, out_channels, kernel_size=3,
+#                       stride=stride, padding=padding)
+#     if batch_norm:
+#         layers += [conv2d, nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True)]
+#     else:
+#         layers += [conv2d, nn.ReLU(inplace=True)]
+# 
+#     return nn.Sequential(*layers)
+# =============================================================================
 
 
 def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False, n_branches=2):
@@ -157,8 +189,6 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
         deep learning network.
 
     """
-    #
-    
     # determine number of max-pool layers
     n_mpool = np.sum(cfg['branch'] == 'M') + np.sum(cfg['top'] == 'M')    
 
@@ -177,8 +207,16 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
         # does nothing because next layer is the same
         joint = nn.AdaptiveAvgPool2d((patch_size, patch_size)) 
     
+    # determine input sizes for input classification layers
+    patch_size_lin = patch_size
+    for i in range(n_mpool):
+        patch_size_lin = int(patch_size_lin/2)
+    n_channels_classifier = n_channels_lin * patch_size_lin * patch_size_lin
+    
+    classifier = make_classifier(cfg['classifier'], n_channels_classifier)
     # create network
-    net = SiameseNet(branches, joint, n_channels_lin, n_classes, n_mpool, patch_size) 
+    #net = SiameseNet(branches, joint, n_channels_lin, n_classes, n_mpool, patch_size) 
+    net = SiameseNet(branches, joint, classifier, patch_size_lin) 
     
     print(net)
     return net
