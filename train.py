@@ -30,7 +30,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
     print("tensorboard --logdir {}".format(tb_dir))
     
     # init save-file
-    fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', \
+    fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', 'cfg_classifier' \
                   'optimizer', 'lr', 'weight_decay', 'loss', 'n_classes', \
                   'n_channels','patch_size','batch_norm','dataset', 'best_acc',\
                   'best_epoch', 'best_loss']
@@ -216,6 +216,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
                'networkname': network_name, 
                'cfg_branch': str(list(network_settings['cfg']['branch'])), 
                'cfg_top': str(list(network_settings['cfg']['top'])),
+               'cfg_classifier': str(list(network_settings['cfg']['classifier'])),
                'optimizer': network_settings['optimizer'],
                'lr': network_settings['lr'], 
                'weight_decay': network_settings['weight_decay'],
