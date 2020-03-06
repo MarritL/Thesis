@@ -333,7 +333,8 @@ class TripletDatasetPreSaved(BaseDataset):
                 options_for2.append(idx)
         
         im_patch_idx2 = np.random.choice(options_for2, 1)       
-        pairidxs2 = np.random.choice([0, 1], size=1) 
+        #pairidxs2 = np.random.choice([0, 1], size=1) 
+        pairidxs2 = pairidxs[1]
         
         # 'reconstruct' filename
         filename = get_filenames(im_patch_idx2[0], pairidxs2)
