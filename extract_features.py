@@ -57,9 +57,15 @@ def extract_features(directories, imagelist, model_settings, layers):
     top = top.replace("'", "")
     top = top.replace(" ", "")
     top = top.split(",")
+    classifier = model_settings['cfg_classifier'].split("[" )[1]
+    classifier = classifier.split("]" )[0]
+    classifier = classifier.replace("'", "")
+    classifier = classifier.replace(" ", "")
+    classifier = classifier.split(",")
     # save in model_settigns
     model_settings['cfg'] = {'branch': np.array(branch, dtype='object'), 
-                               'top': np.array(top,dtype='object')}
+                             'top': np.array(top,dtype='object'),
+                             'classifier': np.array(classifier, dtype='object')}
     
     # batch_norm saved as string cast back to bool
     if model_settings['batch_norm'] == 'False' : 
@@ -74,9 +80,11 @@ def extract_features(directories, imagelist, model_settings, layers):
     elif model_settings['network'] == 'triplet':
         n_branches = 3
         model_settings['network'] = 'siamese'
+    elif model_settings['network'] == 'hypercolumn':
+        n_branches = 2
     else:
         raise Exception('Architecture undefined! \n \
-                        Choose one of: "siamese", "triplet"')
+                        Choose one of: "siamese", "triplet", hypercolumn')
         
         
     net = NetBuilder.build_network(
@@ -85,19 +93,32 @@ def extract_features(directories, imagelist, model_settings, layers):
         n_channels=int(model_settings['n_channels']), 
         n_classes=int(model_settings['n_classes']),
         patch_size=int(model_settings['patch_size']),
+        im_size=imagelist[0].shape[:2],
         batch_norm=model_settings['batch_norm'],
         n_branches=n_branches)  
     
     # load weights
     net.load_state_dict(torch.load(model_settings['filename']))
-
+    
     outlist = list()
-    for j, im in enumerate(imagelist):
+    for j, im in enumerate(imagelist): 
         # prepare image
         im_n = normalize2plot(im)
         im_n = np.moveaxis(im_n, -1, 0)
         im_n = np.expand_dims(im_n, axis=0)
         im_t = torch.as_tensor(im_n)
+        
+# =============================================================================
+#         im_n = normalize2plot(imagelist[0])
+#         im_n = np.moveaxis(im_n, -1, 0)
+#         im_n = np.expand_dims(im_n, axis=0)
+#         im_t1 = torch.as_tensor(im_n)
+#         
+#         im_n = normalize2plot(imagelist[1])
+#         im_n = np.moveaxis(im_n, -1, 0)
+#         im_n = np.expand_dims(im_n, axis=0)
+#         im_t2 = torch.as_tensor(im_n)
+# =============================================================================
     
         # get features
         im_out = net([im_t.float(),im_t], 1, extract_features=layers)
@@ -153,7 +174,7 @@ def calculate_differencemaps(f1, f2):
         pixelwise difference between image 1 and image 2
 
     """
-    diff_per_fmap= [(f1[:,:,i]-f2[:,:,i]) for i in range(f1.shape[2])]
+    diff_per_fmap= [abs(f1[:,:,i]-f2[:,:,i]) for i in range(f1.shape[2])]
     
     return diff_per_fmap
 
