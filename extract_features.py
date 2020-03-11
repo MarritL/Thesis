@@ -12,10 +12,7 @@ import torch
 from plots import normalize2plot
 import torch.nn as nn
 import matplotlib.pyplot as plt
-from skimage.filters import threshold_otsu
-
-
-
+from skimage.filters import threshold_otsu, threshold_local, try_all_threshold, threshold_triangle, threshold_niblack
 
 def extract_features(directories, imagelist, model_settings, layers):
     """
@@ -100,8 +97,9 @@ def extract_features(directories, imagelist, model_settings, layers):
     # load weights
     net.load_state_dict(torch.load(model_settings['filename']))
     
-    outlist = list()
+    featlist = list()
     for j, im in enumerate(imagelist): 
+        outlist = list()
         # prepare image
         im_n = normalize2plot(im)
         im_n = np.moveaxis(im_n, -1, 0)
@@ -132,7 +130,8 @@ def extract_features(directories, imagelist, model_settings, layers):
             im_out[i] = np.moveaxis(np.squeeze(fl.detach().numpy()), 0,-1)
         
         # concat
-        outlist.append(np.concatenate(im_out,axis=2))
+        outlist.extend(im_out)
+        featlist.append(outlist)
         
     return outlist
 
@@ -153,9 +152,28 @@ def calculate_distancemap(f1, f2):
         pixelwise euclidean distance between image 1 and image 2
 
     """
-    dist_per_fmap= [(f1[:,:,i]-f2[:,:,i])**2 for i in range(f1.shape[2])]
+    dist_per_fmap= [(f2[:,:,i]-f1[:,:,i])**2 for i in range(f1.shape[2])]
     
     return np.sqrt(sum(dist_per_fmap))
+
+def calculate_magnitudemap(dcv):
+    """
+    calculates pixelwise change magnitude in deep change hypervector 
+
+    Parameters
+    ----------
+    dcv: list
+        each item in the list is a featuremap
+        
+    Returns
+    -------
+    np.ndarray of shape(N,M)
+        pixelwise deep magnitude of combined featuremaps 
+
+    """
+    sq_dcv= [g**2 for g in dcv]
+    
+    return np.sqrt(sum(sq_dcv))
 
 def calculate_differencemaps(f1, f2):
     """
@@ -174,7 +192,7 @@ def calculate_differencemaps(f1, f2):
         pixelwise difference between image 1 and image 2
 
     """
-    diff_per_fmap= [abs(f1[:,:,i]-f2[:,:,i]) for i in range(f1.shape[2])]
+    diff_per_fmap= [f2[:,:,i]-f1[:,:,i] for i in range(f1.shape[2])]
     
     return diff_per_fmap
 
@@ -195,6 +213,14 @@ def calculate_changemap(distmap, plot=False):
     """
     
     thresh = threshold_otsu(distmap)
+    #thresh = threshold_local(distmap, block_size=101, method='gaussian')
+    #thresh = threshold_triangle(distmap)
+    #thresh = threshold_niblack(distmap, window_size=101)
+    #fig, ax = try_all_threshold(distmap)
+    #fig, ax = plt.subplots()
+    #d = ax.imshow(thresh)
+    #fig.colorbar(d)
+    
     binary =  distmap > thresh
     
     if plot:

@@ -10,31 +10,31 @@ import os
 import numpy as np
 import pandas as pd
 
-computer = 'desktop'
+computer = 'optimus'
 
 # init
 if computer == 'desktop':
     directories = {
-        'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
-        'results_dir_training': '/media/cordolo/elements/results/training_S2',
-        'intermediate_dir_cd': '/media/cordolo/elements/Intermediate/CD_OSCD',
-        'intermediate_dir': '/media/cordolo/elements/Intermediate',
+        'intermediate_dir_training': '/media/cordolo/marrit/Intermediate/training_S2',
+        'results_dir_training': '/media/cordolo/marrit/results/training_S2',
+        'intermediate_dir_cd': '/media/cordolo/marrit/Intermediate/CD_OSCD',
+        'intermediate_dir': '/media/cordolo/marrit/Intermediate',
         'csv_file_S21C': 'S21C_dataset.csv',
         'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
         'csv_file_oscd': 'OSCD_dataset.csv',
         'csv_file_train_oscd' : 'OSCD_train.csv',
         'csv_file_test_oscd': 'OSCD_test.csv',
-        'csv_file_patches90-100': 'S21C_patches_overlap90-100.csv',
+        'csv_file_patches_overlap': 'S21C_patches_overlap50-70.csv',
         'csv_models': 'trained_models.csv',
         'data_dir_S21C': 'data_S21C',
         'data_dir_oscd': 'data_OSCD',
-        'data_dir_patches90-100': 'patches_S21C_overlap90-100',
+        'data_dir_patches_overlap': 'patches_S21C_overlap50-70',
         'labels_dir_oscd' : 'labels_OSCD',
-        'tb_dir': '/media/cordolo/elements/Intermediate/tensorboard',
-        'model_dir': '/media/cordolo/elements/Intermediate/trained_models'}
+        'tb_dir': '/media/cordolo/marrit/Intermediate/tensorboard',
+        'model_dir': '/media/cordolo/marrit/Intermediate/trained_models'}
 elif computer == 'optimus':
     directories = {
-        #'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
+        'intermediate_dir_training': '/media/marrit/Intermediate/training_S2',
         'results_dir_training': '/media/marrit/results/training_S2',
         'intermediate_dir_cd': '/media/marrit/Intermediate/CD_OSCD',
         'intermediate_dir': '/media/marrit/Intermediate',
@@ -43,87 +43,110 @@ elif computer == 'optimus':
         'csv_file_oscd': 'OSCD_dataset.csv',
         'csv_file_train_oscd' : 'OSCD_train.csv',
         'csv_file_test_oscd': 'OSCD_test.csv',
-        'csv_file_patches90-100': 'S21C_patches_overlap90-100.csv',
+        'csv_file_patches_overlap': 'S21C_patches_overlap50-70.csv',
         'csv_models': 'trained_models.csv',
         'data_dir_S21C': 'data_S21C',
         'data_dir_oscd': 'data_OSCD',
         'labels_dir_oscd' : 'labels_OSCD',
-        'data_dir_patches90-100': 'patches_S21C_overlap90-100',
+        'data_dir_patches_overlap': 'patches_S21C_overlap50-70',
         'tb_dir': '/media/marrit/Intermediate/tensorboard',
         'model_dir': '/media/marrit/Intermediate/trained_models'}
 
-# network cofiguration:
-# number denotes number of output channels of 3x3 conv layer
-# 'M' denotes max-pooling layer (2x2), stride=2
-# note: first number of top should be 2* or 3* las4 conv layer of branch 
-cfg = {
-       'branch': np.array([32,'M',64,'M',128,'M'], dtype='object'), 
-       'top': np.array([384], dtype='object')}
-
-
 network_settings = {
-    'network': 'triplet',
-    'cfg': cfg,
+    'network': 'siamese_unet_diff',
     'optimizer': 'adam',
     'lr':1e-3,
     'weight_decay':0,
-    'loss': 'bce_sigmoid',
+    'loss': 'nll',
     'n_classes': 2,
     'patch_size': 96,
+    'im_size': (96,96),
     'batch_norm': True,
-    'weights_file': '' }
+    'weights_file': '' ,
+    'extract_features': None}
+
+# network cofiguration:
+# number denotes number of output channels of conv layer or linear layer
+# 'M' denotes max-pooling layer (2x2), stride=2
+# 'D' denotes drop-outlayer (only in classifier for siamese/triplet network)
+# classifier in siamese/triplet network uses linear layers
+# classifier in hypercolumn network uses conv layers
+# note: first number of top should be 2* or 3* last conv layer of branch
+cfg = {'branch': np.array([32, 32, 'M',64, 64,'M',128,'M'], dtype='object'), 
+       'top': np.array([384], dtype='object'),
+       'classifier': np.array([256,128,network_settings['n_classes']])}
+network_settings['cfg'] = cfg
+
+# add layers from which to extract features in hypercolumn network
+if network_settings['network'] == 'hypercolumn':
+    branch = network_settings['cfg']['branch']
+    # extract the features from all activation layers
+    network_settings['extract_features'] = list()
+    layer_i = -1
+    if network_settings['batch_norm']:
+        for layer in branch:
+            if layer == 'M':
+                layer_i += 1
+            else:
+                layer_i += 3
+                network_settings['extract_features'].append(layer_i)
+    else:
+        for layer in branch:
+            if layer == 'M':
+                layer_i += 1
+            else:
+                layer_i += 2
+                network_settings['extract_features'].append(layer_i)
 
 train_settings = {
     'start_epoch': 0,
     'num_epoch': 20,
     'batch_size': 25,
-    'disp_iter': 25,
+    'disp_iter': 10,
     'gpu': None}
 
 dataset_settings = {
-    'dataset_type' : 'triplet_saved',
+    'dataset_type' : 'overlap',
     'perc_train': 0.85,
     'channels': np.arange(13),
-    'min_overlap': 0.9, 
-    'max_overlap':  1}
+    'min_overlap': 0.5, 
+    'max_overlap': 0.7}
 
 #%%
-""" Train on S21C presaved dataset 90-100% overlap """
+""" Train on S21C presaved dataset overlap """
+from utils import cv_test_split
 from train import train
 
 directories['data_path'] = os.path.join(
     directories['intermediate_dir'], 
     'training_S2',
-    directories['data_dir_patches90-100'])
+    directories['data_dir_patches_overlap'])
 
-dataset = pd.read_csv(os.path.join(directories['intermediate_dir'], 'training_S2',directories['csv_file_patches90-100']))
-dataset = dataset.loc[dataset['patchpair_idx'] == 0]
-#dataset = dataset[dataset.duplicated(['im_patch_idx'])]
-#dataset = dataset.loc[dataset['patchpair_idx'] == 0]
+# use all images
+dataset_settings['indices_train'],\
+    dataset_settings['indices_val'],\
+        dataset_settings['indices_test'] = cv_test_split(
+            csv_file=os.path.join(
+                directories['intermediate_dir'], 
+                'training_S2',
+                directories['csv_file_patches_overlap']), 
+            n_test_ims=100,
+            folds=5,
+            k=0)
 
+# subset of all images
+dataset_settings['indices_train'] = dataset_settings['indices_train'][:20000]
+dataset_settings['indices_val'] = dataset_settings['indices_val'][:2500]
 
-# train on the complete dataset
-dataset_ims = np.unique(dataset['im_idx'])
-np.random.seed(234)
-dataset_ims = np.random.choice(dataset_ims, len(dataset_ims), replace=False)
-dataset_settings['indices_train'] = dataset[dataset['im_idx'].isin(
-    dataset_ims[:int(dataset_settings['perc_train']*len(dataset_ims))])]['im_patch_idx'].values
-dataset_settings['indices_val'] = dataset[dataset['im_idx'].isin(
-    dataset_ims[int(dataset_settings['perc_train']*len(dataset_ims)):-100])]['im_patch_idx'].values
-dataset_settings['indices_test'] = dataset[dataset['im_idx'].isin(
-    dataset_ims[-100:])]['im_patch_idx'].values
+t = [int(x.split('_')[0]) for x in dataset_settings['indices_train']]
+unique, counts = np.unique(t, return_counts=True)
+assert len(counts[counts < 2]) == 0, \
+    "Training set: number of patches per images may not be smaller than 2"
 
-np.random.seed(234)
-dataset_settings['indices_train'] = np.random.choice(
-    dataset_settings['indices_train'], 
-    len(dataset_settings['indices_train']), 
-    replace=False)[:20000]
-np.random.seed(234)
-dataset_settings['indices_val'] = np.random.choice(
-    dataset_settings['indices_val'], 
-    len(dataset_settings['indices_val']), 
-    replace=False)[:2000]
-
+v = [int(x.split('_')[0]) for x in dataset_settings['indices_val']]
+unique, counts = np.unique(v, return_counts=True)
+assert len(counts[counts < 2]) == 0, \
+    "Validation set: number of patches per images may not be smaller than 2"
 
 # train on only 1 image
 # =============================================================================
@@ -131,19 +154,15 @@ dataset_settings['indices_val'] = np.random.choice(
 # random_image = np.random.choice(dataset['im_idx'], 1, replace=False)
 # dataset = dataset[dataset['im_idx'] == random_image[0]]['im_patch_idx'].values
 # 
-# =============================================================================
-
-# train on image 0 only
-#random_pair = [0]
-
-# for 1 image only
-# =============================================================================
+# # train on image 0 only
+# #random_pair = [0]
+# 
+# # for 1 image only
 # dataset_settings['indices_train'] = np.repeat(dataset, 25)
 # dataset_settings['indices_val'] = dataset
 # dataset_settings['indices_test'] = dataset
-# dataset_settings['indices_patch2'] = dataset
+# 
 # =============================================================================
-
 # train on n images (part kept apart for val and test)
 # =============================================================================
 # n = 25
@@ -162,8 +181,81 @@ dataset_settings['indices_val'] = np.random.choice(
 # =============================================================================
 #dataset = dataset['im_idx'].values
 
+# train
+train(directories, dataset_settings, network_settings, train_settings)
 
+#%%
+""" Train on presaved dataset, only patches from other image as pairs """
+from train import train
 
+directories['data_path'] = os.path.join(
+    directories['intermediate_dir'], 
+    'training_S2',
+    directories['data_dir_patches_overlap'])
+
+folds = 5
+k = 0
+n_ims_test = 100
+
+# only patches from image a or image b
+dataset = pd.read_csv(os.path.join(
+                 directories['intermediate_dir'], 
+                'training_S2',
+                 directories['csv_file_patches_overlap']), sep=',')
+patch0 = dataset[dataset['patchpair_idx'] == 0]
+patch1 = dataset[dataset['patchpair_idx'] == 1]
+patchpairs = pd.merge(patch0, patch1, on='im_patch_idx')
+patchpairs_diff = patchpairs[patchpairs['impair_idx_x'] != patchpairs['impair_idx_y']]
+
+# train / test split
+dataset_ims = np.unique(patchpairs_diff['im_idx_x'])
+np.random.seed(234)
+test_ims = np.random.choice(dataset_ims, n_ims_test, replace=False)
+
+# remove test images
+dataset_ims = dataset_ims[np.isin(dataset_ims, test_ims) == False]
+
+# shuffle and save train-part
+import random
+random.seed(890)
+random.shuffle(dataset_ims)
+
+ims_per_fold = int(len(dataset_ims)/folds)
+
+# train / val split  
+val_ims = dataset_ims[k*ims_per_fold:(k+1)*ims_per_fold]
+train_ims = dataset_ims[np.isin(dataset_ims, val_ims) == False]
+
+# find indices
+dataset_val = patchpairs_diff[np.isin(patchpairs_diff['im_idx_x'], val_ims)]
+dataset_val = dataset_val[dataset_val['impair_idx_x'] == 'a']
+dataset_train = patchpairs_diff[np.isin(patchpairs_diff['im_idx_x'], train_ims)]
+dataset_train = dataset_train[dataset_train['impair_idx_x'] == 'a']
+dataset_test = patchpairs_diff[np.isin(patchpairs_diff['im_idx_x'], test_ims)]
+
+indices_val = np.array(dataset_val['im_patch_idx'])
+indices_train = np.array(dataset_train['im_patch_idx'])
+indices_test = np.array(dataset_test['im_patch_idx'])
+
+random.seed(123)
+random.shuffle(indices_val)
+random.shuffle(indices_train)
+random.shuffle(indices_test)
+
+dataset_settings['indices_train'] = indices_train
+dataset_settings['indices_val'] = indices_val
+dataset_settings['indices_test'] = indices_test
+
+t = [int(x.split('_')[0]) for x in dataset_settings['indices_train']]
+unique, counts = np.unique(t, return_counts=True)
+assert len(counts[counts < 2]) == 0, \
+     "Training set: number of patches per images may not be smaller than 2"
+ 
+v = [int(x.split('_')[0]) for x in dataset_settings['indices_val']]
+unique, counts = np.unique(v, return_counts=True)
+assert len(counts[counts < 2]) == 0, \
+    "Validation set: number of patches per images may not be smaller than 2"
+    
 # train
 train(directories, dataset_settings, network_settings, train_settings)
 
@@ -230,9 +322,10 @@ train(directories, dataset_settings, network_settings, train_settings)
 #%%
 """ Extract Features """
 
-from extract_features import extract_features, calculate_distancemap, calculate_differencemaps, calculate_changemap
+from extract_features import extract_features, calculate_distancemap, calculate_differencemaps, calculate_magnitudemap, calculate_changemap
 from metrics import compute_confusion_matrix, compute_matthews_corrcoef
 from plots import plot_imagepair_plus_gt, plot_changemap_plus_gt
+import matplotlib.pyplot as plt
 
 # get csv files
 oscd_train = pd.read_csv(os.path.join(directories['intermediate_dir_cd'], directories['csv_file_train_oscd']))
@@ -254,27 +347,27 @@ if extract_layers == None:
     
     # extract the features from all activation layers
     extract_layers = list()
-    layer_i = -1
+    layer_i = 0
     if model_settings['batch_norm']:
         for layer in branch:
             if layer == 'M':
                 layer_i += 1
             else:
-                layer_i += 3
                 extract_layers.append(layer_i)
+                layer_i += 3
+                
     else:
         for layer in branch:
             if layer == 'M':
                 layer_i += 1
             else:
-                layer_i += 2
                 extract_layers.append(layer_i)
-                   
-
+                layer_i += 2
+                
 # get image
 np.random.seed(789)
 randim = np.random.choice(oscd_train.im_idx.values)
-randim = 0
+randim = 8
 randim_a = str(randim)+'_a.npy'
 randim_b = str(randim)+'_b.npy'
 im_a = np.load(os.path.join(directories['intermediate_dir_cd'], directories['data_dir_oscd'],randim_a))
@@ -287,17 +380,54 @@ features = extract_features(
     model_settings=model_settings,  
     layers=extract_layers)
 
-assert(features[0].shape == features[1].shape)
-#plt.imshow(features[0][:,:,40], cmap=plt.cm.gray)
+#plt.imshow(features[0][2][:,:,21], cmap=plt.cm.gray)
 
-# calculate change map
-diffmaps = calculate_differencemaps(features[0], features[1])
-variance = [(i,np.var(diffmap)) for i, diffmap in enumerate(diffmaps)]
-variance.sort(key=lambda tup: tup[1], reverse=True)
-n=50
-var_layers = [l[0] for l in variance[:n]]
+# calculate difference maps per layer
+dcv = list()
+for i in range(2,len(features[0])): 
+    diffmaps = calculate_differencemaps(features[0][i], features[1][i])
+    # divide the differencemaps in a grid of S splits # for now in 4 splits, may be suoptimal
+    height = im_a.shape[0] // 2
+    width = im_a.shape[1] // 2
+    # calculate variance in feature of each split 
+    var_split0 = [(fl,np.var(diffmap[:height,:width])) for fl, diffmap in enumerate(diffmaps)]
+    var_split1 = [(fl,np.var(diffmap[:height, width:])) for fl, diffmap in enumerate(diffmaps)]
+    var_split2 = [(fl,np.var(diffmap[height:,:width])) for fl, diffmap in enumerate(diffmaps)]
+    var_split3 = [(fl,np.var(diffmap[height:, width:])) for fl, diffmap in enumerate(diffmaps)]
+    var_split0.sort(key=lambda tup: tup[1], reverse=True)
+    var_split1.sort(key=lambda tup: tup[1], reverse=True)
+    var_split2.sort(key=lambda tup: tup[1], reverse=True)
+    var_split3.sort(key=lambda tup: tup[1], reverse=True)
+    # select n features with heighest variance
+    n = int(0.25* len(diffmaps))
+    var_layers = list()
+    var_layers.extend([l[0] for l in var_split0[:n]])
+    var_layers.extend([l[0] for l in var_split1[:n]])
+    var_layers.extend([l[0] for l in var_split2[:n]])
+    var_layers.extend([l[0] for l in var_split3[:n]])
+    var_layers = np.unique(np.array(var_layers))
+    
+    dcv.extend([diffmaps[i] for i in var_layers])
 
-distmap = calculate_distancemap(features[0][:,:,var_layers], features[1][:,:,var_layers])
+
+distmap = calculate_magnitudemap(dcv)
+fig, ax = plt.subplots()
+d = ax.imshow(distmap)
+fig.colorbar(d)
+
+# without splits
+# =============================================================================
+# variance = [(i,np.var(diffmap)) for i, diffmap in enumerate(diffmaps)]
+# variance.sort(key=lambda tup: tup[1], reverse=True)
+# n=20
+# var_layers = [l[0] for l in variance[:n]]
+# =============================================================================
+
+# different methods for distance map
+# =============================================================================
+# distmap = calculate_distancemap(features[0][:,:,var_layers], features[1][:,:,var_layers])
+# distmap = calculate_distancemap(features[0], features[1])
+# =============================================================================
 
 changemap = calculate_changemap(distmap, plot=True)
 
@@ -305,8 +435,18 @@ changemap = calculate_changemap(distmap, plot=True)
 label = str(randim)+'.npy'
 gt = np.load(os.path.join(directories['intermediate_dir_cd'], directories['labels_dir_oscd'],label))
 
+changemap_classes = gt - (changemap+1)
+changemap_classes[changemap_classes == -1] = -1 #fp
+changemap_classes[changemap_classes == 1] = 3 #fn
+changemap_classes[changemap_classes == 0] = changemap[changemap_classes == 0]
+colors = ['green','black','white','magenta']
+from matplotlib.colors import ListedColormap
+from matplotlib import pyplot as plt
+cmap = ListedColormap(colors)
+plt.imshow(changemap_classes, vmin=-1, vmax=3, cmap=cmap)
+
 #plots
-fig1, ax1 = plot_imagepair_plus_gt(im_a, im_b, gt)  
+fig1, ax1 = plot_imagepair_plus_gt(im_a, im_b, gt, axis=True)  
 fig2, ax2 = plot_changemap_plus_gt(changemap, gt, axis=True)
 
 # confusion matrix
@@ -319,8 +459,10 @@ tn = cm[0,0]
 fp = cm[0,1]
 fn = cm[1,0]
 sensitivity = tp/(tp+fn) # prop of correctly identified changed pixels = recall
+recall = sensitivity
 specificity = tn/(tn+fp) # prop of correctly identified unchanged pixels
 precision = tp/(tp+fp) # prop of changed pixels that are truly changed
+F1 = 2 * (precision * recall) / (precision + recall)
 
 # print metrics
 print("mcc: ", mcc)
@@ -328,3 +470,5 @@ print("sensitivity: ", sensitivity)
 print("specificity: ", specificity)
 print("recall: ", sensitivity)
 print("precision: ", precision)
+print("F1: ", F1)
+
