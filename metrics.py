@@ -190,5 +190,26 @@ def compute_matthews_corrcoef(gt, changemap):
     
     return mcc  
  
+def compute_mcc(conf_matrix):
+    """ compute multi-class mcc using equation from source:
+        https://scikit-learn.org/stable/modules/model_evaluation.html#matthews-corrcoef
+        
+    arguments
+    ---------
+        conf_matrix: numpy.ndarray
+            confusion matrix. true in rows, predicted in columns
+            
+    return
+    ------
+        mcc: float
+            matthews correlation coefficient
+    
+    """
+    correct = np.trace(conf_matrix)
+    tot = np.sum(conf_matrix)
+    cl_true = np.sum(conf_matrix,axis = 1)
+    cl_pred = np.sum(conf_matrix, axis = 0)
 
+    mcc = (correct*tot-np.sum(cl_true*cl_pred))/(np.sqrt((tot**2-np.sum(cl_pred**2))*(tot**2-np.sum(cl_true**2))))
+    return mcc
 

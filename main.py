@@ -10,7 +10,7 @@ import os
 import numpy as np
 import pandas as pd
 
-computer = 'optimus'
+computer = 'desktop'
 
 # init
 if computer == 'desktop':
@@ -322,19 +322,23 @@ train(directories, dataset_settings, network_settings, train_settings)
 #%%
 """ Extract Features """
 
-from extract_features import extract_features, calculate_distancemap, calculate_differencemaps, calculate_magnitudemap, calculate_changemap
-from metrics import compute_confusion_matrix, compute_matthews_corrcoef
-from plots import plot_imagepair_plus_gt, plot_changemap_plus_gt
-import matplotlib.pyplot as plt
+from extract_features import get_network, extract_features, get_dcv
+from extract_features import calculate_magnitudemap, calculate_changemap
+from metrics import compute_confusion_matrix, compute_mcc
+from matplotlib.colors import ListedColormap
+from matplotlib import pyplot as plt
+
 
 # get csv files
 oscd_train = pd.read_csv(os.path.join(directories['intermediate_dir_cd'], directories['csv_file_train_oscd']))
 oscd_test = pd.read_csv(os.path.join(directories['intermediate_dir_cd'], directories['csv_file_test_oscd']))
 trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], directories['csv_models']))
 
+oscd_indices_train = np.unique(oscd_train.im_idx.values)
+
+# get model
 #model_settings = trained_models.sort_values('best_acc',ascending=False).iloc[0]
-model_settings = trained_models.iloc[-1]
-print("MODEL SETTINGS: \n", model_settings)
+model_settings = trained_models.iloc[-2]
 extract_layers = None # for manual setting which layers to use
 
 if extract_layers == None:
@@ -363,97 +367,60 @@ if extract_layers == None:
             else:
                 extract_layers.append(layer_i)
                 layer_i += 2
-                
-# get image
-np.random.seed(789)
-randim = np.random.choice(oscd_train.im_idx.values)
-randim = 8
-randim_a = str(randim)+'_a.npy'
-randim_b = str(randim)+'_b.npy'
-im_a = np.load(os.path.join(directories['intermediate_dir_cd'], directories['data_dir_oscd'],randim_a))
-im_b = np.load(os.path.join(directories['intermediate_dir_cd'], directories['data_dir_oscd'],randim_b))
 
-# extract features
-features = extract_features(
-    directories=directories, 
-    imagelist=[im_a, im_b], 
-    model_settings=model_settings,  
-    layers=extract_layers)
+model_settings['extract_features'] = extract_layers
+print("MODEL SETTINGS: \n", model_settings)
+net = get_network(model_settings)
 
-#plt.imshow(features[0][2][:,:,21], cmap=plt.cm.gray)
+# initiate confusion matrix
+cm = np.zeros((2,2), dtype=np.int)
 
-# calculate difference maps per layer
-dcv = list()
-for i in range(2,len(features[0])): 
-    diffmaps = calculate_differencemaps(features[0][i], features[1][i])
-    # divide the differencemaps in a grid of S splits # for now in 4 splits, may be suoptimal
+for idx in oscd_indices_train:
+    
+    # load images
+    im_a = np.load(os.path.join(
+        directories['intermediate_dir_cd'], 
+        directories['data_dir_oscd'], 
+        str(idx)+'_a.npy'))
+    im_b = np.load(os.path.join(
+        directories['intermediate_dir_cd'], 
+        directories['data_dir_oscd'],
+        str(idx)+'_b.npy'))
+    gt = np.load(os.path.join(
+        directories['intermediate_dir_cd'], 
+        directories['labels_dir_oscd'],
+        str(idx)+'.npy'))
+  
+    # get features
+    features = extract_features(net, model_settings['extract_features'], [im_a, im_b])
+    
+    # calculate difference maps per layer
+    layers_diffmap = range(2,len(features[0]))
+    # find height and width of S splits # for now in 4 splits, may be suoptimal
     height = im_a.shape[0] // 2
     width = im_a.shape[1] // 2
-    # calculate variance in feature of each split 
-    var_split0 = [(fl,np.var(diffmap[:height,:width])) for fl, diffmap in enumerate(diffmaps)]
-    var_split1 = [(fl,np.var(diffmap[:height, width:])) for fl, diffmap in enumerate(diffmaps)]
-    var_split2 = [(fl,np.var(diffmap[height:,:width])) for fl, diffmap in enumerate(diffmaps)]
-    var_split3 = [(fl,np.var(diffmap[height:, width:])) for fl, diffmap in enumerate(diffmaps)]
-    var_split0.sort(key=lambda tup: tup[1], reverse=True)
-    var_split1.sort(key=lambda tup: tup[1], reverse=True)
-    var_split2.sort(key=lambda tup: tup[1], reverse=True)
-    var_split3.sort(key=lambda tup: tup[1], reverse=True)
-    # select n features with heighest variance
-    n = int(0.25* len(diffmaps))
-    var_layers = list()
-    var_layers.extend([l[0] for l in var_split0[:n]])
-    var_layers.extend([l[0] for l in var_split1[:n]])
-    var_layers.extend([l[0] for l in var_split2[:n]])
-    var_layers.extend([l[0] for l in var_split3[:n]])
-    var_layers = np.unique(np.array(var_layers))
+    dcv = get_dcv(features, layers_diffmap, height, width, prop=0.1)
     
-    dcv.extend([diffmaps[i] for i in var_layers])
-
-
-distmap = calculate_magnitudemap(dcv)
-fig, ax = plt.subplots()
-d = ax.imshow(distmap)
-fig.colorbar(d)
-
-# without splits
-# =============================================================================
-# variance = [(i,np.var(diffmap)) for i, diffmap in enumerate(diffmaps)]
-# variance.sort(key=lambda tup: tup[1], reverse=True)
-# n=20
-# var_layers = [l[0] for l in variance[:n]]
-# =============================================================================
-
-# different methods for distance map
-# =============================================================================
-# distmap = calculate_distancemap(features[0][:,:,var_layers], features[1][:,:,var_layers])
-# distmap = calculate_distancemap(features[0], features[1])
-# =============================================================================
-
-changemap = calculate_changemap(distmap, plot=True)
-
-# get labels
-label = str(randim)+'.npy'
-gt = np.load(os.path.join(directories['intermediate_dir_cd'], directories['labels_dir_oscd'],label))
-
-changemap_classes = gt - (changemap+1)
-changemap_classes[changemap_classes == -1] = -1 #fp
-changemap_classes[changemap_classes == 1] = 3 #fn
-changemap_classes[changemap_classes == 0] = changemap[changemap_classes == 0]
-colors = ['green','black','white','magenta']
-from matplotlib.colors import ListedColormap
-from matplotlib import pyplot as plt
-cmap = ListedColormap(colors)
-plt.imshow(changemap_classes, vmin=-1, vmax=3, cmap=cmap)
-
-#plots
-fig1, ax1 = plot_imagepair_plus_gt(im_a, im_b, gt, axis=True)  
-fig2, ax2 = plot_changemap_plus_gt(changemap, gt, axis=True)
-
-# confusion matrix
-cm, fig3, axes3 = compute_confusion_matrix(gt, changemap, normalize=False)
-
+    # calculate distance map
+    distmap = calculate_magnitudemap(dcv)
+    
+    # calculate change map
+    changemap = calculate_changemap(distmap, plot=True)
+  
+    changemap_classes = gt - (changemap+1)
+    changemap_classes[changemap_classes == -1] = -1 #fp
+    changemap_classes[changemap_classes == 1] = 3 #fn
+    changemap_classes[changemap_classes == 0] = changemap[changemap_classes == 0]
+    colors = ['green','black','white','magenta']
+    cmap = ListedColormap(colors)
+    plt.imshow(changemap_classes, vmin=-1, vmax=3, cmap=cmap)
+    
+    # confusion matrix
+    conf_matrix, fig3, axes3 = compute_confusion_matrix(gt, changemap, normalize=False)
+    cm += cm
+    
 # compute metrics
-mcc = compute_matthews_corrcoef(gt, changemap)
+mcc = compute_mcc(cm)
 tp = cm[1,1]
 tn = cm[0,0]
 fp = cm[0,1]
@@ -471,4 +438,6 @@ print("specificity: ", specificity)
 print("recall: ", sensitivity)
 print("precision: ", precision)
 print("F1: ", F1)
-
+    
+    
+    
