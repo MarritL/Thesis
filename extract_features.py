@@ -13,6 +13,7 @@ from plots import normalize2plot
 import torch.nn as nn
 import matplotlib.pyplot as plt
 from skimage.filters import threshold_otsu, threshold_local, try_all_threshold, threshold_triangle, threshold_niblack
+from skimage.morphology import remove_small_objects
 
 def get_network(model_settings):
     
@@ -324,16 +325,17 @@ def calculate_changemap(distmap, plot=False):
 
     """
     
-    thresh = threshold_otsu(distmap)
+    #thresh = threshold_otsu(distmap_norm)
     #thresh = threshold_local(distmap, block_size=101, method='gaussian')
-    #thresh = threshold_triangle(distmap)
+    thresh = threshold_triangle(distmap)
     #thresh = threshold_niblack(distmap, window_size=101)
-    #fig, ax = try_all_threshold(distmap)
+    #fig, ax = try_all_threshold(distmap_norm)
     #fig, ax = plt.subplots()
     #d = ax.imshow(thresh)
     #fig.colorbar(d)
     
     binary =  distmap > thresh
+    binary = remove_small_objects(binary,min_size=11)
     
     if plot:
         fig, axes = plt.subplots(ncols=3, figsize=(8, 2.5))
@@ -357,3 +359,5 @@ def calculate_changemap(distmap, plot=False):
         plt.show() 
     
     return binary
+
+
