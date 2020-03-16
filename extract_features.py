@@ -325,9 +325,9 @@ def calculate_changemap(distmap, plot=False):
 
     """
     
-    #thresh = threshold_otsu(distmap_norm)
+    thresh = threshold_otsu(distmap)
     #thresh = threshold_local(distmap, block_size=101, method='gaussian')
-    thresh = threshold_triangle(distmap)
+    #thresh = threshold_triangle(distmap)
     #thresh = threshold_niblack(distmap, window_size=101)
     #fig, ax = try_all_threshold(distmap_norm)
     #fig, ax = plt.subplots()
@@ -335,7 +335,7 @@ def calculate_changemap(distmap, plot=False):
     #fig.colorbar(d)
     
     binary =  distmap > thresh
-    binary = remove_small_objects(binary,min_size=11)
+    binary = remove_small_objects(binary,min_size=7)
     
     if plot:
         fig, axes = plt.subplots(ncols=3, figsize=(8, 2.5))
