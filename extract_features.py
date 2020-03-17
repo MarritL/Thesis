@@ -244,6 +244,7 @@ def get_dcv(features, layers_diffmap, height, width, prop):
         var_layers.extend([l[0] for l in var_split2[:n]])
         var_layers.extend([l[0] for l in var_split3[:n]])
         var_layers = np.unique(np.array(var_layers))
+        print(var_layers)
         
         dcv.extend([diffmaps[i] for i in var_layers])
           
