@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from skimage.filters import threshold_otsu, threshold_local, try_all_threshold, threshold_triangle, threshold_niblack
 from skimage.morphology import remove_small_objects
 
+
 def get_network(model_settings):
     
     # cfgs are saved as strings, cast back to list
@@ -309,7 +310,7 @@ def calculate_differencemaps(f1, f2):
     
     return diff_per_fmap
 
-def calculate_changemap(distmap, plot=False):
+def calculate_changemap(distmap, method='otsu', plot=False):
     """
     create binary change map using otsu thresholding
 
@@ -324,8 +325,13 @@ def calculate_changemap(distmap, plot=False):
         DESCRIPTION.
 
     """
+    thresholdmethods = {
+        'otsu': threshold_otsu(distmap),
+        'triangle': threshold_triangle(distmap)}
     
-    thresh = threshold_otsu(distmap)
+    thresh = thresholdmethods[method]
+
+    #thresh = threshold_otsu(distmap)
     #thresh = threshold_local(distmap, block_size=101, method='gaussian')
     #thresh = threshold_triangle(distmap)
     #thresh = threshold_niblack(distmap, window_size=101)
@@ -358,6 +364,8 @@ def calculate_changemap(distmap, plot=False):
         
         plt.show() 
     
-    return binary
+    return binary, thresh
+
+
 
 

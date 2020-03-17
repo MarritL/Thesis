@@ -613,6 +613,35 @@ def plot_changemap_colors(changemap, gt, title='Change map', axis=True):
            
     return fig, ax
 
+def plot_distance_decision(distmap, changemap, gt, threshold):
+    colors = ['green','black','white','magenta']
+    cmap = ListedColormap(colors)
+    
+    changemap_classes = gt - (changemap+1)
+    changemap_classes[changemap_classes == -1] = -1 #fp
+    changemap_classes[changemap_classes == 1] = 3 #fn
+    changemap_classes[changemap_classes == 0] = changemap[changemap_classes == 0]
+     
+    fig, axes = plt.subplots(ncols=3, figsize=(8, 2.5))
+    ax = axes.ravel()
+    ax[0] = plt.subplot(1, 3, 1)
+    ax[1] = plt.subplot(1, 3, 2)
+    ax[2] = plt.subplot(1, 3, 3, sharex=ax[0], sharey=ax[0])
+    
+    ax[0].imshow(distmap, cmap=plt.cm.gray)
+    ax[0].set_title('Distance map')
+    ax[0].axis('off')
+    
+    ax[1].hist(distmap.ravel(), bins=256)
+    ax[1].set_title('Histogram')
+    ax[1].axvline(threshold, color='r')
+    
+    ax[2].imshow(changemap_classes, vmin=-1, vmax=3, cmap=cmap)
+    ax[2].set_title('Change map')
+    ax[2].axis('off')
+    
+    return fig, ax
+
 def plot_image_old(image_folder, image_list, bands, axis = False, normalize=True, titles = None):
     """ 
     plot the defined images

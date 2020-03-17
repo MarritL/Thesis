@@ -330,7 +330,7 @@ train(directories, dataset_settings, network_settings, train_settings)
 from extract_features import get_network, extract_features, get_dcv
 from extract_features import calculate_magnitudemap, calculate_changemap
 from metrics import compute_confusion_matrix, compute_mcc
-from plots import plot_changemap_colors, plot_image
+from plots import plot_changemap_colors, plot_image, plot_distance_decision
 from matplotlib import pyplot as plt
 import csv
 
@@ -444,12 +444,13 @@ for idx in oscd_indices:
     distmap = calculate_magnitudemap(dcv)
     
     # calculate change map
-    changemap = calculate_changemap(distmap, plot=True)
+    changemap, threshold = calculate_changemap(distmap, method='Otsu')
+    fig, ax = plot_distance_decision(distmap, changemap, gt, threshold)
     np.save(os.path.join(directories['results_dir_cd'],
                               model_settings['filename'].split('/')[-1],
                               str(idx)+'.npy'))
   
-    plot_changemap_colors(changemap, gt, title='Change map '+cityname, axis=False)
+    #plot_changemap_colors(changemap, gt, title='Change map '+cityname, axis=False)
 
     # confusion matrix
     conf_matrix, fig3, axes3 = compute_confusion_matrix(gt, changemap, normalize=False)
