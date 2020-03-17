@@ -17,6 +17,7 @@ if computer == 'desktop':
     directories = {
         'intermediate_dir_training': '/media/cordolo/marrit/Intermediate/training_S2',
         'results_dir_training': '/media/cordolo/marrit/results/training_S2',
+        'results_dir_cd': '/media/cordolo/marrit/results/CD_OSCD',
         'intermediate_dir_cd': '/media/cordolo/marrit/Intermediate/CD_OSCD',
         'intermediate_dir': '/media/cordolo/marrit/Intermediate',
         'csv_file_S21C': 'S21C_dataset.csv',
@@ -26,6 +27,7 @@ if computer == 'desktop':
         'csv_file_test_oscd': 'OSCD_test.csv',
         'csv_file_patches_overlap': 'S21C_patches_overlap50-70.csv',
         'csv_models': 'trained_models.csv',
+        'csv_models_results': 'models_results.csv',
         'data_dir_S21C': 'data_S21C',
         'data_dir_oscd': 'data_OSCD',
         'data_dir_patches_overlap': 'patches_S21C_overlap50-70',
@@ -36,6 +38,7 @@ elif computer == 'optimus':
     directories = {
         'intermediate_dir_training': '/media/marrit/Intermediate/training_S2',
         'results_dir_training': '/media/marrit/results/training_S2',
+        'results_dir_cd': '/media/marrit/results/CD_OSCD',
         'intermediate_dir_cd': '/media/marrit/Intermediate/CD_OSCD',
         'intermediate_dir': '/media/marrit/Intermediate',
         'csv_file_S21C': 'S21C_dataset.csv',
@@ -43,21 +46,22 @@ elif computer == 'optimus':
         'csv_file_oscd': 'OSCD_dataset.csv',
         'csv_file_train_oscd' : 'OSCD_train.csv',
         'csv_file_test_oscd': 'OSCD_test.csv',
-        'csv_file_patches_overlap': 'S21C_patches_overlap50-70.csv',
+        'csv_file_patches_overlap': 'S21C_patches_overlap90-100.csv',
         'csv_models': 'trained_models.csv',
+        'csv_models_results': 'models_results.csv',
         'data_dir_S21C': 'data_S21C',
         'data_dir_oscd': 'data_OSCD',
         'labels_dir_oscd' : 'labels_OSCD',
-        'data_dir_patches_overlap': 'patches_S21C_overlap50-70',
+        'data_dir_patches_overlap': 'patches_S21C_overlap90-100',
         'tb_dir': '/media/marrit/Intermediate/tensorboard',
         'model_dir': '/media/marrit/Intermediate/trained_models'}
 
 network_settings = {
-    'network': 'siamese_unet_diff',
+    'network': 'siamese',
     'optimizer': 'adam',
     'lr':1e-3,
     'weight_decay':0,
-    'loss': 'nll',
+    'loss': 'bce_sigmoid',
     'n_classes': 2,
     'patch_size': 96,
     'im_size': (96,96),
@@ -72,7 +76,7 @@ network_settings = {
 # classifier in siamese/triplet network uses linear layers
 # classifier in hypercolumn network uses conv layers
 # note: first number of top should be 2* or 3* last conv layer of branch
-cfg = {'branch': np.array([32, 32, 'M',64, 64,'M',128,'M'], dtype='object'), 
+cfg = {'branch': np.array([32,'M', 64,'M', 128,'M'], dtype='object'), 
        'top': np.array([384], dtype='object'),
        'classifier': np.array([256,128,network_settings['n_classes']])}
 network_settings['cfg'] = cfg
@@ -100,17 +104,17 @@ if network_settings['network'] == 'hypercolumn':
 
 train_settings = {
     'start_epoch': 0,
-    'num_epoch': 20,
-    'batch_size': 25,
+    'num_epoch': 30,
+    'batch_size': 13,
     'disp_iter': 10,
     'gpu': None}
 
 dataset_settings = {
-    'dataset_type' : 'overlap',
+    'dataset_type' : 'triplet',
     'perc_train': 0.85,
     'channels': np.arange(13),
-    'min_overlap': 0.5, 
-    'max_overlap': 0.7}
+    'min_overlap': 0.9, 
+    'max_overlap': 1}
 
 #%%
 """ Train on S21C presaved dataset overlap """
@@ -135,8 +139,8 @@ dataset_settings['indices_train'],\
             k=0)
 
 # subset of all images
-dataset_settings['indices_train'] = dataset_settings['indices_train'][:20000]
-dataset_settings['indices_val'] = dataset_settings['indices_val'][:2500]
+#dataset_settings['indices_train'] = dataset_settings['indices_train'][:20000]
+#dataset_settings['indices_val'] = dataset_settings['indices_val'][:2500]
 
 t = [int(x.split('_')[0]) for x in dataset_settings['indices_train']]
 unique, counts = np.unique(t, return_counts=True)
@@ -304,11 +308,12 @@ dataset = dataset.loc[dataset['pair_idx'] == 'a']
 # dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
 # =============================================================================
 np.random.seed(234)
-#dataset = np.random.choice(dataset['im_idx'], 1, replace=False)
-dataset = [0] # select one specific image
-dataset_settings['indices_train'] = np.repeat(dataset[0], 1000)
-dataset_settings['indices_val'] = np.repeat(dataset[0], 25)
-dataset_settings['indices_test'] = np.repeat(dataset[0], 25)
+dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
+dataset_val = dataset[0] # select one specific image
+dataset = dataset[1:]
+dataset_settings['indices_train'] = np.repeat(dataset[0], 100)
+dataset_settings['indices_val'] = np.array([dataset_val])
+#dataset_settings['indices_test'] = np.repeat(dataset[0], 25)
 
 # continue training
 trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], directories['csv_models']))
@@ -325,20 +330,33 @@ train(directories, dataset_settings, network_settings, train_settings)
 from extract_features import get_network, extract_features, get_dcv
 from extract_features import calculate_magnitudemap, calculate_changemap
 from metrics import compute_confusion_matrix, compute_mcc
-from matplotlib.colors import ListedColormap
+from plots import plot_changemap_colors, plot_image
 from matplotlib import pyplot as plt
+import csv
 
+# init save-file
+fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', 'cfg_classifier', \
+              'optimizer', 'lr', 'weight_decay', 'loss', 'n_classes', \
+              'n_channels','patch_size','batch_norm','dataset','min_overlap',\
+              'max_overlap', 'best_acc','best_epoch', 'best_loss', 'cd_dataset', \
+              'extract_layers', 'prop_layers', 'tp', 'tn', 'fp', 'fn', \
+              'sensitivity', 'specificity', 'recall', 'precision', 'F1', 'accuracy']   
+if not os.path.isdir(directories['results_dir_cd']):
+    os.makedirs(directories['results_dir_cd'])     
+if not os.path.exists(os.path.join(directories['results_dir_cd'], 
+                                   directories['csv_models_results'])):
+    with open(os.path.join(directories['results_dir_cd'], 
+                           directories['csv_models_results']), 'a') as file:
+        filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
+        filewriter.writeheader()
 
-# get csv files
-oscd_train = pd.read_csv(os.path.join(directories['intermediate_dir_cd'], directories['csv_file_train_oscd']))
-oscd_test = pd.read_csv(os.path.join(directories['intermediate_dir_cd'], directories['csv_file_test_oscd']))
-trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], directories['csv_models']))
-
-oscd_indices_train = np.unique(oscd_train.im_idx.values)
+# get model files
+trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], 
+                                          directories['csv_models']))
 
 # get model
 #model_settings = trained_models.sort_values('best_acc',ascending=False).iloc[0]
-model_settings = trained_models.iloc[-2]
+model_settings = trained_models.iloc[-4]
 extract_layers = None # for manual setting which layers to use
 
 if extract_layers == None:
@@ -372,11 +390,26 @@ model_settings['extract_features'] = extract_layers
 print("MODEL SETTINGS: \n", model_settings)
 net = get_network(model_settings)
 
+# get cd dataset
+model_settings['cd_dataset'] = 'train_oscd'
+oscd_dataset = pd.read_csv(os.path.join(
+    directories['intermediate_dir_cd'], 
+    directories['csv_file_' + model_settings['cd_dataset']]))
+
+# get indices
+oscd_indices = np.unique(oscd_dataset.im_idx.values)
+oscd_indices = np.array([21])
+
 # initiate confusion matrix
 cm = np.zeros((2,2), dtype=np.int)
+if not os.path.isdir(os.path.join(directories['results_dir_cd'],
+                     model_settings['filename'].split('/')[-1])):
+     os.makedirs(os.path.join(directories['results_dir_cd'],
+                              model_settings['filename'].split('/')[-1]))
 
-for idx in oscd_indices_train:
+for idx in oscd_indices:
     
+    cityname = oscd_dataset[oscd_dataset['im_idx'] == idx].iloc[0]['city']
     # load images
     im_a = np.load(os.path.join(
         directories['intermediate_dir_cd'], 
@@ -391,6 +424,11 @@ for idx in oscd_indices_train:
         directories['labels_dir_oscd'],
         str(idx)+'.npy'))
   
+    # plot images
+    plot_image(
+        os.path.join(directories['intermediate_dir_cd'], directories['data_dir_oscd']),
+        [str(idx)+'_a.npy', str(idx)+'_b.npy'], [3,2,1], titles=[str(idx)+'_a.npy', str(idx)+'_b.npy'])
+    
     # get features
     features = extract_features(net, model_settings['extract_features'], [im_a, im_b])
     
@@ -399,28 +437,26 @@ for idx in oscd_indices_train:
     # find height and width of S splits # for now in 4 splits, may be suoptimal
     height = im_a.shape[0] // 2
     width = im_a.shape[1] // 2
-    dcv = get_dcv(features, layers_diffmap, height, width, prop=0.1)
+    prop=0.1
+    dcv = get_dcv(features, layers_diffmap, height, width, prop)
     
     # calculate distance map
     distmap = calculate_magnitudemap(dcv)
     
     # calculate change map
     changemap = calculate_changemap(distmap, plot=True)
+    np.save(os.path.join(directories['results_dir_cd'],
+                              model_settings['filename'].split('/')[-1],
+                              str(idx)+'.npy'))
   
-    changemap_classes = gt - (changemap+1)
-    changemap_classes[changemap_classes == -1] = -1 #fp
-    changemap_classes[changemap_classes == 1] = 3 #fn
-    changemap_classes[changemap_classes == 0] = changemap[changemap_classes == 0]
-    colors = ['green','black','white','magenta']
-    cmap = ListedColormap(colors)
-    plt.imshow(changemap_classes, vmin=-1, vmax=3, cmap=cmap)
-    
+    plot_changemap_colors(changemap, gt, title='Change map '+cityname, axis=False)
+
     # confusion matrix
     conf_matrix, fig3, axes3 = compute_confusion_matrix(gt, changemap, normalize=False)
-    cm += cm
+    cm += conf_matrix
     
 # compute metrics
-mcc = compute_mcc(cm)
+#mcc = compute_mcc(cm)
 tp = cm[1,1]
 tn = cm[0,0]
 fp = cm[0,1]
@@ -430,14 +466,32 @@ recall = sensitivity
 specificity = tn/(tn+fp) # prop of correctly identified unchanged pixels
 precision = tp/(tp+fp) # prop of changed pixels that are truly changed
 F1 = 2 * (precision * recall) / (precision + recall)
+acc = (tp+tn)/sum(sum(cm))
 
 # print metrics
-print("mcc: ", mcc)
+#print("mcc: ", mcc)
 print("sensitivity: ", sensitivity)
 print("specificity: ", specificity)
 print("recall: ", sensitivity)
 print("precision: ", precision)
 print("F1: ", F1)
-    
-    
+print("acc: ", acc)    
+
+model_settings['extract_layers'] = model_settings['extract_features'][1:]
+model_settings['prop_layers'] = prop 
+model_settings['tp'] = tp
+model_settings['tn'] = tn
+model_settings['fp'] = fp
+model_settings['fn'] = fn
+model_settings['sensitivity'] = sensitivity
+model_settings['specificity'] = specificity
+model_settings[ 'recall'] = recall
+model_settings['precision'] = precision
+model_settings['F1'] = F1
+model_settings['accuracy'] = acc
+
+with open(os.path.join(directories['results_dir_cd'], 
+                       directories['csv_models_results']), 'a') as file:
+    filewriter = csv.DictWriter(file, fieldnames, delimiter = ",", extrasaction='ignore')
+    filewriter.writerow(model_settings)  
     

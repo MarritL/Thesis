@@ -12,6 +12,7 @@ from random import sample
 from matplotlib import pyplot as plt
 from matplotlib import cm
 from matplotlib import patches as patches
+from matplotlib.colors import ListedColormap
      
 def plot_random_imagepairs(n_imagepairs, image_folder, bands, axis=False, normalize=True, titles = None, rows = None, cols = None):
     """ 
@@ -571,6 +572,46 @@ def plot_changemap_plus_gt(changemap, gt, axis=True):
         ax[1].axis('off')
         
     return fig, axes 
+
+def plot_changemap_colors(changemap, gt, title='Change map', axis=True):
+    """
+    plot change map with black: TN, white: TP, green: FP, magenta: FN
+
+    Parameters
+    ----------
+    changemap : boolean np.ndarray of shape (N,M) 
+        binary change map. False = No change, True = Change.
+    gt : numpy.ndarray of shape (N,M)
+        ground truth map, 1 = No change, 2 = Change
+    title : string, optional
+        plot title. The default is 'Change map'.
+    axis : boolean, optional
+        whether or not to plot the axis. The default is True.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        figure
+    axes : list
+        list of axes in the figure
+
+    """
+
+    colors = ['green','black','white','magenta']
+    cmap = ListedColormap(colors)
+    
+    changemap_classes = gt - (changemap+1)
+    changemap_classes[changemap_classes == -1] = -1 #fp
+    changemap_classes[changemap_classes == 1] = 3 #fn
+    changemap_classes[changemap_classes == 0] = changemap[changemap_classes == 0]
+ 
+    fig, ax = plt.subplots(figsize=(10, 10))
+    ax.imshow(changemap_classes, vmin=-1, vmax=3, cmap=cmap)
+    ax.set_title(title)
+    if not axis:
+        ax.axis('off')
+           
+    return fig, ax
 
 def plot_image_old(image_folder, image_list, bands, axis = False, normalize=True, titles = None):
     """ 
