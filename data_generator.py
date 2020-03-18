@@ -682,8 +682,8 @@ def sample_patchtriplet(im1_shape, patch_size=96, min_overlap=0.2,
     #print("overlap = ", overlap/(patch_size*patch_size))
 
     # save in variable
-    patch_starts.append(np.array([patch_starts[0][0] + shift_ud,
-                                  patch_starts[0][1] + shift_lr]))
+    patch_starts.append(np.array([int(patch_starts[0][0] + shift_ud),
+                                  int(patch_starts[0][1] + shift_lr)]))
         
     
     # sample starting point of the 3th patch
@@ -692,8 +692,8 @@ def sample_patchtriplet(im1_shape, patch_size=96, min_overlap=0.2,
                              dtype=np.bool)
     # make sure overlapping regions with patch 1 and 2 are excluded
     for i in range(2):
-        not_start_row = max(patch_starts[i][0]-patch_size, 0)
-        not_start_col = max(patch_starts[i][1]-patch_size, 0)   
+        not_start_row = int(max(patch_starts[i][0]-patch_size, 0))
+        not_start_col = int(max(patch_starts[i][1]-patch_size, 0))   
         patch3_options[not_start_row:patch_starts[i][0]+patch_size,
                        not_start_col:patch_starts[i][1]+patch_size] = False
 

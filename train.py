@@ -58,9 +58,13 @@ def train(directories, dataset_settings, network_settings, train_settings):
         mean_overlap = np.mean([dataset_settings['min_overlap'], 
                                 dataset_settings['max_overlap']])
         pos_weight = (1-mean_overlap)/mean_overlap
+    elif network_settings['network'] == 'siamese_unet_diff':
+        print('n_branches = 2')
+        n_branches = 2
     else:
         raise Exception('Architecture undefined! \n \
-                        Choose one of: "siamese", "triplet", "hypercolumn"')
+                        Choose one of: "siamese", "triplet", "hypercolumn", \
+                        "siamese_unet_diff"')
         
         
     net = NetBuilder.build_network(
@@ -144,7 +148,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
         dataset_train, 
         batch_size=train_settings['batch_size'], 
         shuffle=True,
-        num_workers = 6)
+        num_workers = 4)
     dataloader_val = DataLoader(
         dataset_val, 
         batch_size=train_settings['batch_size'], 
@@ -187,7 +191,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 extract_features=network_settings['extract_features'])
             
             # validation epoch
-            best_net_wts, best_acc, best_epoch, best_loss = validate(
+            best_net_wts, best_acc, best_epoch, best_loss = validate_epoch(
                 network=net, 
                 n_branches=n_branches,
                 dataloader=dataloader_val, 
@@ -242,6 +246,97 @@ def train(directories, dataset_settings, network_settings, train_settings):
     print('Training Done!')
     writer.close()
 
+def validate(model_settings, eval_settings):
+    # build network
+    if model_settings['networkname'] == 'siamese':
+        n_branches = 2
+        pos_weight = 1
+        model_settings['im_size'] = (1,1)
+    elif model_settings['network'] == 'triplet':
+        print('n_branches = 3')
+        n_branches = 3
+        pos_weight=1
+        model_settings['network'] = 'siamese'
+        model_settings['im_size'] = (1,1)        
+    elif model_settings['network'] == 'hypercolumn':
+        print('n_branches = 2')
+        n_branches = 2
+        mean_overlap = np.mean([model_settings['min_overlap'], 
+                                model_settings['max_overlap']])
+        pos_weight = (1-mean_overlap)/mean_overlap
+    else:
+        raise Exception('Architecture undefined! \n \
+                        Choose one of: "siamese", "triplet", "hypercolumn", \
+                        "siamese_unet_diff"')
+        
+        
+    net = NetBuilder.build_network(
+        net=model_settings['network'],
+        cfg=model_settings['cfg'],
+        n_channels=model_settings['n_channels'], 
+        n_classes=model_settings['n_classes'],
+        patch_size=model_settings['patch_size'],
+        im_size=model_settings['im_size'],
+        batch_norm=model_settings['batch_norm'],
+        n_branches=n_branches,
+        weights=model_settings['filename'])  
+       
+    loss_func, acc_func, one_hot = create_loss_function(model_settings['loss'], pos_weight=pos_weight)
+    
+    # load net to GPU     
+    if eval_settings['gpu'] != None:
+        torch.cuda.set_device(eval_settings['gpu'])
+        net.cuda()
+        loss_func = loss_func.cuda()
+                     
+    # Datasets
+    if model_settings['dataset'] == 'pair':
+        dataset_val = PairDataset(
+            data_dir=eval_settings['data_path'], 
+            indices=eval_settings['indices_eval'], 
+            channels=np.arange(13))       
+    elif model_settings['dataset'] == 'triplet' or model_settings['dataset'] == 'triplet_saved': 
+        dataset_val = TripletDataset(
+            data_dir=eval_settings['data_path'], 
+            indices=eval_settings['indices_eval'], 
+            channels=np.arange(13), 
+            one_hot=one_hot,
+            min_overlap = model_settings['min_overlap'],
+            max_overlap = model_settings['max_overlap'])  
+    else:
+        raise Exception('dataset_type undefined! \n \
+                        Choose one of: "pair", "triplet", "triplet_saved"')
+    
+    # Data loaders
+    dataloader = DataLoader(
+        dataset_val, 
+        batch_size=eval_settings['batch_size'], 
+        shuffle=False,
+        num_workers = 4)
+    
+    val_epoch_iters = max(len(dataset_val) // eval_settings['batch_size'],1)
+    best_net_wts = copy.deepcopy(net.state_dict())
+    
+    # validation epoch
+    best_net_wts, best_acc, best_epoch, best_loss = validate(
+        network=net, 
+        n_branches=n_branches,
+        dataloader=dataloader, 
+        loss_func=loss_func,
+        acc_func=acc_func,
+        history=None, 
+        epoch=0, 
+        writer=None,
+        val_epoch_iters=val_epoch_iters,
+        best_net_wts=best_net_wts,
+        best_acc=0.0,
+        best_epoch=0,
+        best_loss=99999,
+        gpu = eval_settings['gpu'],
+        im_size = (1,1),
+        extract_features=None)
+
+    return best_acc, best_loss
 
     
 def train_epoch(network, n_branches, dataloader, optimizer, loss_func, 
@@ -336,7 +431,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
 
 
     
-def validate(network, n_branches, dataloader, loss_func, acc_func, history, 
+def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, extract_features=None):    
 
@@ -409,8 +504,9 @@ def validate(network, n_branches, dataloader, loss_func, acc_func, history,
           .format(epoch, time_meter.value(),
                   ave_loss.average(), ave_acc.average()))
     
-    writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
-    writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
+    if writer != None:
+        writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
+        writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
     
     if ave_loss.average() < best_loss:
         best_acc = ave_acc.average()
