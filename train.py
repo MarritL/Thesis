@@ -269,7 +269,34 @@ def validate(model_settings, eval_settings):
                         Choose one of: "siamese", "triplet", "hypercolumn", \
                         "siamese_unet_diff"')
         
-        
+    # cfgs are saved as strings, cast back to list
+    branch = model_settings['cfg_branch'].split("[" )[1]
+    branch = branch.split("]" )[0]
+    branch = branch.replace("'", "")
+    branch = branch.replace(" ", "")
+    branch = branch.split(",")
+    top = model_settings['cfg_top'].split("[" )[1]
+    top = top.split("]" )[0]
+    top = top.replace("'", "")
+    top = top.replace(" ", "")
+    top = top.split(",")
+    classifier = model_settings['cfg_classifier'].split("[" )[1]
+    classifier = classifier.split("]" )[0]
+    classifier = classifier.replace("'", "")
+    classifier = classifier.replace(" ", "")
+    classifier = classifier.split(",")
+    # save in model_settigns
+    model_settings['cfg'] = {'branch': np.array(branch, dtype='object'), 
+                             'top': np.array(top,dtype='object'),
+                             'classifier': np.array(classifier, dtype='object')}
+    
+    # batch_norm saved as string cast back to bool
+    if model_settings['batch_norm'] == 'False' : 
+        model_settings['batch_norm'] = False
+    elif model_settings['batch_norm'] == 'True' : 
+        model_settings['batch_norm'] = True
+
+    
     net = NetBuilder.build_network(
         net=model_settings['network'],
         cfg=model_settings['cfg'],
