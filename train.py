@@ -252,13 +252,13 @@ def validate(model_settings, eval_settings):
         n_branches = 2
         pos_weight = 1
         model_settings['im_size'] = (1,1)
-    elif model_settings['network'] == 'triplet':
+    elif model_settings['networkname'] == 'triplet':
         print('n_branches = 3')
         n_branches = 3
         pos_weight=1
         model_settings['network'] = 'siamese'
         model_settings['im_size'] = (1,1)        
-    elif model_settings['network'] == 'hypercolumn':
+    elif model_settings['networkname'] == 'hypercolumn':
         print('n_branches = 2')
         n_branches = 2
         mean_overlap = np.mean([model_settings['min_overlap'], 
