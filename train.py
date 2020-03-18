@@ -345,7 +345,7 @@ def validate(model_settings, eval_settings):
     best_net_wts = copy.deepcopy(net.state_dict())
     
     # validation epoch
-    best_net_wts, best_acc, best_epoch, best_loss = validate(
+    best_net_wts, best_acc, best_epoch, best_loss = validate_epoch(
         network=net, 
         n_branches=n_branches,
         dataloader=dataloader, 
