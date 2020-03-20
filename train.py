@@ -484,7 +484,7 @@ def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history
 
     # main loop
     tic = time.time()
-    for i, batch_data in enumerate(iterator):    
+    for i, batch_data in enumerate(iterator):  
 
         # get the inputs
         if n_branches == 2:
