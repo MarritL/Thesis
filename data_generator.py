@@ -296,6 +296,80 @@ class TripletDataset(BaseDataset):
         patchtriplet['label'] = torch.as_tensor(lbl, dtype=dtype)
         
         return patchtriplet
+
+class TripletAPNDataset(BaseDataset):
+    """ Generate dataset with patch triplets, anchor and positive 100% overlap """
+    
+    def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
+                 percentile=99, one_hot=True):
+        super(TripletAPNDataset, self).__init__(data_dir, indices, channels, 
+                                             patch_size, percentile)
+        
+        self.one_hot = one_hot
+    
+    def __getitem__(self, index):
+        'Generates one patch triplet'
+        # Select sample
+        im_idx = self.indices[index]
+            
+        # get random image-pair index (i.e. a/b)
+        #triplet_pairidxs = np.random.choice(self.pair_indices, size=3, replace=True)
+        triplet_pairidxs = np.array(['a', 'b', 'b'])
+
+        # 'reconstruct' the filenames
+        filenames = get_filenames(im_idx, triplet_pairidxs)
+        unique_images = np.unique(filenames)
+        n_images = len(unique_images)
+    
+        # load image
+        images = self.get_images(unique_images)
+
+        # check if all images have the same shape
+        if n_images > 1:
+            for i in range(n_images-1):
+                assert images[i].shape == images[i+1].shape,\
+                    'Shape not matching in image pair {}'.format(im_idx)
+
+        # sample start locations patches
+        patch_starts = sample_patchtriplet_apn(
+            images[0].shape, 
+            self.patch_size)
+        
+        # label for l1 loss
+        # lbl = 0 # if using mean of distance image
+        lbl = np.zeros((self.patch_size, self.patch_size)) # if calculating pixelwise
+        
+        # get patches
+        patchtriplet = self.get_patches(patch_starts, images, triplet_pairidxs)
+
+        # rearange axis (channels first)
+        patchtriplet = channelsfirst(patchtriplet)
+                             
+        assert patchtriplet['patch0'].shape == \
+            patchtriplet['patch1'].shape == \
+            patchtriplet['patch2'].shape, \
+            "Shape not matching in patch triplet {}, shape: 0:{} 1:{} 2:{}"\
+            .format(
+                im_idx, 
+                patchtriplet['patch0'].shape, 
+                patchtriplet['patch1'].shape,
+                patchtriplet['patch2'].shape)
+        assert np.any(~np.isnan(patchtriplet['patch0'])) \
+            & np.any(~np.isnan(patchtriplet['patch1'])) \
+            & np.any(~np.isnan(patchtriplet['patch2'])), \
+            "Nans in patch triplet {}".format(im_idx)  
+        
+        # add image info
+        patchtriplet['im_idx'] = im_idx
+        
+        # cast to tensors
+        patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
+        patchtriplet['patch1'] = torch.as_tensor(patchtriplet['patch1'])
+        patchtriplet['patch2'] = torch.as_tensor(patchtriplet['patch2'])
+        patchtriplet['label'] = torch.as_tensor(lbl)
+        
+        return patchtriplet
+
     
 class TripletDatasetPreSaved(BaseDataset):
     """ Generate dataset of patch triplets from patches saved on disk """
@@ -709,4 +783,52 @@ def sample_patchtriplet(im1_shape, patch_size=96, min_overlap=0.2,
 #     patch_starts = [np.array([341,  82]), np.array([279,  51]), np.array([463, 360])]
 #     ##
 # =============================================================================
+    return patch_starts
+
+def sample_patchtriplet_apn(im1_shape, patch_size=96):
+    """
+    Samples a patch triplet from the image. The first two patches (0,1) are 
+    100% overlapping the third patch (2) is not overlapping patch 0 and 1.
+
+    Parameters
+    ----------
+    im1_shape : tuple
+        tuple of shape of the image to smaple the patches from
+    patch_size : int, optional
+        width and height of the patches in pixels, patches are squared. 
+        The default is 96.
+
+    Returns
+    -------
+    patch_starts : list
+        list of upper left corners of patch 0 to 2. 
+        patch_starts[0] : starting point of patch 0, described by numpy.ndarray 
+            of shape (2,) representing resp. row, column
+        patch_starts[1] : starting point of patch 1, described by numpy.ndarray
+            of shape (2,) representing respectively row and column.
+        patch_starts[2] : starting point of patch2, described by numpy.ndarray
+            of shape (2,) representing respectively row and column.
+    """
+    patch_starts = list()
+ 
+    # sample starting point of the central patch = patch1
+    patch0_row = np.random.randint(0,im1_shape[0]-patch_size, size = 1)
+    patch0_col = np.random.randint(0,im1_shape[1]-patch_size, size = 1)
+    patch_starts.append(np.concatenate([patch0_row,patch0_col]))
+    # patch start 0 and 1 are the same (100% overlap)
+    patch_starts.append(np.concatenate([patch0_row,patch0_col])) 
+    
+    # sample starting point of the 2th patch
+    patch2_options = np.ones((im1_shape[0]-patch_size, im1_shape[1]-patch_size),dtype=np.bool)
+    # exclude patch 0 (no overlap with 0 and 1)
+    not_start_row = max(patch_starts[0][0]-patch_size,0)
+    not_start_col = max(patch_starts[0][1]-patch_size,0)   
+    patch2_options[not_start_row:patch_starts[0][0]+patch_size,
+                   not_start_col:patch_starts[0][1]+patch_size] = False
+    idx = np.random.randint(np.where(patch2_options)[0].shape[0])
+    patch2_row = np.where(patch2_options)[0][idx]    
+    patch2_col = np.where(patch2_options)[1][idx]      
+    
+    patch_starts.append(np.array([patch2_row, patch2_col]))
+    
     return patch_starts

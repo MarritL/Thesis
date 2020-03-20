@@ -57,11 +57,11 @@ elif computer == 'optimus':
         'model_dir': '/media/marrit/Intermediate/trained_models'}
 
 network_settings = {
-    'network': 'triplet',
+    'network': 'triplet_apn',
     'optimizer': 'adam',
     'lr':1e-3,
     'weight_decay':0,
-    'loss': 'bce_sigmoid',
+    'loss': 'l1+triplet',
     'n_classes': 2,
     'patch_size': 96,
     'im_size': (96,96),
@@ -76,7 +76,7 @@ network_settings = {
 # classifier in siamese/triplet network uses linear layers
 # classifier in hypercolumn network uses conv layers
 # note: first number of top should be 2* or 3* last conv layer of branch
-cfg = {'branch': np.array([32,'M', 64,'M', 128,'M'], dtype='object'), 
+cfg = {'branch': np.array([32, 64, 128], dtype='object'), 
        'top': np.array([384], dtype='object'),
        'classifier': np.array([256,128,network_settings['n_classes']])}
 network_settings['cfg'] = cfg
@@ -104,13 +104,13 @@ if network_settings['network'] == 'hypercolumn':
 
 train_settings = {
     'start_epoch': 0,
-    'num_epoch': 20,
-    'batch_size': 10,
-    'disp_iter': 10,
+    'num_epoch': 40,
+    'batch_size': 25,
+    'disp_iter': 1,
     'gpu': None}
 
 dataset_settings = {
-    'dataset_type' : 'triplet',
+    'dataset_type' : 'triplet_apn',
     'perc_train': 0.85,
     'channels': np.arange(13),
     'min_overlap': 0.9, 
@@ -276,18 +276,23 @@ dataset = dataset.loc[dataset['pair_idx'] == 'a']
 np.random.seed(234)
 #dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
 
-dataset = np.random.choice(dataset['im_idx'], 1, replace=False)
-dataset_settings['indices_train'] = np.repeat(dataset[0], 1000)
-dataset_settings['indices_val'] = np.repeat(dataset[0], 25)
-dataset_settings['indices_test'] = np.repeat(dataset[0], 25)
+dataset = np.random.choice(dataset['im_idx'], 150, replace=False)
+dataset_settings['indices_train'] = np.repeat(dataset[:100], 50)
+dataset_settings['indices_val'] = np.repeat(dataset[100:-25], 25)
+dataset_settings['indices_test'] = np.repeat(dataset[-25], 25)
 
 # =============================================================================
-# #dataset = np.random.choice(dataset['im_idx'], 1000, replace=False)
-# #dataset = dataset['im_idx'].values
-# 
+# dataset = np.random.choice(dataset['im_idx'], 125, replace=False)
+# dataset_settings['indices_train'] = dataset[:75]
+# dataset_settings['indices_val'] = dataset[75:-25]
+# dataset_settings['indices_test'] = dataset[-25:]
+# =============================================================================
+#dataset = dataset['im_idx'].values
+
+# =============================================================================
 # dataset_settings['indices_train'] = dataset[:int(dataset_settings['perc_train']*len(dataset))]
-# dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):-100]
-# dataset_settings['indices_test'] = dataset[-100:]
+# dataset_settings['indices_val'] = dataset[int(dataset_settings['perc_train']*len(dataset)):-25]
+# dataset_settings['indices_test'] = dataset[-25:]
 # =============================================================================
 
 # train
@@ -311,19 +316,23 @@ np.random.seed(234)
 dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
 #dataset = np.array([8]) # select one specific image
 #dataset = dataset[1:]
-dataset_settings['indices_train'] = np.repeat(dataset, 71)
-dataset_settings['indices_val'] = np.repeat(dataset, 71)
+dataset_settings['indices_train'] = np.repeat(dataset, 60)
+dataset_settings['indices_val'] = np.repeat(dataset, 60)
 #dataset_settings['indices_test'] = np.repeat(dataset[0], 25)
 
 # continue training
-# =============================================================================
-# trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], directories['csv_models']))
-# model_settings = trained_models.iloc[24]
-# network_settings['weights_file'] = model_settings['filename']
-# =============================================================================
+trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], directories['csv_models']))
+model_settings = trained_models.iloc[-1]
+network_settings['weights_file'] = model_settings['filename']
 
 # train
 train(directories, dataset_settings, network_settings, train_settings)
+
+#%%
+""" Finetune on OSCD dataset """
+from train import train
+
+
 
 #%% 
 """ Check accuracy model on OSCD dataset """
@@ -335,7 +344,7 @@ trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'],
 
 # get model
 #model_settings = trained_models.sort_values('best_acc',ascending=False).iloc[0]
-model_settings = trained_models.iloc[3] # TODO: change here the model
+model_settings = trained_models.iloc[-1] # TODO: change here the model
 print("MODEL SETTINGS: \n", model_settings)
 
 # get oscd dataset
@@ -347,6 +356,7 @@ dataset = pd.read_csv(os.path.join(directories['intermediate_dir_cd'],directorie
 dataset = dataset.loc[dataset['pair_idx'] == 'a']
 np.random.seed(234)
 dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
+#dataset = np.array([21]) # select one specific image
 eval_settings['indices_eval'] = np.repeat(dataset, 75)
 
 eval_settings['gpu'] = train_settings['gpu']
@@ -394,8 +404,9 @@ trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'],
 
 # get model
 #model_settings = trained_models.sort_values('best_acc',ascending=False).iloc[0]
-model_settings = trained_models.iloc[-1] # TODO: change here the model
+model_settings = trained_models.iloc[1] # TODO: change here the model
 extract_layers = None # for manual setting which layers to use
+which_layers = 'activations' # TODO: change here which layers (conv / activations)
 
 if extract_layers == None:
     # cfgs are saved as strings, cast back to list
@@ -405,27 +416,49 @@ if extract_layers == None:
     branch = branch.replace(" ", "")
     branch = branch.split(",")
     
-    # extract the features from all activation layers
-    extract_layers = list()
-    layer_i = 0
-    if model_settings['batch_norm']:
-        for layer in branch:
-            if layer == 'M':
-                layer_i += 1
-            else:
-                extract_layers.append(layer_i)
-                layer_i += 3
-                
-    else:
-        for layer in branch:
-            if layer == 'M':
-                layer_i += 1
-            else:
-                extract_layers.append(layer_i)
-                layer_i += 2
+    if which_layers == 'conv':
+        # extract the features from all conv layers
+        extract_layers = list()
+        layer_i = 0
+        if model_settings['batch_norm']:
+            for layer in branch:
+                if layer == 'M':
+                    layer_i += 1
+                else:
+                    extract_layers.append(layer_i)
+                    layer_i += 3
+                    
+        else:
+            for layer in branch:
+                if layer == 'M':
+                    layer_i += 1
+                else:
+                    extract_layers.append(layer_i)
+                    layer_i += 2
+    elif which_layers == 'activations':
+        # extract the features from all conv layers
+        extract_layers = list()
+        layer_i = 0
+        if model_settings['batch_norm']:
+            for layer in branch:
+                if layer == 'M':
+                    layer_i += 1
+                else:
+                    layer_i += 2
+                    extract_layers.append(layer_i)
+                    layer_i += 1
+                    
+        else:
+            for layer in branch:
+                if layer == 'M':
+                    layer_i += 1
+                else:
+                    layer_i += 1
+                    extract_layers.append(layer_i)
+                    layer_i += 1
 
 model_settings['extract_features'] = extract_layers
-model_settings['threshold'] = 'otsu' # TODO: change here the threshold method
+model_settings['threshold'] = 'triangle' # TODO: change here the threshold method
 print("MODEL SETTINGS: \n", model_settings)
 net = get_network(model_settings)
 
@@ -472,7 +505,8 @@ for idx in oscd_indices:
     features = extract_features(net, model_settings['extract_features'], [im_a, im_b])
     
     # calculate difference maps per layer
-    layers_diffmap = range(2,len(features[0])) # TODO: change here which layers to extract from
+    start = 1
+    layers_diffmap = range(start,len(features[0])) # TODO: change here which layers to extract from
     # find height and width of S splits # for now in 4 splits, may be suoptimal
     height = im_a.shape[0] // 2
     width = im_a.shape[1] // 2
@@ -543,7 +577,7 @@ print("precision: ", precision)
 print("F1: ", F1)
 print("acc: ", acc)    
 
-model_settings['extract_layers'] = model_settings['extract_features'][1:]
+model_settings['extract_layers'] = model_settings['extract_features'][start:]
 model_settings['prop_layers'] = prop 
 model_settings['tp'] = tp
 model_settings['tn'] = tn

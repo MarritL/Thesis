@@ -9,7 +9,7 @@ Created on Tue Feb  4 16:21:16 2020
 from tensorboardX import SummaryWriter
 from models.netbuilder import NetBuilder, create_loss_function, create_optimizer
 from data_generator import PairDataset, TripletDataset, TripletDatasetPreSaved
-from data_generator import PartlyOverlapDataset
+from data_generator import PartlyOverlapDataset, TripletAPNDataset
 from utils import AverageMeter
 import torch
 from torch.utils.data import DataLoader
@@ -41,17 +41,15 @@ def train(directories, dataset_settings, network_settings, train_settings):
 # =============================================================================
             
     # build network
+    pos_weight = 1
+    network_settings['im_size'] = (1,1)
     if network_settings['network'] == 'siamese':
         print('n_branches = 2')
         n_branches = 2
-        pos_weight = 1
-        network_settings['im_size'] = (1,1)
     elif network_settings['network'] == 'triplet':
         print('n_branches = 3')
         n_branches = 3
-        pos_weight=1
-        network_settings['network'] = 'siamese'
-        network_settings['im_size'] = (1,1)        
+        network_settings['network'] = 'siamese'    
     elif network_settings['network'] == 'hypercolumn':
         print('n_branches = 2')
         n_branches = 2
@@ -61,12 +59,14 @@ def train(directories, dataset_settings, network_settings, train_settings):
     elif network_settings['network'] == 'siamese_unet_diff':
         print('n_branches = 2')
         n_branches = 2
+    elif network_settings['network'] == 'triplet_apn':
+        print('n_branches = 3')
+        n_branches = 3 
     else:
         raise Exception('Architecture undefined! \n \
                         Choose one of: "siamese", "triplet", "hypercolumn", \
-                        "siamese_unet_diff"')
-        
-        
+                        "siamese_unet_diff", "triplet_apn"')
+                
     net = NetBuilder.build_network(
         net=network_settings['network'],
         cfg=network_settings['cfg'],
@@ -137,18 +137,29 @@ def train(directories, dataset_settings, network_settings, train_settings):
             data_dir=directories['data_path'], 
             indices=dataset_settings['indices_val'], 
             channels=dataset_settings['channels'], 
+            one_hot=one_hot) 
+    elif dataset_settings['dataset_type'] == 'triplet_apn':
+        dataset_train = TripletAPNDataset(
+            data_dir=directories['data_path'], 
+            indices=dataset_settings['indices_train'], 
+            channels=dataset_settings['channels'], 
+            one_hot=one_hot)           
+        dataset_val = TripletAPNDataset(
+            data_dir=directories['data_path'], 
+            indices=dataset_settings['indices_val'], 
+            channels=dataset_settings['channels'], 
             one_hot=one_hot)  
     else:
         raise Exception('dataset_type undefined! \n \
                         Choose one of: "pair", "triplet", "triplet_saved",\
-                        "overlap"')
+                        "overlap", "triplet_apn"')
     
     # Data loaders
     dataloader_train = DataLoader(
         dataset_train, 
         batch_size=train_settings['batch_size'], 
-        shuffle=True,
-        num_workers = 4)
+        shuffle=False,
+        num_workers = 2)
     dataloader_val = DataLoader(
         dataset_val, 
         batch_size=train_settings['batch_size'], 
@@ -248,6 +259,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
 
 def validate(model_settings, eval_settings):
     # build network
+    model_settings['network'] = model_settings['networkname']
     if model_settings['networkname'] == 'siamese':
         n_branches = 2
         pos_weight = 1
@@ -339,7 +351,7 @@ def validate(model_settings, eval_settings):
         dataset_val, 
         batch_size=eval_settings['batch_size'], 
         shuffle=False,
-        num_workers = 4)
+        num_workers = 1)
     
     val_epoch_iters = max(len(dataset_val) // eval_settings['batch_size'],1)
     best_net_wts = copy.deepcopy(net.state_dict())
@@ -472,12 +484,8 @@ def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history
 
     # main loop
     tic = time.time()
-    #for i in range(val_epoch_iters):
-    for i, batch_data in enumerate(iterator):
-        
-        # load a batch of data
-        #batch_data = next(iterator)
-        
+    for i, batch_data in enumerate(iterator):    
+
         # get the inputs
         if n_branches == 2:
             if gpu != None:
@@ -506,6 +514,12 @@ def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history
             outputs = network(inputs, n_branches, extract_features)
             loss = loss_func(outputs, labels)
             acc = acc_func(outputs, labels, im_size)
+
+# =============================================================================
+# fig, ax = plt.subplots()
+# im2 = ax.imshow(outputs[1][0].detach())
+# fig.colorbar(im2, ax=ax)
+# =============================================================================
         
         loss = loss.mean()
         acc = acc.mean()
