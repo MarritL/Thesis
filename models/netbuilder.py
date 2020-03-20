@@ -176,7 +176,7 @@ class CombinedLoss(nn.Module):
         # pixel-wise
         loss1 = self.L1(pos_dist, targets)          
         loss2 = self.Ltriplet(pos_dist, neg_dist) 
-        print("L1: {}, triplet: {}".format(loss1, loss2))
+        #print("L1: {}, triplet: {}".format(loss1, loss2))
         
         loss = loss1 + self.weight * loss2
         
