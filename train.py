@@ -18,6 +18,7 @@ import time
 import csv
 import copy
 import numpy as np
+import matplotlib.pyplot as plt
 
 def train(directories, dataset_settings, network_settings, train_settings):
 
@@ -77,6 +78,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
         batch_norm=network_settings['batch_norm'],
         n_branches=n_branches,
         weights=network_settings['weights_file'])  
+    #net = net.float()
        
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], pos_weight=pos_weight)
     
@@ -427,9 +429,31 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
         if gpu != None:
             labels = labels.cuda()
 
+        if torch.any(torch.isnan(inputs[0])) or torch.any(torch.isnan(inputs[1])) or torch.any(torch.isnan(inputs[2])):
+            print("inputs = nan")
+            import ipdb
+            ipdb.set_trace()
         # forward pass
         outputs = network(inputs, n_branches, extract_features=extract_features)
-        loss = loss_func(outputs, labels)
+        if torch.any(torch.isnan(outputs[0])) or torch.any(torch.isnan(outputs[1])):
+            print("outputs is nan")
+            import ipdb
+            ipdb.set_trace()
+        #loss, loss1, loss2 = loss_func(outputs, labels)
+        loss = loss_func(outputs[0], outputs[1], outputs[2])
+        if torch.isnan(loss) :
+            print("loss is nan")
+            import ipdb
+            ipdb.set_trace()
+# =============================================================================
+#         min0 = np.min(outputs[0][0].detach().numpy())
+#         min1 = np.min(outputs[1][0].detach().numpy())
+#         max0 = np.max(outputs[0][0].detach().numpy())
+#         max1 = np.max(outputs[1][0].detach().numpy())
+#         mean0 = np.mean(outputs[0][0].detach().numpy())
+#         mean1 = np.mean(outputs[1][0].detach().numpy())
+#         print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}, min: {3:.3f}-{4:.3f}, max: {5:.3f}-{6:.3f}, mean: {7:.3f}-{8:.3f}".format(loss, loss1, loss2, min0, min1, max0, max1, mean0, mean1))
+# =============================================================================
         acc = acc_func(outputs, labels, im_size)
 
         # Backward
@@ -447,11 +471,24 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
 
         # calculate accuracy, and display
         if (i+1) % disp_iter == 0:
+            #print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}".format(loss, loss1, loss2))
             print('Epoch: [{}][{}/{}], Batch-time: {:.2f}, Data-time: {:.2f}, '
                   'Loss: {:.4f}, Acc: {:.4f}'
                   .format(epoch, i+1, epoch_iters,
                           batch_time.average(), data_time.average(),
                           ave_loss.average(), ave_acc.average()))
+            ave_loss = AverageMeter()
+            
+            
+# =============================================================================
+#         if (i+1) > 105:
+#             fig, (ax0, ax1) = plt.subplots(ncols=2)
+#             im0 = ax0.imshow(outputs[0][0].detach())
+#             im1 = ax1.imshow(outputs[1][0].detach())
+#             fig.colorbar(im0, ax=ax0)
+#             fig.colorbar(im1, ax=ax1)
+# =============================================================================
+
 
 # =============================================================================
 #         fractional_epoch = epoch + 1. * i / epoch_iters
@@ -512,7 +549,8 @@ def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history
         with torch.no_grad():
             # forward pass
             outputs = network(inputs, n_branches, extract_features)
-            loss = loss_func(outputs, labels)
+            #loss, loss1, loss2  = loss_func(outputs, labels)
+            loss = loss_func(outputs[0], outputs[1], outputs[2])
             acc = acc_func(outputs, labels, im_size)
 
 # =============================================================================

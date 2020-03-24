@@ -44,16 +44,19 @@ class SiameseNetAPN(nn.Module):
         for i in range(n_branches): # Siamese/triplet nets; sharing weights
             x = data[i]
             res.append(self.branches(x))
-            
-        anchor = res[0]
-        pos = res[1]
-        pos_dist = (anchor - pos).pow(2).sum(1).sqrt()
         
-        if n_branches == 3:
-            neg = res[2]
-            neg_dist = (anchor - neg).pow(2).sum(1).sqrt()
-        
-        return [pos_dist, neg_dist] if n_branches == 3 else [pos_dist]
+        return res
+# =============================================================================
+#         anchor = res[0]
+#         pos = res[1]
+#         pos_dist = (anchor - pos).pow(2).sum(1)#.sqrt()
+#         
+#         if n_branches == 3:
+#             neg = res[2]
+#             neg_dist = (anchor - neg).pow(2).sum(1)#.sqrt()
+#         
+#         return [pos_dist, neg_dist] if n_branches == 3 else [pos_dist]
+# =============================================================================
  
     
 def make_layers(cfg, n_channels, batch_norm=False):

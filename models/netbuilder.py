@@ -103,6 +103,10 @@ def create_loss_function(lossfunction, pos_weight=1):
         one_hot = False
         loss_func = CombinedLoss()
         acc_func = acc_functions['accuracy_fake']
+    elif lossfunction == 'triplet':
+        one_hot = False
+        loss_func = nn.TripletMarginLoss()
+        acc_func = acc_functions['accuracy_fake']
     else:
         raise Exception('loss function not implemented! \n \
                         Choose one of: "cross_entropy", "bce_sigmoid" \
@@ -145,24 +149,41 @@ class TripletLoss(nn.Module):
     def __init__(self, margin = 1.0):
         super(TripletLoss, self).__init__()
         self.margin = margin
+        self.reduction = 'mean'
     
-    def forward(self, pos_dist, neg_dist, reduction='mean'):
+    def forward(self, inputs, targets):
+        pos_dist = inputs[0]
+        neg_dist = inputs[1]
         losses = F.relu(self.margin + pos_dist - neg_dist)
-        if reduction == 'none':
+        if self.reduction == 'none':
             return losses
-        elif reduction == 'mean':
+        elif self.reduction == 'mean':
             return losses.mean()
-        elif reduction == 'sum':
+        elif self.reduction == 'sum':
             return losses.sum()
         else:
             raise Exception('reduction undefined! \n \
                             Choose one of: "mean", "sum", "none"!')
+    
+# =============================================================================
+#     def forward(self, pos_dist, neg_dist, reduction='mean'):
+#         losses = F.relu(self.margin + pos_dist - neg_dist)
+#         if reduction == 'none':
+#             return losses
+#         elif reduction == 'mean':
+#             return losses.mean()
+#         elif reduction == 'sum':
+#             return losses.sum()
+#         else:
+#             raise Exception('reduction undefined! \n \
+#                             Choose one of: "mean", "sum", "none"!')
+# =============================================================================
 
 class CombinedLoss(nn.Module):
-    def __init__(self, margin = 1.0, weight=10):
+    def __init__(self, margin = 1.0, weight=1):
         super(CombinedLoss, self).__init__()
         self.weight = weight
-        self.L1 = nn.L1Loss(reduction='mean')   
+        self.L1 = nn.L1Loss(reduction='mean') 
         self.Ltriplet = TripletLoss(margin)
         
     def forward(self, inputs, targets):
@@ -174,13 +195,13 @@ class CombinedLoss(nn.Module):
         #loss2 = self.Ltriplet(pos_dist.mean((1,2)), neg_dist.mean((1,2))) 
         
         # pixel-wise
-        loss1 = self.L1(pos_dist, targets)          
-        loss2 = self.Ltriplet(pos_dist, neg_dist) 
+        loss1 = self.L1(pos_dist, targets)      
+        loss2 = self.Ltriplet(pos_dist, neg_dist)
         #print("L1: {}, triplet: {}".format(loss1, loss2))
         
         loss = loss1 + self.weight * loss2
         
-        return loss
+        return loss, loss1, loss2
 
 # =============================================================================
 # fig, ax = plt.subplots()
