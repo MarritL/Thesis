@@ -470,7 +470,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
         # update average loss and acc
         ave_loss.update(loss.data.item())
         ave_lossL1.update(loss1.data.item())
-        ave_lossTriplet.update(loss2.data.itme())
+        ave_lossTriplet.update(loss2.data.item())
         ave_acc.update(acc.item())
         
 
