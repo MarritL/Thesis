@@ -180,28 +180,50 @@ class TripletLoss(nn.Module):
 # =============================================================================
 
 class CombinedLoss(nn.Module):
-    def __init__(self, margin = 1.0, weight=1):
+    def __init__(self, margin = 1.0, weight=10):
         super(CombinedLoss, self).__init__()
         self.weight = weight
-        self.L1 = nn.L1Loss(reduction='mean') 
-        self.Ltriplet = TripletLoss(margin)
+        self.l1 = nn.L1Loss(reduction='mean')
+        self.ltriplet = nn.TripletMarginLoss()
         
     def forward(self, inputs, targets):
-        pos_dist = inputs[0]
-        neg_dist = inputs[1]
+        anchor = inputs[0]
+        positives = inputs[1]
+        negatives = inputs[2]
         
-        # average over image
-        #loss1 = self.L1(pos_dist.mean((1,2)), targets) 
-        #loss2 = self.Ltriplet(pos_dist.mean((1,2)), neg_dist.mean((1,2))) 
-        
-        # pixel-wise
-        loss1 = self.L1(pos_dist, targets)      
-        loss2 = self.Ltriplet(pos_dist, neg_dist)
-        #print("L1: {}, triplet: {}".format(loss1, loss2))
+        loss1 = self.l1(positives.pow(2).sum(1), anchor.pow(2).sum(1))
+        loss2 = self.ltriplet(anchor, positives, negatives)
         
         loss = loss1 + self.weight * loss2
         
         return loss, loss1, loss2
+
+
+# =============================================================================
+# class CombinedLoss(nn.Module):
+#     def __init__(self, margin = 1.0, weight=1):
+#         super(CombinedLoss, self).__init__()
+#         self.weight = weight
+#         self.L1 = nn.L1Loss(reduction='mean') 
+#         self.Ltriplet = TripletLoss(margin)
+#         
+#     def forward(self, inputs, targets):
+#         pos_dist = inputs[0]
+#         neg_dist = inputs[1]
+#         
+#         # average over image
+#         #loss1 = self.L1(pos_dist.mean((1,2)), targets) 
+#         #loss2 = self.Ltriplet(pos_dist.mean((1,2)), neg_dist.mean((1,2))) 
+#         
+#         # pixel-wise
+#         loss1 = self.L1(pos_dist, targets)      
+#         loss2 = self.Ltriplet(pos_dist, neg_dist)
+#         #print("L1: {}, triplet: {}".format(loss1, loss2))
+#         
+#         loss = loss1 + self.weight * loss2
+#         
+#         return loss, loss1, loss2
+# =============================================================================
 
 # =============================================================================
 # fig, ax = plt.subplots()
