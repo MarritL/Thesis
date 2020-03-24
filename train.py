@@ -386,6 +386,8 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
     batch_time = AverageMeter()
     data_time = AverageMeter()
     ave_loss = AverageMeter()
+    ave_lossL1 = AverageMeter()
+    ave_lossTriplet = AverageMeter()
     ave_loss_all = AverageMeter()
     ave_acc = AverageMeter()
     
@@ -446,13 +448,15 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
             print("loss is nan")
             import ipdb
             ipdb.set_trace()
-        min0 = np.min(outputs[0][0].detach().numpy())
-        min1 = np.min(outputs[1][0].detach().numpy())
-        max0 = np.max(outputs[0][0].detach().numpy())
-        max1 = np.max(outputs[1][0].detach().numpy())
-        mean0 = np.mean(outputs[0][0].detach().numpy())
-        mean1 = np.mean(outputs[1][0].detach().numpy())
-        print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}, min: {3:.3f}-{4:.3f}, max: {5:.3f}-{6:.3f}, mean: {7:.3f}-{8:.3f}".format(loss, loss1, loss2, min0, min1, max0, max1, mean0, mean1))
+# =============================================================================
+#         min0 = np.min(outputs[0][0].detach().numpy())
+#         min1 = np.min(outputs[1][0].detach().numpy())
+#         max0 = np.max(outputs[0][0].detach().numpy())
+#         max1 = np.max(outputs[1][0].detach().numpy())
+#         mean0 = np.mean(outputs[0][0].detach().numpy())
+#         mean1 = np.mean(outputs[1][0].detach().numpy())
+# =============================================================================
+        #print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}, min: {3:.3f}-{4:.3f}, max: {5:.3f}-{6:.3f}, mean: {7:.3f}-{8:.3f}".format(loss, loss1, loss2, min0, min1, max0, max1, mean0, mean1))
         acc = acc_func(outputs, labels, im_size)
 
         # Backward
@@ -465,6 +469,8 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
 
         # update average loss and acc
         ave_loss.update(loss.data.item())
+        ave_lossL1.update(loss1.data.item())
+        ave_lossTriplet.update(loss2.data.itme())
         ave_acc.update(acc.item())
         
 
@@ -472,12 +478,15 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
         if (i+1) % disp_iter == 0:
             #print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}".format(loss, loss1, loss2))
             print('Epoch: [{}][{}/{}], Batch-time: {:.2f}, Data-time: {:.2f}, '
-                  'Loss: {:.4f}, Acc: {:.4f}'
+                  'Loss: {:.4f}, Acc: {:.4f}, L1: {:.4f}, LTriplet: {:.4f}'
                   .format(epoch, i+1, epoch_iters,
                           batch_time.average(), data_time.average(),
-                          ave_loss.average(), ave_acc.average()))
+                          ave_loss.average(), ave_acc.average(), 
+                          ave_lossL1.average(), ave_lossTriplet.average()))
             ave_loss_all.update(ave_loss.average())
             ave_loss = AverageMeter()
+            ave_lossL1 = AverageMeter()
+            ave_lossTriplet = AverageMeter()
             
             
 # =============================================================================
