@@ -54,9 +54,12 @@ def get_network(model_settings):
         model_settings['network'] = 'siamese'
     elif model_settings['network'] == 'hypercolumn':
         n_branches = 2
+    elif model_settings['network'] == 'triplet_apn':
+        n_branches = 2 
     else:
         raise Exception('Architecture undefined! \n \
-                        Choose one of: "siamese", "triplet", hypercolumn')
+                        Choose one of: "siamese", "triplet", "hypercolumn", \
+                            "triplet_apn"')
         
         
     net = NetBuilder.build_network(
