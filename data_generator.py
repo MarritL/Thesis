@@ -314,7 +314,7 @@ class TripletAPNDataset(BaseDataset):
             
         # get random image-pair index (i.e. a/b)
         #triplet_pairidxs = np.random.choice(self.pair_indices, size=3, replace=True)
-        triplet_pairidxs = np.array(['a', 'b', 'b'])
+        triplet_pairidxs = np.array(['a', 'b', 'a'])
 
         # 'reconstruct' the filenames
         filenames = get_filenames(im_idx, triplet_pairidxs)
