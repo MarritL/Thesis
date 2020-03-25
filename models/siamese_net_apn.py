@@ -7,6 +7,7 @@ Created on Tue Jan 28 15:55:01 2020
 """
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 
 __all__ = ['siamese_net_apn']
@@ -17,7 +18,7 @@ class SiameseNetAPN(nn.Module):
                 
         self.branches = branches    
 
-    def forward(self, data, n_branches, extract_features=None):
+    def forward(self, data, n_branches, avg_pool=False , **kwargs):
         """
         forward pass through network
 
@@ -43,6 +44,8 @@ class SiameseNetAPN(nn.Module):
         res = list()
         for i in range(n_branches): # Siamese/triplet nets; sharing weights
             x = data[i]
+            if avg_pool:
+                x = F.adaptive_avg_pool2d(x, (1,1))
             res.append(self.branches(x))
         
         return res

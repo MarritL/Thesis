@@ -201,7 +201,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 disp_iter=train_settings['disp_iter'],
                 gpu = train_settings['gpu'],
                 im_size = network_settings['im_size'],
-                extract_features=network_settings['extract_features'])
+                extract_features=network_settings['extract_features'],
+                avg_pool=network_settings['avg_pool'])
             
             # validation epoch
             best_net_wts, best_acc, best_epoch, best_loss = validate_epoch(
@@ -220,7 +221,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 best_loss=best_loss,
                 gpu = train_settings['gpu'],
                 im_size = network_settings['im_size'],
-                extract_features=network_settings['extract_features'])
+                extract_features=network_settings['extract_features'],
+                avg_pool=network_settings['avg_pool'])
     
     # on keyboard interupt continue the script: saves the best model until interrupt
     except KeyboardInterrupt:
@@ -382,7 +384,7 @@ def validate(model_settings, eval_settings):
     
 def train_epoch(network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
-                gpu, im_size, extract_features=None):
+                gpu, im_size, extract_features=None, avg_pool=False):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     ave_loss = AverageMeter()
@@ -437,11 +439,25 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
             import ipdb
             ipdb.set_trace()
         # forward pass
-        outputs = network(inputs, n_branches, extract_features=extract_features)
+        outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
         if torch.any(torch.isnan(outputs[0])) or torch.any(torch.isnan(outputs[1])):
             print("outputs is nan")
             import ipdb
             ipdb.set_trace()
+# =============================================================================
+#         # =====================================================================
+#         anchor = outputs[0]
+#         positive = outputs[1]
+#         negative = outputs[2]
+# 
+#         anchor_mean = anchor.mean((2,3))  
+#         positive_mean = positive.mean((2,3))
+#         negative_mean = negative.mean((2,3))            
+#         
+#         out = [output.mean((2,3)) for output in outputs]
+#             
+#         # =====================================================================    
+# =============================================================================
         loss, loss1, loss2 = loss_func(outputs, labels)
         #loss = loss_func(outputs[0], outputs[1], outputs[2])
         if torch.isnan(loss) :
@@ -518,7 +534,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
     
 def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
-             best_loss, gpu, im_size, extract_features=None):    
+             best_loss, gpu, im_size, extract_features=None, avg_pool=False):    
 
     ave_loss = AverageMeter()
     ave_acc = AverageMeter()
@@ -557,7 +573,7 @@ def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history
       
         with torch.no_grad():
             # forward pass
-            outputs = network(inputs, n_branches, extract_features)
+            outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
             loss, loss1, loss2  = loss_func(outputs, labels)
             #loss = loss_func(outputs[0], outputs[1], outputs[2])
             acc = acc_func(outputs, labels, im_size)
