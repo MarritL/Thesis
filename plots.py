@@ -57,6 +57,11 @@ def plot_random_imagepairs(n_imagepairs, image_folder, bands, axis=False, normal
     rand_im = sample(entries, n_imagepairs)
     rand_imidx = [s.split('_')[0] for s in rand_im]
     rand_impairs = [func(s) for s in rand_imidx for func in (lambda s: s+'_a.npy',lambda s: s+'_b.npy')]
+
+    
+    if titles == 'image_nr':
+        titles = rand_impairs
+
     
     fig, ax = plot_image(image_folder=image_folder, image_list= rand_impairs,bands=bands, axis=axis, \
                          normalize=normalize, titles=titles, rows=rows, cols=cols)
@@ -235,7 +240,7 @@ def plot_image(image_folder, image_list, bands, axis = False, normalize=True, ti
         cols = 1 if n_images < 2 else 2
     
     # prepare
-    fig = plt.figure(constrained_layout=constrainted_layout, figsize=(5,5))
+    fig = plt.figure(constrained_layout=constrainted_layout, figsize=(15,15))
     gs = fig.add_gridspec(rows, cols)
     
     #fig, ax = plt.subplots(rows,cols, figsize = (10,10))
@@ -597,6 +602,78 @@ def plot_changemap_colors(changemap, gt, title='Change map', axis=True):
 
     """
 
+    changemap_colors = np.stack((255*gt,255*changemap,255*gt),2).astype(np.int)
+ 
+    fig, ax = plt.subplots(figsize=(10, 10))
+    ax.imshow(changemap_colors)
+    ax.set_title(title)
+    if not axis:
+        ax.axis('off')
+           
+    return fig, ax
+
+def plot_changemap_colors_gt(changemap, gt, title='Change map', axis=True):
+    """
+    plot change map with black: TN, white: TP, green: FP, magenta: FN
+
+    Parameters
+    ----------
+    changemap : boolean np.ndarray of shape (N,M) 
+        binary change map. False = No change, True = Change.
+    gt : numpy.ndarray of shape (N,M)
+        ground truth map, 1 = No change, 2 = Change
+    title : string, optional
+        plot title. The default is 'Change map'.
+    axis : boolean, optional
+        whether or not to plot the axis. The default is True.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        figure
+    axes : list
+        list of axes in the figure
+
+    """
+
+    changemap_colors = np.stack((255*gt,255*changemap,255*gt),2).astype(np.int)
+ 
+    fig, ax = plt.subplots(ncols = 2, figsize=(10, 20))
+    ax[0].imshow(gt, cmap = cm.gray)
+    ax[0].set_title('ground truth')
+    if not axis:
+        ax[0].axis('off')
+    ax[1].imshow(changemap_colors)
+    ax[1].set_title(title)
+    if not axis:
+        ax[1].axis('off')
+           
+    return fig, ax
+
+def plot_changemap_colors_gt_old(changemap, gt, title='Change map', axis=True):
+    """
+    plot change map with black: TN, white: TP, green: FP, magenta: FN
+
+    Parameters
+    ----------
+    changemap : boolean np.ndarray of shape (N,M) 
+        binary change map. False = No change, True = Change.
+    gt : numpy.ndarray of shape (N,M)
+        ground truth map, 1 = No change, 2 = Change
+    title : string, optional
+        plot title. The default is 'Change map'.
+    axis : boolean, optional
+        whether or not to plot the axis. The default is True.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        figure
+    axes : list
+        list of axes in the figure
+
+    """
+
     colors = ['green','black','white','magenta']
     cmap = ListedColormap(colors)
     
@@ -605,11 +682,15 @@ def plot_changemap_colors(changemap, gt, title='Change map', axis=True):
     changemap_classes[changemap_classes == 1] = 3 #fn
     changemap_classes[changemap_classes == 0] = changemap[changemap_classes == 0]
  
-    fig, ax = plt.subplots(figsize=(10, 10))
-    ax.imshow(changemap_classes, vmin=-1, vmax=3, cmap=cmap)
-    ax.set_title(title)
+    fig, ax = plt.subplots(ncols = 2, figsize=(10, 20))
+    ax[0].imshow(gt, cmap = cm.gray)
+    ax[0].set_title('ground truth')
     if not axis:
-        ax.axis('off')
+        ax[0].axis('off')
+    ax[1].imshow(changemap_classes, vmin=-1, vmax=3, cmap=cmap)
+    ax[1].set_title(title)
+    if not axis:
+        ax[1].axis('off')
            
     return fig, ax
 
