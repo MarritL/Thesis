@@ -10,6 +10,8 @@ import os
 import torch
 from torch.utils.data import Dataset
 import numpy as np
+from math import ceil
+from tqdm import tqdm
 
 class BaseDataset(Dataset):
     """Base dataset with common parameters and functions """
@@ -61,6 +63,36 @@ class BaseDataset(Dataset):
                 'Nans in image {} after normalization'.format(filename)     
 
         return images
+    
+    def get_images_dict(self, filenames):
+        """
+        loads imags into memory and normalizes them
+
+        Parameters
+        ----------
+        filenames : list
+            list of filenames (strings)
+
+        Returns
+        -------
+        images : dict
+            dict of np.ndarrays of shape (N,M,D), filenames are keys
+        """        
+        images = {}
+        for filename in filenames:
+            images[filename] = np.load(
+                os.path.join(self.data_dir, filename))[:, :, self.channels]
+
+            # replace potential nan values 
+            images[filename][np.isnan(images[filename])] = 0
+            
+            # normalize
+            images[filename] = self.normalize(images[filename], self.percentile)
+            assert np.any(~np.isnan(images[filename])), \
+                'Nans in image {} after normalization'.format(filename)     
+
+        return images
+    
     
     def normalize(self, image, percentile):
         """
@@ -143,25 +175,35 @@ class BaseDataset(Dataset):
                      patch_start[1]:patch_start[1]+self.patch_size, :]
         
         return patches   
-                    
-# substituted range+len by enumerate
-# =============================================================================
-#         for i in range(len(patch_starts)):
-#             key = 'patch' +str(i)
-#             if pair_idxs is None:
-#                 patches[key] = images[i]\
-#                     [patch_starts[i][0]:patch_starts[i][0]+self.patch_size,
-#                      patch_starts[i][1]:patch_starts[i][1]+self.patch_size, :]
-#             else:
-#                 if n_unique == 1:
-#                     im_idx = 0 
-#                 else: 
-#                     im_idx = ord(pair_idxs[i])-97
-#                 patches[key] = images[im_idx]\
-#                     [patch_starts[i][0]:patch_starts[i][0]+self.patch_size,
-#                      patch_starts[i][1]:patch_starts[i][1]+self.patch_size, :]
-# =============================================================================                
     
+    def get_patches_gt(self, patch_starts, gt, images):
+        """
+        subset the gt patch from the gt image
+
+        Parameters
+        ----------
+        patch_starts : list
+            list of upper left corners of the patches
+        gt: np.ndarrays of shape (N,M)
+            ground truth image of change detection 
+        
+        Returns
+        -------
+        gt_sub : np.ndarray of shape (N,M)
+            ground truth of patches
+
+        """        
+
+        patches = dict()
+        patches['patch0'] = images[0][patch_starts[0][0]:patch_starts[0][0]+self.patch_size,
+                     patch_starts[0][1]:patch_starts[0][1]+self.patch_size, :]
+        patches['patch1'] = images[1][patch_starts[0][0]:patch_starts[0][0]+self.patch_size,
+                     patch_starts[0][1]:patch_starts[0][1]+self.patch_size, :]
+        patches['label'] = gt[patch_starts[0][0]:patch_starts[0][0]+self.patch_size,
+                     patch_starts[0][1]:patch_starts[0][1]+self.patch_size]
+        
+        return patches
+                                
     
 class PairDataset(BaseDataset):
     """ Generate dataset of patch_pairs using method inspired on Doersch"""
@@ -204,7 +246,8 @@ class PairDataset(BaseDataset):
             "Nans in patch pair {}".format(im_idx)  
         
         # add image info
-        patchpair['im_idx'] = im_idx
+        patchpair['im_idx'] = torch.as_tensor(im_idx)
+        patchpair['patch_starts'] = torch.as_tensor(patch_starts)
         
         # cast to tensors
         patchpair['patch0'] = torch.as_tensor(patchpair['patch0'])
@@ -213,18 +256,100 @@ class PairDataset(BaseDataset):
         
         return patchpair
     
+class PairDatasetOverlap(BaseDataset):
+    """ Generate dataset of patch_pairs using method inspired on Doersch"""
+    
+    def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
+                 percentile=99, min_overlap=0.2, max_overlap=0.5, 
+                 one_hot=True, in_memory=False):
+        super(PairDatasetOverlap, self).__init__(data_dir, indices, channels, 
+                                          patch_size, percentile)
+    
+        self.min_overlap = min_overlap
+        self.max_overlap = max_overlap
+        self.one_hot = one_hot
+        self.in_memory = in_memory
+        
+        images = [str(i)+'_a.npy' for i in indices]
+        images.extend([str(i)+'_b.npy' for i in indices])
+        unique_images = np.unique(images)
+        if self.in_memory:
+            # 'reconstruct' the filenames
+            self.images = self.get_images_dict(unique_images)
+    
+    def __getitem__(self, index):
+        'Generates one patch pair'
+        # Select sample
+        im_idx = self.indices[index]
+            
+        # get random pairindex (i.e. a/b)
+        pair_idxs = np.random.choice(self.pair_indices, size=2, replace=False)
+        
+        # 'reconstruct' the filenames
+        filenames = get_filenames(im_idx, pair_idxs)
+    
+        # load image
+        if self.in_memory:
+            images = list()
+            for filename in filenames:
+                    images.append(self.images[filename])
+        else:
+            # load image
+            images = self.get_images(filenames)
+        
+        assert images[0].shape == images[1].shape, \
+            'Shape not matching in image pair {}'.format(im_idx)
+            
+        # sample start location patches 
+        patch_starts, lbl = sample_patchpair_overlap(
+            images[0].shape, 
+            self.patch_size, 
+            self.min_overlap, 
+            self.max_overlap)
+        
+        # get patches
+        patchpair = self.get_patches(patch_starts, images)
+
+        # rearange axis (channels first)
+        patchpair = channelsfirst(patchpair)
+                             
+        assert patchpair['patch0'].shape == patchpair['patch1'].shape, \
+            "Shape not matching in patch pair {}".format(im_idx)
+        assert np.any(~np.isnan(patchpair['patch0'])) \
+            & np.any(~np.isnan(patchpair['patch1'])), \
+            "Nans in patch pair {}".format(im_idx)  
+        
+        # add image info
+        patchpair['im_idx'] = torch.as_tensor(im_idx)
+        patchpair['patch_starts'] = torch.as_tensor(patch_starts)
+        
+        # cast to tensors
+        patchpair['patch0'] = torch.as_tensor(patchpair['patch0'])
+        patchpair['patch1'] = torch.as_tensor(patchpair['patch1'])
+        patchpair['label'] = torch.as_tensor(lbl, dtype=torch.float32)
+        
+        return patchpair
+    
 class TripletDataset(BaseDataset):
     """ Generate dataset with patch triplets, based on partial overlap """
     
     def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
                  percentile=99, min_overlap=0.2, max_overlap=0.5, 
-                 one_hot=True):
+                 one_hot=True, in_memory=False):
         super(TripletDataset, self).__init__(data_dir, indices, channels, 
                                              patch_size, percentile)
         
         self.min_overlap = min_overlap
         self.max_overlap = max_overlap
         self.one_hot = one_hot
+        self.in_memory = in_memory
+        
+        images = [str(i)+'_a.npy' for i in indices]
+        images.extend([str(i)+'_b.npy' for i in indices])
+        unique_images = np.unique(images)
+        if self.in_memory:
+            # 'reconstruct' the filenames
+            self.images = self.get_images_dict(unique_images)
     
     def __getitem__(self, index):
         'Generates one patch triplet'
@@ -240,7 +365,13 @@ class TripletDataset(BaseDataset):
         n_images = len(unique_images)
     
         # load image
-        images = self.get_images(unique_images)
+        if self.in_memory:
+            images = list()
+            for filename in unique_images:
+                    images.append(self.images[filename])
+        else:
+            # load image
+            images = self.get_images(unique_images)
 
         # check if all images have the same shape
         if n_images > 1:
@@ -249,11 +380,15 @@ class TripletDataset(BaseDataset):
                     'Shape not matching in image pair {}'.format(im_idx)
 
         # sample start locations patches
-        patch_starts = sample_patchtriplet(
-            images[0].shape, 
-            self.patch_size, 
-            min_overlap=self.min_overlap, 
-            max_overlap=self.max_overlap)
+        if self.min_overlap == 1 & self.max_overlap == 1:
+            patch_starts = sample_patchtriplet_apn(
+                images[0].shape, self.patch_size)
+        else:
+            patch_starts = sample_patchtriplet(
+                images[0].shape, 
+                self.patch_size, 
+                min_overlap=self.min_overlap, 
+                max_overlap=self.max_overlap)
         
         # get a random order
         lbl = np.random.randint(2)
@@ -287,7 +422,8 @@ class TripletDataset(BaseDataset):
             "Nans in patch triplet {}".format(im_idx)  
         
         # add image info
-        patchtriplet['im_idx'] = im_idx
+        patchtriplet['im_idx'] = torch.as_tensor(im_idx)
+        patchtriplet['patch_starts'] = torch.as_tensor(patch_starts)
         
         # cast to tensors
         patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
@@ -295,17 +431,221 @@ class TripletDataset(BaseDataset):
         patchtriplet['patch2'] = torch.as_tensor(patchtriplet['patch2'])
         patchtriplet['label'] = torch.as_tensor(lbl, dtype=dtype)
         
+        
         return patchtriplet
+    
+class PairHardNegDataset(BaseDataset):
+    """ Generate dataset with patch pairs, 100% overlap, second possible rotated """
+    
+    def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
+                 percentile=99, one_hot=True, in_memory=False):
+        super(PairHardNegDataset, self).__init__(data_dir, indices, channels, 
+                                             patch_size, percentile)
+        self.one_hot = one_hot
+        self.in_memory = in_memory
+        
+        images = [str(i)+'_a.npy' for i in indices]
+        images.extend([str(i)+'_b.npy' for i in indices])
+        unique_images = np.unique(images)
+        if self.in_memory:
+            # 'reconstruct' the filenames
+            self.images = self.get_images_dict(unique_images)
+
+    
+    def __getitem__(self, index):
+        'Generates one patch triplet'
+        # Select sample
+        im_idx = self.indices[index] 
+        
+        # get random image-pair index (i.e. a/b)
+        pairidxs = np.random.choice(self.pair_indices, size=2, replace=True)
+    
+        # load image
+        filenames = get_filenames(im_idx, pairidxs)
+        if self.in_memory:
+            images = list()
+            for filename in filenames:
+                    images.append(self.images[filename])
+        else:
+            # 'reconstruct' the filenames           
+            unique_images = np.unique(filenames)
+            # load image
+            images = self.get_images(unique_images)
+
+        # sample start locations patches
+        patch_starts = sample_patchpair_ap(
+                images[0].shape, self.patch_size)
+        
+        # get patches
+        patchpair = self.get_patches(patch_starts, images, pairidxs)
+        
+        # get a random label
+        lbl = np.random.randint(2)
+        if lbl == 1:
+            rot = np.random.randint(1,4)
+            flipud = np.random.randint(2)
+            fliplr = np.random.randint(2)
+            patchpair['patch1'] = np.rot90(patchpair['patch1'], rot, axes=(0, 1)).copy()
+            if flipud:
+                patchpair['patch1'] = np.flipud(patchpair['patch1']).copy()
+            if not flipud:
+                if fliplr:
+                    patchpair['patch1'] = np.fliplr(patchpair['patch1']).copy()
+
+        if self.one_hot:
+            lbl = to_categorical(lbl, num_classes=2)
+            dtype = torch.float32
+        else: 
+            dtype = torch.int64
+        
+        # rearange axis (channels first)
+        patchpair = channelsfirst( patchpair)
+                             
+        assert patchpair['patch0'].shape == \
+             patchpair['patch1'].shape, \
+            "Shape not matching in  patchpair {}, shape: 0:{} 1:{}"\
+            .format(
+                im_idx, 
+                patchpair['patch0'].shape, 
+                patchpair['patch1'].shape)
+        assert np.any(~np.isnan(patchpair['patch0'])) \
+            & np.any(~np.isnan(patchpair['patch1'])), \
+            "Nans in patchpair {}".format(im_idx)  
+        
+        # add image info
+        patchpair['im_idx'] = torch.as_tensor(im_idx)
+        patchpair['patch_starts'] = torch.as_tensor(patch_starts)
+        
+        # cast to tensors
+        patchpair['patch0'] = torch.as_tensor(patchpair['patch0'])
+        patchpair['patch1'] = torch.from_numpy(patchpair['patch1'])
+        patchpair['label'] = torch.as_tensor(lbl, dtype=dtype)
+
+        
+        return patchpair
+    
+# =============================================================================
+# class TripletAPNDataset(BaseDataset):
+#     """ Generate dataset with patch triplets, anchor and positive 100% overlap """
+#     
+#     def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
+#                  percentile=99, one_hot=True, batch_size=25):
+#         super(TripletAPNDataset, self).__init__(data_dir, indices, channels, 
+#                                              patch_size, percentile)
+#         
+#         self.one_hot = one_hot
+#         self.batch_size = batch_size
+#         self.patch_starts = list()
+#     
+#     def __getitem__(self, index):
+#         'Generates one patch triplet'
+#         # Select sample
+#         im_idx = self.indices[index]
+#             
+#         # get random image-pair index (i.e. a/b)
+#         #triplet_pairidxs = np.random.choice(self.pair_indices, size=3, replace=True)
+#         triplet_pairidxs = np.array(['a', 'b', 'a'])
+# 
+#         # 'reconstruct' the filenames
+#         filenames = get_filenames(im_idx, triplet_pairidxs)
+#         unique_images = np.unique(filenames)
+#         n_images = len(unique_images)
+#     
+#         # load image
+#         images = self.get_images(unique_images)
+# 
+#         # check if all images have the same shape
+#         if n_images > 1:
+#             for i in range(n_images-1):
+#                 assert images[i].shape == images[i+1].shape,\
+#                     'Shape not matching in image pair {}'.format(im_idx)
+# 
+#         batch_of_patch0 = torch.zeros(
+#             (self.batch_size, self.n_channels, self.patch_size, self.patch_size), 
+#             dtype=torch.float)
+#         batch_of_patch1 = torch.zeros(
+#             (self.batch_size, self.n_channels, self.patch_size, self.patch_size), 
+#             dtype=torch.float)
+#         batch_of_patch2 = torch.zeros(
+#             (self.batch_size, self.n_channels, self.patch_size, self.patch_size), 
+#             dtype=torch.float)
+#         batch_of_labels = torch.zeros(
+#             (self.batch_size, self.patch_size, self.patch_size), 
+#             dtype=torch.long)
+#         
+#         for i in range(self.batch_size):
+# 
+#             # sample start locations patches
+#             patch_starts = sample_patchtriplet_apn(
+#                 images[0].shape, 
+#                 self.patch_size)
+#             
+#             self.patch_starts.extend(patch_starts)
+#             # label for l1 loss
+#             # lbl = 0 # if using mean of distance image
+#             lbl = np.zeros((self.patch_size, self.patch_size)) # if calculating pixelwise
+#             
+#             # get patches
+#             patchtriplet = self.get_patches(patch_starts, images, triplet_pairidxs)
+#     
+#             # rearange axis (channels first)
+#             patchtriplet = channelsfirst(patchtriplet)
+#                                  
+#             assert patchtriplet['patch0'].shape == \
+#                 patchtriplet['patch1'].shape == \
+#                 patchtriplet['patch2'].shape, \
+#                 "Shape not matching in patch triplet {}, shape: 0:{} 1:{} 2:{}"\
+#                 .format(
+#                     im_idx, 
+#                     patchtriplet['patch0'].shape, 
+#                     patchtriplet['patch1'].shape,
+#                     patchtriplet['patch2'].shape)
+#             assert np.any(~np.isnan(patchtriplet['patch0'])) \
+#                 & np.any(~np.isnan(patchtriplet['patch1'])) \
+#                 & np.any(~np.isnan(patchtriplet['patch2'])), \
+#                 "Nans in patch triplet {}".format(im_idx)  
+#             
+#             # add image info
+#             patchtriplet['im_idx'] = im_idx
+#             
+#             # cast to tensors
+#             patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
+#             patchtriplet['patch1'] = torch.as_tensor(patchtriplet['patch1'])
+#             patchtriplet['patch2'] = torch.as_tensor(patchtriplet['patch2'])
+#             patchtriplet['label'] = torch.as_tensor(lbl)
+#             
+#             batch_of_patch0[i] = patchtriplet['patch0']
+#             batch_of_patch1[i] = patchtriplet['patch1']
+#             batch_of_patch2[i] = patchtriplet['patch2']
+#             batch_of_labels[i] = patchtriplet['label']
+#             
+#         batch = dict()
+#         batch['patch0'] = batch_of_patch0
+#         batch['patch1'] = batch_of_patch1
+#         batch['patch2'] = batch_of_patch2
+#         batch['label'] = batch_of_labels
+#             
+#         return batch
+# =============================================================================
 
 class TripletAPNDataset(BaseDataset):
     """ Generate dataset with patch triplets, anchor and positive 100% overlap """
     
     def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
-                 percentile=99, one_hot=True):
+                 percentile=99, one_hot=True, second_label=False, in_memory=False):
         super(TripletAPNDataset, self).__init__(data_dir, indices, channels, 
                                              patch_size, percentile)
         
         self.one_hot = one_hot
+        self.second_label = second_label
+        self.in_memory = in_memory
+        
+        images = [str(i)+'_a.npy' for i in indices]
+        images.extend([str(i)+'_b.npy' for i in indices])
+        unique_images = np.unique(images)
+        if self.in_memory:
+            # 'reconstruct' the filenames
+            self.images = self.get_images_dict(unique_images)
     
     def __getitem__(self, index):
         'Generates one patch triplet'
@@ -313,16 +653,21 @@ class TripletAPNDataset(BaseDataset):
         im_idx = self.indices[index]
             
         # get random image-pair index (i.e. a/b)
-        #triplet_pairidxs = np.random.choice(self.pair_indices, size=3, replace=True)
-        triplet_pairidxs = np.array(['a', 'b', 'a'])
+        triplet_pairidxs = np.random.choice(self.pair_indices, size=3, replace=True)
+        #triplet_pairidxs = np.array(['a', 'b', 'a'])
 
-        # 'reconstruct' the filenames
+        # load image
         filenames = get_filenames(im_idx, triplet_pairidxs)
         unique_images = np.unique(filenames)
         n_images = len(unique_images)
-    
-        # load image
-        images = self.get_images(unique_images)
+        if self.in_memory:
+            images = list()
+            for filename in unique_images:
+                    images.append(self.images[filename])
+        else:
+            # 'reconstruct' the filenames           
+            # load image
+            images = self.get_images(unique_images)
 
         # check if all images have the same shape
         if n_images > 1:
@@ -335,9 +680,20 @@ class TripletAPNDataset(BaseDataset):
             images[0].shape, 
             self.patch_size)
         
+        
         # label for l1 loss
-        # lbl = 0 # if using mean of distance image
         lbl = np.zeros((self.patch_size, self.patch_size)) # if calculating pixelwise
+        
+        if self.second_label:
+            lbl_bottle = np.random.randint(2)
+            if lbl_bottle == 1:
+                patch_starts[1], patch_starts[2] = patch_starts[2], patch_starts[1]
+            
+            if self.one_hot:
+                lbl_bottle = to_categorical(lbl_bottle, num_classes=2)
+                dtype = torch.float32
+            else: 
+                dtype = torch.int64
         
         # get patches
         patchtriplet = self.get_patches(patch_starts, images, triplet_pairidxs)
@@ -360,13 +716,129 @@ class TripletAPNDataset(BaseDataset):
             "Nans in patch triplet {}".format(im_idx)  
         
         # add image info
-        patchtriplet['im_idx'] = im_idx
+        patchtriplet['im_idx'] = torch.as_tensor(im_idx)
+        patchtriplet['patch_starts'] = torch.as_tensor(patch_starts)
         
         # cast to tensors
         patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
         patchtriplet['patch1'] = torch.as_tensor(patchtriplet['patch1'])
         patchtriplet['patch2'] = torch.as_tensor(patchtriplet['patch2'])
         patchtriplet['label'] = torch.as_tensor(lbl)
+        if self.second_label:
+            patchtriplet['label_bottle'] = torch.as_tensor(lbl_bottle, dtype=dtype)
+        
+        return patchtriplet
+
+class TripletAPNHardNegDataset(BaseDataset):
+    """ Generate dataset with patch triplets, anchor and positive 100% overlap """
+    
+    def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
+                 percentile=99, one_hot=True, second_label=False, in_memory=False):
+        super(TripletAPNHardNegDataset, self).__init__(data_dir, indices, channels, 
+                                             patch_size, percentile)
+        
+        self.one_hot = one_hot
+        self.second_label = second_label
+        self.in_memory = in_memory
+        
+        images = [str(i)+'_a.npy' for i in indices]
+        images.extend([str(i)+'_b.npy' for i in indices])
+        unique_images = np.unique(images)
+        if self.in_memory:
+            # 'reconstruct' the filenames
+            self.images = self.get_images_dict(unique_images)
+    
+    def __getitem__(self, index):
+        'Generates one patch triplet'
+        # Select sample
+        im_idx = self.indices[index]
+            
+        # get random image-pair index (i.e. a/b)
+        triplet_pairidxs = np.random.choice(self.pair_indices, size=3, replace=True)
+        #triplet_pairidxs = np.array(['a', 'b', 'a'])
+
+        # load image
+        filenames = get_filenames(im_idx, triplet_pairidxs)
+        unique_images = np.unique(filenames)
+        n_images = len(unique_images)
+        if self.in_memory:
+            images = list()
+            for filename in unique_images:
+                    images.append(self.images[filename])
+        else:
+            # 'reconstruct' the filenames           
+            # load image
+            images = self.get_images(unique_images)
+
+        # check if all images have the same shape
+        if n_images > 1:
+            for i in range(n_images-1):
+                assert images[i].shape == images[i+1].shape,\
+                    'Shape not matching in image pair {}'.format(im_idx)
+
+        # sample start locations patches
+        patch_starts = sample_patchpair_ap(
+            images[0].shape, 
+            self.patch_size)
+        
+        patch_starts.append(patch_starts[0])
+                        
+        # get patches
+        patchtriplet = self.get_patches(patch_starts, images, triplet_pairidxs)
+        
+        # create negative
+        rot = np.random.randint(1,4)
+        flipud = np.random.randint(2)
+        fliplr = np.random.randint(2)
+        patchtriplet['patch2'] = np.rot90(patchtriplet['patch2'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchtriplet['patch2'] = np.flipud(patchtriplet['patch2']).copy()
+        if not flipud:
+            if fliplr:
+                patchtriplet['patch2'] = np.fliplr(patchtriplet['patch2']).copy()
+                
+        # label for l1 loss
+        lbl = np.zeros((self.patch_size, self.patch_size)) # if calculating pixelwise
+        
+        if self.second_label:
+            lbl_bottle = np.random.randint(2)
+            if lbl_bottle == 1:
+                patchtriplet['patch1'], patchtriplet['patch2'] = patchtriplet['patch2'], patchtriplet['patch1']
+            
+            if self.one_hot:
+                lbl_bottle = to_categorical(lbl_bottle, num_classes=2)
+                dtype = torch.float32
+            else: 
+                dtype = torch.int64
+
+        # rearange axis (channels first)
+        patchtriplet = channelsfirst(patchtriplet)
+                             
+        assert patchtriplet['patch0'].shape == \
+            patchtriplet['patch1'].shape == \
+            patchtriplet['patch2'].shape, \
+            "Shape not matching in patch triplet {}, shape: 0:{} 1:{} 2:{}"\
+            .format(
+                im_idx, 
+                patchtriplet['patch0'].shape, 
+                patchtriplet['patch1'].shape,
+                patchtriplet['patch2'].shape)
+        assert np.any(~np.isnan(patchtriplet['patch0'])) \
+            & np.any(~np.isnan(patchtriplet['patch1'])) \
+            & np.any(~np.isnan(patchtriplet['patch2'])), \
+            "Nans in patch triplet {}".format(im_idx)  
+        
+        # add image info
+        patchtriplet['im_idx'] = torch.as_tensor(im_idx)
+        patchtriplet['patch_starts'] = torch.as_tensor(patch_starts)
+        
+        # cast to tensors
+        patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
+        patchtriplet['patch1'] = torch.as_tensor(patchtriplet['patch1'])
+        patchtriplet['patch2'] = torch.as_tensor(patchtriplet['patch2'])
+        patchtriplet['label'] = torch.as_tensor(lbl)
+        if self.second_label:
+            patchtriplet['label_bottle'] = torch.as_tensor(lbl_bottle, dtype=dtype)
         
         return patchtriplet
 
@@ -451,7 +923,8 @@ class TripletDatasetPreSaved(BaseDataset):
             "Nans in patch triplet {}".format(im_patch_idx)  
         
         # add image info
-        patchtriplet['im_idx'] = im_patch_idx
+        patchtriplet['im_idx'] = torch.as_tensor(im_patch_idx)
+        patchtriplet['patch_starts'] = torch.as_tensor(filename)
         
         # cast to tensors
         patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
@@ -522,7 +995,8 @@ class PartlyOverlapDataset(BaseDataset):
             "Nans in patch pair {}".format(im_patch_idx)  
         
         # add image info
-        patchpair['im_idx'] = im_patch_idx
+        patchpair['im_idx'] = torch.as_tensor(im_patch_idx)
+        patchpair['patch_starts'] = torch.as_tensor(filenames)
         
         # cast to tensors
         patchpair['patch0'] = torch.as_tensor(patchpair['patch0'])
@@ -530,6 +1004,184 @@ class PartlyOverlapDataset(BaseDataset):
         patchpair['label'] = torch.as_tensor(patchpair['label'],dtype=dtype)
         
         return patchpair
+
+class TripletAPNFinetuneDataset(BaseDataset):
+    """ Generate dataset with patch pair, anchor and positive 100% overlap """
+    
+    def __init__(self, data_dir, data_dir_gt, indices, channels=np.arange(14), 
+                 patch_size=96, percentile=99, one_hot=False, batch_size=25):
+        super(TripletAPNFinetuneDataset, self).__init__(data_dir, indices, channels, 
+                                             patch_size, percentile)
+        
+        self.one_hot = one_hot # todo: not hardcoded..
+        self.data_dir_gt = data_dir_gt
+        self.weight = torch.ones((2,), dtype=torch.float())
+        self.batch_size = batch_size
+    
+    def __getitem__(self, index):
+        'Generates one patch pair'
+        # Select sample
+        im_idx = self.indices[index]
+        # get random image-pair index (i.e. a/b)
+        #triplet_pairidxs = np.random.choice(self.pair_indices, size=3, replace=True)
+        pair_pairidxs = np.array(['a', 'b'])
+
+        # 'reconstruct' the filenames
+        filenames = get_filenames(im_idx, pair_pairidxs)
+        unique_images = np.unique(filenames)
+        n_images = len(unique_images)
+    
+
+        # load image
+        images = self.get_images(unique_images)
+        gt = get_gt(self.data_dir_gt, str(im_idx)+'.npy')
+
+        # check if all images have the same shape
+        if n_images > 1:
+            for i in range(n_images-1):
+                assert images[i].shape == images[i+1].shape,\
+                    'Shape not matching in image pair {}'.format(im_idx)
+        assert images[0].shape[:2] == gt.shape,\
+            'Shape gt not matchin in image pair {}'.format(im_idx)
+
+        batch_of_patch0 = torch.zeros(
+            (self.batch_size, self.n_channels, self.patch_size, self.patch_size), 
+            dtype=torch.float)
+        batch_of_patch1 = torch.zeros(
+            (self.batch_size, self.n_channels, self.patch_size, self.patch_size), 
+            dtype=torch.float)
+        batch_of_labels = torch.zeros(
+            (self.batch_size, self.patch_size, self.patch_size), 
+            dtype=torch.long)
+        
+        for i in range(self.batch_size):
+            # sample start locations patches
+            patch_starts = sample_patchpair_ap(
+                images[0].shape, 
+                self.patch_size)
+    
+            # get gt patch and calculate number of changed pixels
+            patches = self.get_patches_gt(patch_starts, gt, images)
+            self.weight[0] += np.sum(patches['label'] == 2)
+            self.weight[1] += np.sum(patches['label'] == 1)
+            
+            if self.one_hot:
+                to_categorical(patches['label'], num_classes=2)
+    
+            # rearange axis (channels first)
+            patches['patch0'] = np.moveaxis(patches['patch0'], -1, 0)
+            patches['patch1'] = np.moveaxis(patches['patch1'], -1, 0)
+            
+            assert patches['patch0'].shape == patches['patch1'].shape,\
+                "Shape not matching in patch pair {}, shape: 0:{} 1:{}"\
+                .format(
+                    im_idx, 
+                    patches['patch0'].shape, 
+                    patches['patch1'].shape)
+            assert np.any(~np.isnan(patches['patch0'])) \
+            & np.any(~np.isnan(patches['patch1'])), \
+                "Nans in patch pair {}".format(im_idx)  
+            
+            # add image info
+            patches['im_idx'] = torch.as_tensor(im_idx)
+            patches['patch_starts'] = torch.as_tensor(patch_starts)
+            
+            # cast to tensors
+            patches['patch0'] = torch.as_tensor(patches['patch0'])
+            patches['patch1'] = torch.as_tensor(patches['patch1'])
+            patches['label'] = torch.as_tensor(patches['label']-1, dtype=torch.long)
+            
+            batch_of_patch0[i] = patches['patch0']
+            batch_of_patch1[i] = patches['patch1']
+            batch_of_labels[i] = patches['label']
+        
+        batch = dict()
+        batch['patch0'] = batch_of_patch0
+        batch['patch1'] = batch_of_patch1
+        batch['label'] = batch_of_labels
+            
+        return batch
+
+class OSCDDataset(BaseDataset):
+    """Change Detection dataset class, used for both training and test data."""
+    def __init__(self, data_dir, data_dir_gt, indices, channels=np.arange(13), 
+                 patch_size=96, percentile=99, one_hot=False):
+        super(OSCDDataset, self).__init__(data_dir, indices, channels, 
+                                             patch_size, percentile)
+        
+        self.one_hot = one_hot 
+        self.data_dir_gt = data_dir_gt
+        self.weight = torch.ones((2,), dtype=torch.float)
+        self.stride = self.patch_size
+        self.n_imgs = len(self.indices)
+        
+        n_pix = 0
+        true_pix = 0
+        pair_pairidxs = np.array(['a', 'b'])
+        
+        # load images
+        self.im_0 = {}
+        self.im_1 = {}
+        self.gts = {}
+        self.n_patches_per_image = {}
+        self.n_patches = 0
+        self.patch_coords = []
+        for im_idx in tqdm(self.indices):
+            # load and store each image
+            filenames = get_filenames(im_idx, pair_pairidxs)
+            images = self.get_images(filenames)
+            gt = get_gt(self.data_dir_gt, str(im_idx)+'.npy')
+            
+            self.im_0[im_idx] = torch.as_tensor(np.moveaxis(images[0], -1, 0))
+            self.im_1[im_idx] = torch.as_tensor(np.moveaxis(images[1], -1, 0))
+            self.gts[im_idx] = gt
+            
+            s = gt.shape
+            n_pix += np.prod(s)
+            true_pix += np.sum(gt == 2)
+            
+            # calculate the number of patches
+            s = self.im_0[im_idx].shape
+            n1 = ceil((s[1] - self.patch_size + 1) / self.stride)
+            n2 = ceil((s[2] - self.patch_size + 1) / self.stride)
+            n_patches_i = n1 * n2
+            self.n_patches_per_image[im_idx] = n_patches_i
+            self.n_patches += n_patches_i
+            
+            # generate data_dir coordinates
+            for i in range(n1):
+                for j in range(n2):
+                    # coordinates in (x1, x2, y1, y2)
+                    current_patch_coords = (im_idx, 
+                                    [self.stride*i, self.stride*i + self.patch_size, self.stride*j, self.stride*j + self.patch_size],
+                                    [self.stride*(i + 1), self.stride*(j + 1)])
+                    self.patch_coords.append(current_patch_coords)
+                    
+        self.weights = [ 3 * 2 * true_pix / n_pix, 2 * (n_pix - true_pix) / n_pix]
+        
+        
+
+    def get_img(self, im_idx):
+        return {'im_0': self.im_0[im_idx],'im_1': self.im_1[im_idx], 'label': self.gts[im_idx]}
+
+    def __len__(self):
+        return self.n_patches
+
+    def __getitem__(self, idx):
+        current_patch_coords = self.patch_coords[idx]
+        im_idx = current_patch_coords[0]
+        limits = current_patch_coords[1]
+        
+        patch0 = self.im_0[im_idx][:, limits[0]:limits[1], limits[2]:limits[3]]
+        patch1 = self.im_1[im_idx][:, limits[0]:limits[1], limits[2]:limits[3]]
+        
+        label = self.gts[im_idx][limits[0]:limits[1], limits[2]:limits[3]]
+        #label = torch.from_numpy(1*np.array(label)).float()
+        label = torch.as_tensor(label-1, dtype=torch.long)
+        
+        patches = {'patch0': patch0, 'patch1': patch1, 'label': label}
+        
+        return patches
 
 def get_filenames(im_idx, pair_idxs):
     """
@@ -553,7 +1205,10 @@ def get_filenames(im_idx, pair_idxs):
         filenames.append(str(im_idx) + '_' + str(pair_idx) + '.npy')
     
     return filenames   
-    
+
+def get_gt(data_dir, filename):
+    return np.load(os.path.join(data_dir, filename))
+   
 def channelsfirst(patches, src=-1, dest=0):
     """
     move axis in numpy array to get channels first
@@ -785,6 +1440,81 @@ def sample_patchtriplet(im1_shape, patch_size=96, min_overlap=0.2,
 # =============================================================================
     return patch_starts
 
+def sample_patchpair_overlap(im1_shape, patch_size=96, min_overlap=0.2, 
+                        max_overlap=0.5):
+    """
+    Samples a patch pair from the image. Patch1 is partly overlapping patch0.
+    Note: overlapping patch only shifted to right and down.
+
+    Parameters
+    ----------
+    im1_shape : tuple
+        tuple of shape of the image to smaple the patches from
+    patch_size : int, optional
+        width and height of the patches in pixels, patches are squared. 
+        The default is 96.
+    min_overlap : float, optional
+        minimal proportion overlap between patch 1 and patch 2. 
+        The default is 0.2.
+    max_overlap : float, optional
+        maximum proportion overlap between patch 1 and patch 2. 
+        The default is 0.5.
+
+    Returns
+    -------
+    patch_starts : list
+        list of upper left corners of patch 0 to 2. 
+        patch_starts[0] : starting point of patch 0, described by numpy.ndarray 
+            of shape (2,) representing resp. row, column
+        patch_starts[1] : starting point of patch 1, described by numpy.ndarray
+            of shape (2,) representing respectively row and column.
+    """
+    patch_starts = list()
+
+    # determine min and max shift based on overlap
+    min_shift_pix = patch_size - patch_size*max_overlap
+    max_shift_pix = patch_size - patch_size*min_overlap
+ 
+    # sample starting point of the central patch = patch1
+    patch0_row = np.random.randint(
+        np.ceil(max_shift_pix), 
+        im1_shape[0]-patch_size-np.ceil(max_shift_pix), 
+        size=1)
+    patch0_col = np.random.randint(
+        np.ceil(max_shift_pix), 
+        im1_shape[1]-patch_size-np.ceil(max_shift_pix), 
+        size=1)
+    patch_starts.append(np.concatenate([patch0_row, patch0_col]))
+    
+    # sample shift of patch2 w.r.t patch1, constraind by defined overlap percentage
+    #shift_lr = np.random.randint(-max_shift_pix, max_shift_pix)
+    shift_lr = np.random.randint(0, max_shift_pix) # only positive shift
+    max_shift_ud = np.floor(np.sqrt(max_shift_pix**2 - shift_lr**2)) 
+    min_shift_ud = np.round(np.sqrt(max(0, min_shift_pix**2 - shift_lr**2)))
+    #random_ud = np.random.choice([-1, 1])
+    if max_shift_ud == min_shift_ud:
+        #shift_ud = min_shift_ud*random_ud
+        shift_ud = min_shift_ud # only positive shift
+    else:
+        #shift_ud = np.random.randint(min_shift_ud, max_shift_ud)*random_ud
+        shift_ud = np.random.randint(min_shift_ud, max_shift_ud) # only positive shift
+    
+    # calculate overlap
+    #overlap = (patch_size - abs(shift_lr)) * (patch_size - abs(shift_ud))
+    #print("overlap = ", overlap/(patch_size*patch_size))
+
+    # save in variable
+    patch_starts.append(np.array([int(patch_starts[0][0] + shift_ud),
+                                  int(patch_starts[0][1] + shift_lr)]))
+                
+
+# =============================================================================
+#     ## TODO: turn on if testing one patch
+#     patch_starts = [np.array([341,  82]), np.array([279,  51])]
+#     ##
+# =============================================================================
+    return patch_starts, (shift_lr, shift_ud)
+
 def sample_patchtriplet_apn(im1_shape, patch_size=96):
     """
     Samples a patch triplet from the image. The first two patches (0,1) are 
@@ -830,5 +1560,37 @@ def sample_patchtriplet_apn(im1_shape, patch_size=96):
     patch2_col = np.where(patch2_options)[1][idx]      
     
     patch_starts.append(np.array([patch2_row, patch2_col]))
+    
+    return patch_starts
+
+def sample_patchpair_ap(im1_shape, patch_size=96):
+    """
+    Samples an overlapping patch pair from the image. 
+    
+    Parameters
+    ----------
+    im1_shape : tuple
+        tuple of shape of the image to smaple the patches from
+    patch_size : int, optional
+        width and height of the patches in pixels, patches are squared. 
+        The default is 96.
+
+    Returns
+    -------
+    patch_starts : list
+        list of upper left corners of patch 0 to 2. 
+        patch_starts[0] : starting point of patch 0, described by numpy.ndarray 
+            of shape (2,) representing resp. row, column
+        patch_starts[1] : starting point of patch 1, described by numpy.ndarray
+            of shape (2,) representing respectively row and column.
+    """
+    patch_starts = list()
+ 
+    # sample starting point of the central patch = patch1
+    patch0_row = np.random.randint(0,im1_shape[0]-patch_size, size = 1)
+    patch0_col = np.random.randint(0,im1_shape[1]-patch_size, size = 1)
+    patch_starts.append(np.concatenate([patch0_row,patch0_col]))
+    # patch start 0 and 1 are the same (100% overlap)
+    patch_starts.append(np.concatenate([patch0_row,patch0_col])) 
     
     return patch_starts
