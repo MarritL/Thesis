@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Jan 28 15:55:01 2020
+Created on Mon Apr 13 10:58:58 2020
 
 @author: M. Leenstra
 """
@@ -9,12 +9,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+torch.manual_seed(0)
 
-__all__ = ['siamese_net_apn']
+__all__ = ['siamese_net_apn_dilated']
         
-class SiameseNetAPN(nn.Module):
+class SiameseDilatedNetAPN(nn.Module):
     def __init__(self, branches):
-        super(SiameseNetAPN, self).__init__()
+        super(SiameseDilatedNetAPN, self).__init__()
                 
         self.branches = branches    
 
@@ -49,29 +50,22 @@ class SiameseNetAPN(nn.Module):
             res.append(self.branches(x))
         
         return res
-# =============================================================================
-#         anchor = res[0]
-#         pos = res[1]
-#         pos_dist = (anchor - pos).pow(2).sum(1)#.sqrt()
-#         
-#         if n_branches == 3:
-#             neg = res[2]
-#             neg_dist = (anchor - neg).pow(2).sum(1)#.sqrt()
-#         
-#         return [pos_dist, neg_dist] if n_branches == 3 else [pos_dist]
-# =============================================================================
- 
+             
     
 def make_layers(cfg, n_channels, batch_norm=False):
     layers = []
     in_channels = int(n_channels)    
     # iterate over layers and add to sequential
-    for v in cfg:
+    for i, v in enumerate(cfg):
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+        elif v == 'CU':
+            layers += [nn.ConvTranspose2d(in_channels, v, kernel_size=2, stride=2)]
+        elif v == 'BU':
+            layers += [nn.Upsample(scale_factor=8, mode='bilinear')]        # TODO: scale factor hard-coded  
         else:
             v = int(v)
-            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
+            conv2d = nn.Conv2d(in_channels, v, kernel_size=i*2+3, padding=(i+1)**2, dilation=i+1)
             if batch_norm:
                 layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
             else:
@@ -80,8 +74,7 @@ def make_layers(cfg, n_channels, batch_norm=False):
     return nn.Sequential(*layers)
 
 
-
-def siamese_net_apn(cfg, n_channels=13,n_classes=2, batch_norm=False):
+def siamese_net_apn_dilated(cfg, n_channels=13,n_classes=2, batch_norm=False):
     """
     Create network
 
@@ -114,10 +107,8 @@ def siamese_net_apn(cfg, n_channels=13,n_classes=2, batch_norm=False):
     branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm)
 
     # create network
-    net = SiameseNetAPN(branches) 
+    net = SiameseDilatedNetAPN(branches) 
     
     print(net)
     return net
-
-
-
+    

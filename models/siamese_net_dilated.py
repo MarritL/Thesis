@@ -10,12 +10,12 @@ import torch.nn as nn
 import numpy as np
 torch.manual_seed(0)
 
-__all__ = ['siamese_net']
+__all__ = ['siamese_net_dilated']
 
         
-class SiameseNet(nn.Module):
+class SiameseDilatedNet(nn.Module):
     def __init__(self, branches, joint, classifier, patch_size_lin):
-        super(SiameseNet, self).__init__()
+        super(SiameseDilatedNet, self).__init__()
                 
         self.branches = branches    
         self.joint = joint
@@ -81,6 +81,7 @@ class SiameseNet(nn.Module):
         x = self.joint(x)
         if extract_features == 'joint': 
             return x
+
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         # classification layers
@@ -93,7 +94,7 @@ def make_layers(cfg, n_channels, batch_norm=False):
     layers = []
     in_channels = int(n_channels)    
     # iterate over layers and add to sequential
-    for v in cfg:
+    for i, v in enumerate(cfg):
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         elif v == 'CU':
@@ -102,7 +103,28 @@ def make_layers(cfg, n_channels, batch_norm=False):
             layers += [nn.Upsample(scale_factor=8, mode='bilinear')]        # TODO: scale factor hard-coded  
         else:
             v = int(v)
-            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
+            conv2d = nn.Conv2d(in_channels, v, kernel_size=i*2+3, padding=(i+1)**2, dilation=i+1)
+            if batch_norm:
+                layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
+            else:
+                layers += [conv2d, nn.ReLU(inplace=True)]
+            in_channels = v
+    return nn.Sequential(*layers)
+
+def make_layers_joint(cfg, n_channels, batch_norm=False):
+    layers = []
+    in_channels = int(n_channels)    
+    # iterate over layers and add to sequential
+    for i, v in enumerate(cfg):
+        if v == 'M':
+            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+        elif v == 'CU':
+            layers += [nn.ConvTranspose2d(in_channels, v, kernel_size=2, stride=2)]
+        elif v == 'BU':
+            layers += [nn.Upsample(scale_factor=8, mode='bilinear')]        # TODO: scale factor hard-coded  
+        else:
+            v = int(v)
+            conv2d = nn.Conv2d(in_channels, v, kernel_size=7, padding=9, dilation=3)
             if batch_norm:
                 layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
             else:
@@ -129,7 +151,8 @@ def make_classifier(cfg, n_channels):
     layers += [linear]        
     return nn.Sequential(*layers)
 
-def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False, n_branches=2):
+
+def siamese_net_dilated(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False, n_branches=2):
     """
     Create network
 
@@ -168,7 +191,7 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
     # create layers
     branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm)
     if cfg['top'] is not None:
-        joint = make_layers(cfg['top'],
+        joint = make_layers_joint(cfg['top'],
                             int(cfg['branch'][cfg['branch'] != 'M'][-1])*(n_branches-1),
                             batch_norm=batch_norm)
     else:
@@ -185,7 +208,7 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
     classifier = make_classifier(cfg['classifier'], n_channels_classifier)
     # create network
     #net = SiameseNet(branches, joint, n_channels_lin, n_classes, n_mpool, patch_size) 
-    net = SiameseNet(branches, joint, classifier, patch_size_lin) 
+    net = SiameseDilatedNet(branches, joint, classifier, patch_size_lin) 
     
     print(net)
     return net

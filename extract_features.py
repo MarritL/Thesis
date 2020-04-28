@@ -47,19 +47,44 @@ def get_network(model_settings):
           
     # build network
     model_settings['network'] = model_settings['networkname']
+    
+    # build network
     if model_settings['network'] == 'siamese':
+        print('n_branches = 2')
+        n_branches = 2
+    elif model_settings['network'] == 'siamese_concat':
+        print('n_branches = 2')
         n_branches = 2
     elif model_settings['network'] == 'triplet':
+        print('n_branches = 3')
         n_branches = 3
-        model_settings['network'] = 'siamese'
+        model_settings['network'] = 'siamese'    
     elif model_settings['network'] == 'hypercolumn':
+        print('n_branches = 2')
+        n_branches = 2
+    elif model_settings['network'] == 'siamese_unet_diff':
+        print('n_branches = 2')
         n_branches = 2
     elif model_settings['network'] == 'triplet_apn':
-        n_branches = 2 
+        print('n_branches = 3')
+        n_branches = 3 
+    elif model_settings['network'] == 'siamese_unet':
+        print('n_branches = 2')
+        n_branches = 2
+    elif model_settings['network'] == 'triplet_unet':
+        print('n_branches = 3')
+        n_branches = 3
+    elif model_settings['network'] == 'siamese_dilated':
+        print('n_branches = 2')
+        n_branches = 2
+    elif model_settings['network'] == 'triplet_apn_dilated':
+        print('n_branches = 3')
+        n_branches = 3
     else:
         raise Exception('Architecture undefined! \n \
                         Choose one of: "siamese", "triplet", "hypercolumn", \
-                            "triplet_apn"')
+                        "siamese_unet_diff", "triplet_apn", "siamese_unet",\
+                        "siamese_concat"')
         
         
     net = NetBuilder.build_network(
@@ -70,10 +95,11 @@ def get_network(model_settings):
         patch_size=int(model_settings['patch_size']),
         im_size=(96,96),
         batch_norm=model_settings['batch_norm'],
-        n_branches=n_branches)  
+        n_branches=n_branches,
+        weights=model_settings['filename'])  
     
     # load weights
-    net.load_state_dict(torch.load(model_settings['filename']))
+    #net.load_state_dict(torch.load(model_settings['filename']))
     
     return net
 
@@ -345,7 +371,7 @@ def calculate_changemap(distmap, method='otsu', plot=False):
     #fig.colorbar(d)
     
     binary =  distmap > thresh
-    binary = remove_small_objects(binary,min_size=7)
+    binary = remove_small_objects(binary,min_size=3)
     
     if plot:
         fig, axes = plt.subplots(ncols=3, figsize=(8, 2.5))

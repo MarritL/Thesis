@@ -10,7 +10,7 @@ import torch.nn as nn
 import numpy as np
 torch.manual_seed(0)
 
-__all__ = ['siamese_net']
+__all__ = ['siamese_net_concat']
 
         
 class SiameseNet(nn.Module):
@@ -72,10 +72,12 @@ class SiameseNet(nn.Module):
             else:
                 res.append(self.branches(x))
         
+        # concatenate the output of both branches
+        x = torch.cat(res, 1)
         # concatenate the output of difference of branches
-        x = torch.abs(res[1] - res[0])
-        if n_branches == 3:
-            x = torch.cat(x, torch.abs(res[2] - res[1]), 1)
+        #x = torch.abs(res[1] - res[0])
+        #f n_branches == 3:
+        #    x = torch.cat(x, torch.abs(res[2] - res[1]), 1)
         
         # joint layers
         x = self.joint(x)
@@ -89,9 +91,17 @@ class SiameseNet(nn.Module):
 
              
     
-def make_layers(cfg, n_channels, batch_norm=False):
+def make_layers(cfg, n_channels, batch_norm=False, first_77=False):
     layers = []
     in_channels = int(n_channels)    
+    if first_77:
+        v = int(cfg[0])
+        conv2d = nn.Conv2d(in_channels, v, kernel_size=7, padding=3)
+        if batch_norm:
+            layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
+        else:
+            layers += [conv2d, nn.ReLU(inplace=True)]
+        in_channels = v        
     # iterate over layers and add to sequential
     for v in cfg:
         if v == 'M':
@@ -129,7 +139,7 @@ def make_classifier(cfg, n_channels):
     layers += [linear]        
     return nn.Sequential(*layers)
 
-def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False, n_branches=2):
+def siamese_net_concat(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False, n_branches=2):
     """
     Create network
 
@@ -166,10 +176,10 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
         n_channels_lin = int(cfg['branch'][cfg['branch'] != 'M'][-1])*n_branches
     
     # create layers
-    branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm)
+    branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm,first_77=True)
     if cfg['top'] is not None:
         joint = make_layers(cfg['top'],
-                            int(cfg['branch'][cfg['branch'] != 'M'][-1])*(n_branches-1),
+                            int(cfg['branch'][cfg['branch'] != 'M'][-1])*(n_branches),
                             batch_norm=batch_norm)
     else:
         # does nothing because next layer is the same
