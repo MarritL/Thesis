@@ -176,7 +176,7 @@ def siamese_net_concat(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm
         n_channels_lin = int(cfg['branch'][cfg['branch'] != 'M'][-1])*n_branches
     
     # create layers
-    branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm,first_77=True)
+    branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm,first_77=False)
     if cfg['top'] is not None:
         joint = make_layers(cfg['top'],
                             int(cfg['branch'][cfg['branch'] != 'M'][-1])*(n_branches),
