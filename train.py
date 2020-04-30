@@ -272,7 +272,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
         dataset_train, 
         batch_size=train_settings['batch_size'], 
         shuffle=True,
-        num_workers = 1)
+        num_workers = 2)
     dataloader_val = DataLoader(
         dataset_val, 
         batch_size=train_settings['batch_size'], 
@@ -841,11 +841,14 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
 #             ave_lossTriplet = AverageMeter()
 # =============================================================================
             
-        
+    if (i+1) < disp_iter:
+        ave_loss_all_print = ave_loss.average()
+    else:
+        ave_loss_all_print = ave_loss_all.average()
     print('Train epoch: [{}], Time: {:.2f} ' 
           'Train_Loss: {:.4f}, Train_Accuracy: {:0.4f}'
           .format(epoch, time.time()-epoch_start,
-                  ave_loss_all.average(), ave_acc.average()))
+                  ave_loss_all_print, ave_acc.average()))
 
      
     if writer != None:
@@ -1080,10 +1083,14 @@ def train_epoch_apn(network, n_branches, dataloader, optimizer, loss_func,
             ave_lossTriplet = AverageMeter()
             
         
-    print('Train epoch: [{}], Time: {:.2f}, ' 
-          'Train_Loss: {:.4f}'
+    if (i+1) < disp_iter:
+        ave_loss_all_print = ave_loss.average()
+    else:
+        ave_loss_all_print = ave_loss_all.average()
+    print('Train epoch: [{}], Time: {:.2f} ' 
+          'Train_Loss: {:.4f}, Train_Accuracy: {:0.4f}'
           .format(epoch, time.time()-epoch_start,
-                  ave_loss_all.average()))
+                  ave_loss_all_print, ave_acc.average()))
 
      
     if writer != None:
@@ -1330,10 +1337,14 @@ def train_epoch_unet(network, n_branches, dataloader, optimizer, loss_func,
             ave_acc = AverageMeter()
             
         
-    print('Train epoch: [{}], Time: {:.2f}, ' 
-          'Train_Loss: {:.4f}, Train_Acc: {:.4f}'
+    if (i+1) < disp_iter:
+        ave_loss_all_print = ave_loss.average()
+    else:
+        ave_loss_all_print = ave_loss_all.average()
+    print('Train epoch: [{}], Time: {:.2f} ' 
+          'Train_Loss: {:.4f}, Train_Accuracy: {:0.4f}'
           .format(epoch, time.time()-epoch_start,
-                  ave_loss_all.average(), ave_acc_all.average()))
+                  ave_loss_all_print, ave_acc.average()))
 
      
     if writer != None:
