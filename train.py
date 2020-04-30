@@ -124,149 +124,165 @@ def train(directories, dataset_settings, network_settings, train_settings):
                              weight_decay=network_settings['weight_decay'])
 
     # Datasets
-    if dataset_settings['dataset_type'] == 'pair':
-        dataset_train = PairDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_train'], 
-            channels=dataset_settings['channels'])      
-        dataset_val = PairDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_val'], 
-            channels=dataset_settings['channels'])       
-    elif dataset_settings['dataset_type'] == 'triplet':
-        in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
-        dataset_train = TripletDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_train'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot,
-            min_overlap = dataset_settings['min_overlap'],
-            max_overlap = dataset_settings['max_overlap'],
-            in_memory = in_memory)     
-        dataset_val = TripletDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_val'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot,
-            min_overlap = dataset_settings['min_overlap'],
-            max_overlap = dataset_settings['max_overlap'],
-            in_memory = in_memory)
-    elif dataset_settings['dataset_type'] == 'triplet_saved':
-        print("construct from presaved dataset")
-        dataset_train = TripletDatasetPreSaved(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_train'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot)           
-        dataset_val = TripletDatasetPreSaved(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_val'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot)  
-    elif dataset_settings['dataset_type'] == 'overlap':
-        dataset_train = PartlyOverlapDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_train'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot)           
-        dataset_val = PartlyOverlapDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_val'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot) 
-    elif dataset_settings['dataset_type'] == 'triplet_apn':
-        second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
-        in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
-        dataset_train = TripletAPNDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_train'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot,
-            second_label=second_label,
-            in_memory=in_memory)#,
-            #batch_size = 5)           # TODO: hardcoded
-        dataset_val = TripletAPNDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_val'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot,
-            second_label=second_label,
-            in_memory=in_memory)#,
-            #batch_size = 5)  # TODO: hardcoded
-    elif dataset_settings['dataset_type'] == 'triplet_oscd':
-        dataset_train = OSCDDataset(
-            data_dir=directories['data_path'], 
-            indices = dataset_settings['indices_train'], 
-            patch_size=network_settings['patch_size'], 
-            stride = dataset_settings['stride'], 
-            transform = transforms.Compose([RandomFlip(), RandomRot()]), 
-            one_hot=one_hot, 
-            alt_label=True, 
-            mode='train')
-        dataset_val = OSCDDataset(
-            data_dir=directories['data_path'], 
-            indices = dataset_settings['indices_val'], 
-            patch_size=network_settings['patch_size'], 
-            stride = dataset_settings['stride'], 
-            transform = transforms.Compose([RandomFlip(), RandomRot()]), 
-            one_hot=one_hot, 
-            alt_label=True, 
-            mode='train')
-    elif dataset_settings['dataset_type'] == 'overlap_regression':
-        in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
-        dataset_train = PairDatasetOverlap(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_train'], 
-            channels=dataset_settings['channels'], 
-            one_hot=False,
-            min_overlap = dataset_settings['min_overlap'],
-            max_overlap = dataset_settings['max_overlap'],
-            in_memory=in_memory)          
-        dataset_val = PairDatasetOverlap(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_val'], 
-            channels=dataset_settings['channels'], 
-            one_hot=False,
-            min_overlap = dataset_settings['min_overlap'],
-            max_overlap = dataset_settings['max_overlap'],
-            in_memory=in_memory)  
-    elif dataset_settings['dataset_type'] == 'pair_hard_neg':
-        in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
-        dataset_train = PairHardNegDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_train'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot,
-            in_memory = in_memory)
-        dataset_val = PairHardNegDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_val'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot,
-            in_memory = in_memory)
-    elif dataset_settings['dataset_type'] == 'triplet_apn_hard_neg':
-        second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
-        in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
-        dataset_train = TripletAPNHardNegDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_train'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot,
-            second_label=second_label,
-            in_memory=in_memory)
-        dataset_val = TripletAPNHardNegDataset(
-            data_dir=directories['data_path'], 
-            indices=dataset_settings['indices_val'], 
-            channels=dataset_settings['channels'], 
-            one_hot=one_hot,
-            second_label=second_label,
-            in_memory=in_memory)
-    else:
-        raise Exception('dataset_type undefined! \n \
-                        Choose one of: "pair", "triplet", "triplet_saved",\
-                        "overlap", "triplet_apn", "triplet_oscd", "overlap_regression" \
-                        , "pair_hard_neg", "triplet_apn_hard_neg"')
-    
+    dataset_train = get_dataset(
+        data_path=directories['data_path'], 
+        indices=dataset_settings['indices_train'], 
+        channels=dataset_settings['channels'], 
+        one_hot=one_hot, 
+        dataset_settings=dataset_settings, 
+        network_settings=network_settings)
+    dataset_val = get_dataset(
+        data_path=directories['data_path'], 
+        indices=dataset_settings['indices_val'], 
+        channels=dataset_settings['channels'], 
+        one_hot=one_hot, 
+        dataset_settings=dataset_settings, 
+        network_settings=network_settings)
+# =============================================================================
+#     if dataset_settings['dataset_type'] == 'pair':
+#         dataset_train = PairDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_train'], 
+#             channels=dataset_settings['channels'])      
+#         dataset_val = PairDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_val'], 
+#             channels=dataset_settings['channels'])       
+#     elif dataset_settings['dataset_type'] == 'triplet':
+#         in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
+#         dataset_train = TripletDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_train'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot,
+#             min_overlap = dataset_settings['min_overlap'],
+#             max_overlap = dataset_settings['max_overlap'],
+#             in_memory = in_memory)     
+#         dataset_val = TripletDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_val'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot,
+#             min_overlap = dataset_settings['min_overlap'],
+#             max_overlap = dataset_settings['max_overlap'],
+#             in_memory = in_memory)
+#     elif dataset_settings['dataset_type'] == 'triplet_saved':
+#         print("construct from presaved dataset")
+#         dataset_train = TripletDatasetPreSaved(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_train'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot)           
+#         dataset_val = TripletDatasetPreSaved(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_val'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot)  
+#     elif dataset_settings['dataset_type'] == 'overlap':
+#         dataset_train = PartlyOverlapDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_train'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot)           
+#         dataset_val = PartlyOverlapDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_val'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot) 
+#     elif dataset_settings['dataset_type'] == 'triplet_apn':
+#         second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
+#         in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
+#         dataset_train = TripletAPNDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_train'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot,
+#             second_label=second_label,
+#             in_memory=in_memory)#,
+#             #batch_size = 5)           # TODO: hardcoded
+#         dataset_val = TripletAPNDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_val'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot,
+#             second_label=second_label,
+#             in_memory=in_memory)#,
+#             #batch_size = 5)  # TODO: hardcoded
+#     elif dataset_settings['dataset_type'] == 'triplet_oscd':
+#         dataset_train = OSCDDataset(
+#             data_dir=directories['data_path'], 
+#             indices = dataset_settings['indices_train'], 
+#             patch_size=network_settings['patch_size'], 
+#             stride = dataset_settings['stride'], 
+#             transform = transforms.Compose([RandomFlip(), RandomRot()]), 
+#             one_hot=one_hot, 
+#             alt_label=True, 
+#             mode='train')
+#         dataset_val = OSCDDataset(
+#             data_dir=directories['data_path'], 
+#             indices = dataset_settings['indices_val'], 
+#             patch_size=network_settings['patch_size'], 
+#             stride = dataset_settings['stride'], 
+#             transform = transforms.Compose([RandomFlip(), RandomRot()]), 
+#             one_hot=one_hot, 
+#             alt_label=True, 
+#             mode='train')
+#     elif dataset_settings['dataset_type'] == 'overlap_regression':
+#         in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
+#         dataset_train = PairDatasetOverlap(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_train'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=False,
+#             min_overlap = dataset_settings['min_overlap'],
+#             max_overlap = dataset_settings['max_overlap'],
+#             in_memory=in_memory)          
+#         dataset_val = PairDatasetOverlap(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_val'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=False,
+#             min_overlap = dataset_settings['min_overlap'],
+#             max_overlap = dataset_settings['max_overlap'],
+#             in_memory=in_memory)  
+#     elif dataset_settings['dataset_type'] == 'pair_hard_neg':
+#         in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
+#         dataset_train = PairHardNegDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_train'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot,
+#             in_memory = in_memory)
+#         dataset_val = PairHardNegDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_val'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot,
+#             in_memory = in_memory)
+#     elif dataset_settings['dataset_type'] == 'triplet_apn_hard_neg':
+#         second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
+#         in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
+#         dataset_train = TripletAPNHardNegDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_train'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot,
+#             second_label=second_label,
+#             in_memory=in_memory)
+#         dataset_val = TripletAPNHardNegDataset(
+#             data_dir=directories['data_path'], 
+#             indices=dataset_settings['indices_val'], 
+#             channels=dataset_settings['channels'], 
+#             one_hot=one_hot,
+#             second_label=second_label,
+#             in_memory=in_memory)
+#     else:
+#         raise Exception('dataset_type undefined! \n \
+#                         Choose one of: "pair", "triplet", "triplet_saved",\
+#                         "overlap", "triplet_apn", "triplet_oscd", "overlap_regression" \
+#                         , "pair_hard_neg", "triplet_apn_hard_neg"')
+# =============================================================================
+
     # Data loaders
     dataloader_train = DataLoader(
         dataset_train, 
@@ -400,6 +416,93 @@ def train(directories, dataset_settings, network_settings, train_settings):
         
     print('Training Done!')
     writer.close()
+    
+def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network_settings):
+        # Datasets
+    if dataset_settings['dataset_type'] == 'pair':
+        dataset = PairDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels)       
+    elif dataset_settings['dataset_type'] == 'triplet':
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = TripletDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot,
+            min_overlap = dataset_settings['min_overlap'],
+            max_overlap = dataset_settings['max_overlap'],
+            in_memory = in_memory)     
+    elif dataset_settings['dataset_type'] == 'triplet_saved':
+        print("construct from presaved dataset")
+        dataset = TripletDatasetPreSaved(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot)           
+    elif dataset_settings['dataset_type'] == 'overlap':
+        dataset = PartlyOverlapDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot)           
+    elif dataset_settings['dataset_type'] == 'triplet_apn':
+        second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = TripletAPNDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot,
+            second_label=second_label,
+            in_memory=in_memory)#,
+            #batch_size = 5)           # TODO: hardcoded
+    elif dataset_settings['dataset_type'] == 'triplet_oscd':
+        dataset = OSCDDataset(
+            data_dir=data_path,
+            indices=indices,
+            patch_size=network_settings['patch_size'], 
+            stride = dataset_settings['stride'], 
+            transform = transforms.Compose([RandomFlip(), RandomRot()]), 
+            one_hot=one_hot, 
+            alt_label=True, 
+            mode='train')
+    elif dataset_settings['dataset_type'] == 'overlap_regression':
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = PairDatasetOverlap(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=False,
+            min_overlap = dataset_settings['min_overlap'],
+            max_overlap = dataset_settings['max_overlap'],
+            in_memory=in_memory)          
+    elif dataset_settings['dataset_type'] == 'pair_hard_neg':
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = PairHardNegDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot,
+            in_memory = in_memory)
+    elif dataset_settings['dataset_type'] == 'triplet_apn_hard_neg':
+        second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = TripletAPNHardNegDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot,
+            second_label=second_label,
+            in_memory=in_memory)
+    else:
+        raise Exception('dataset_type undefined! \n \
+                        Choose one of: "pair", "triplet", "triplet_saved",\
+                        "overlap", "triplet_apn", "triplet_oscd", "overlap_regression" \
+                        , "pair_hard_neg", "triplet_apn_hard_neg"')
+    
+    return dataset
 
 def validate(model_settings, eval_settings):
     # build network
