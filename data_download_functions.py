@@ -430,6 +430,7 @@ def filter_errors(image_folder, image_list, threshold=0.5, plot = False):
 
         # filter based on standard deviation of angles
         std = np.std(angle)
+        print(std)
         if std < threshold:
             errors.extend([image])
     
@@ -720,8 +721,6 @@ def save_patches(patches_df, images_dir, patches_dir, patch_size = 96):
         # find all patches from image 'b'
         patches_b = im_group[im_group['impair_idx'] == 'b']
         if len(patches_b) > 0: 
-            if i < 5: 
-                print('b')
             im_b = np.load(os.path.join(images_dir, str(unique_im) + '_b.npy'))
         
             for j, df_row in patches_b.iterrows():       

@@ -26,7 +26,7 @@ ntry = 20 # number of times to try to get a sentinel band
 bands = ['B1','B2','B3','B4','B5','B6','B7','B8','B8A','B9','B10','B11','B12','QA60']
 
 # directories cities
-source_dir_cities = '/media/cordolo/elements/source_data/cities'
+source_dir_cities = '/media/cordolo/marrit/source_data/worldcities'
 results_dir_cities = '/media/cordolo/elements/results/cities'
 cities_csv = 'r_cities.csv'
 # directories training
@@ -58,6 +58,7 @@ import random
 
 # variables 
 minPop = 200000 #min population per city
+# data from geonames.org via https://datahub.io/core/world-cities
 data_url = 'https://datahub.io/core/world-cities/datapackage.json'
 
 # data package
@@ -68,10 +69,11 @@ resources = package.resources
 for resource in resources:
     if resource.tabular:
         data = pd.read_csv(resource.descriptor['path'])
-   
+
+data = pd.read_csv(os.path.join(source_dir_cities,'worldcities_geonames.csv'), header=0) 
 # combine with worldcity data from simple maps
 # worldcities.csv downloaded at 06/01/2020 from https://simplemaps.com/data/world-cities
-cities = pd.read_csv(os.path.join(source_dir_cities,'worldcities.csv'), header=0)
+cities = pd.read_csv(os.path.join(source_dir_cities,'worldcities_simplemaps.csv'), header=0)
 
 # data cleaning
 cities_cleaned = cities.drop_duplicates(subset = ['lat', 'lng'])
@@ -347,7 +349,7 @@ dataset = dataset.drop(onesdataset.index, axis=0)
 dataset = dataset.drop(multidataset.index, axis=0)
 
 # find corrupt images at threshold 0.5
-corrupts = filter_errors(os.path.join(results_dir_training, data_dir_S21C), dataset['filename'].values, threshold=0.5, plot = False)
+corrupts = filter_errors(os.path.join(results_dir_training, data_dir_S21C), dataset['filename'].values, threshold=0.4, plot = False)
 
 # find the entries with only one image
 corrupts_df = pd.DataFrame(corrupts, columns=['filename'])
@@ -835,10 +837,10 @@ computer = 'desktop'
 # init
 if computer == 'desktop':
     directories = {
-        'intermediate_dir_training': '/media/cordolo/elements/Intermediate/training_S2',
-        'results_dir_training': '/media/cordolo/elements/results/training_S2',
-        'intermediate_dir_cd': '/media/cordolo/elements/Intermediate/CD_OSCD',
-        'intermediate_dir': '/media/cordolo/elements/Intermediate',
+        'intermediate_dir_training': '/media/cordolo/marrit/Intermediate/training_S2',
+        'results_dir_training': '/media/cordolo/marrit/results/training_S2',
+        'intermediate_dir_cd': '/media/cordolo/marrit/Intermediate/CD_OSCD',
+        'intermediate_dir': '/media/cordolo/marrit/Intermediate',
         'csv_file_S21C': 'S21C_dataset.csv',
         'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
         'csv_file_oscd': 'OSCD_dataset.csv',
@@ -850,8 +852,8 @@ if computer == 'desktop':
         'data_dir_oscd': 'data_OSCD',
         'data_dir_patches90-100': 'patches_S21C_overlap90-100',
         'labels_dir_oscd' : 'labels_OSCD',
-        'tb_dir': '/media/cordolo/elements/Intermediate/tensorboard',
-        'model_dir': '/media/cordolo/elements/Intermediate/trained_models'}
+        'tb_dir': '/media/cordolo/marrit/Intermediate/tensorboard',
+        'model_dir': '/media/cordolo/marrit/Intermediate/trained_models'}
 elif computer == 'optimus':
     directories = {
         'intermediate_dir_training': '/media/marrit/Intermediate/training_S2',
@@ -876,10 +878,10 @@ elif computer == 'optimus':
 intermediate_dir_training= directories['intermediate_dir_training']
 results_dir_training = directories['results_dir_training'] #'/media/marrit/results/training_S2'
 csv_file_S21C = 'S21C_dataset.csv'
-csv_file_patches = 'S21C_patches_overlap90-100.csv'
+csv_file_patches = 'S21C_patches_overlap50-70.csv'
 data_dir_S21C = 'data_S21C'
-patches_dir_S21C = 'patches_S21C_overlap90-100'
-gt_dir_S21C = 'gt_S21C_overlap90-100'
+patches_dir_S21C = 'patches_S21C_overlap50-70'
+gt_dir_S21C = 'gt_S21C_overlap50-70'
 # combinations of dirs
 images_csv=os.path.join(results_dir_training, csv_file_S21C)
 images_dir=os.path.join(results_dir_training,data_dir_S21C)
@@ -889,7 +891,7 @@ gt_dir = os.path.join(intermediate_dir_training, gt_dir_S21C)
 
 # sample start locations of patche and store in csv
 sample_patches_from_image(images_csv, images_dir, patches_csv, patch_size=96, 
-                          min_overlap = 0.9, max_overlap = 1)
+                          min_overlap = 0.5, max_overlap = 0.7)
 
 # create dirs
 if not os.path.isdir(os.path.join(intermediate_dir_training, patches_dir_S21C)):
@@ -910,7 +912,10 @@ save_patches(patches_df=patches_df, images_dir=images_dir, patches_dir=patches_d
 # save a gt of the overlap
 generate_gt_overlap(patches_df, gt_dir, patch_size)
 
-# =============================================================================
+0
+
+
+0# =============================================================================
 # # I changed my mind about the filenames, so i have to change the df
 # patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
 # patches_df['im_patch_idx'] = 'NA'
@@ -998,7 +1003,43 @@ for city in dirs:
     # save
     np.save(os.path.join(intermediate_dir_test,labels_dir_oscd, str(im_idx)+'.npy'), gt)
 
+#%%
+""" Save Barrax dataset """
+import scipy.io
+import imageio
+from setup import setup
+directories, network_settings, train_settings, dataset_settings = setup()
 
+mat = scipy.io.loadmat(os.path.join(directories['source_dir_barrax'],'preChangeImage.mat'))
+b4 = mat['preChangeImage'][:,:,2]
+b3 = mat['preChangeImage'][:,:,1]
+b2 = mat['preChangeImage'][:,:,0]
+b5 = mat['preChangeImage'][:,:,3]
+b6 = mat['preChangeImage'][:,:,4]
+b7 = mat['preChangeImage'][:,:,5]
+b8 = mat['preChangeImage'][:,:,6]
+b8a = mat['preChangeImage'][:,:,7]
+b11 = mat['preChangeImage'][:,:,8]
+b12 = mat['preChangeImage'][:,:,9]
+im0 = np.stack([b2,b3,b4,b5,b6,b7,b8,b8,b8a,b11,b12],axis=2)
+np.save(os.path.join(directories['intermediate_dir'],'CD_barrax',directories['data_dir_barrax'],'0_a.npy'),im0)
+
+mat = scipy.io.loadmat(os.path.join(directories['source_dir_barrax'],'postChangeImage.mat'))
+b4 = mat['postChangeImage'][:,:,2]
+b3 = mat['postChangeImage'][:,:,1]
+b2 = mat['postChangeImage'][:,:,0]
+b5 = mat['postChangeImage'][:,:,3]
+b6 = mat['postChangeImage'][:,:,4]
+b7 = mat['postChangeImage'][:,:,5]
+b8 = mat['postChangeImage'][:,:,6]
+b8a = mat['postChangeImage'][:,:,7]
+b11 = mat['postChangeImage'][:,:,8]
+b12 = mat['postChangeImage'][:,:,9]
+im1 = np.stack([b2,b3,b4,b5,b6,b7,b8,b8,b8a,b11,b12],axis=2)
+np.save(os.path.join(directories['intermediate_dir'],'CD_barrax',directories['data_dir_barrax'],'0_b.npy'),im1)
+
+labels = imageio.imread(os.path.join(directories['source_dir_barrax'],'referenceImage.png'))
+np.save(os.path.join(directories['intermediate_dir'],'CD_barrax','labels_barrax','0.npy'),labels[:,:,0])
 
 
 
@@ -1437,9 +1478,10 @@ fig, ax = plot_image(os.path.join(intermediate_dir_training, data_dir_S21C), ['8
 fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['1001_a.npy', '1001_b.npy','516_a.npy', '516_b.npy', '517_a.npy', '517_b.npy'], [4,3,2], rows=6, cols=0, titles = ['1001_a.npy', '1001_b.npy','516_a.npy', '516_b.npy', '517_a.npy', '517_b.npy'], axis=True)
 fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['1811_a.npy', '1811_b.npy'], [4,3,2], titles = ['1811_a.npy', '1811_b.npy'], axis=True)
 fig, ax = plot_random_imagepairs(2, os.path.join(results_dir_training, data_dir_S21C), [4,3,2])
-fig, ax = plot_image(os.path.join(results_dir_training, data_dir_S21C), ['0_a.npy', '0_b.npy', '1_a.npy', '1_b.npy'], [3,2,1])
-fig, ax = plot_image(os.path.join(patches_dir), ['1466_22_0.npy', '1466_22_1.npy'], [3,2,1], titles = ['a', 'b'], axis=True)
-
+fig, ax = plot_image(os.path.join(results_dir_training, data_dir_S21C), ['1012_a.npy', '1012_b.npy', '617_a.npy', '617_b.npy'], [3,2,1])
+fig, ax = plot_image(os.path.join(patches_dir), ['100_2_0.npy', '100_2_1.npy'], [3,2,1], titles = ['a', 'b'], axis=True)
+fig, ax = plot_random_imagepairs(2, os.path.join(directories['results_dir_training'], directories['data_dir_S21C']), bands=[3,2,1], titles='image_nr')
+fig, ax = plot_image(os.path.join(directories['results_dir_training'], directories['data_dir_S21C']), ['992_b.npy'], [3,2,1])
 
 
 im1 = np.load(os.path.join(intermediate_dir_training, data_dir_S21C, '337_a.npy'))
