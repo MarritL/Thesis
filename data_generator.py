@@ -403,6 +403,24 @@ class TripletDataset(BaseDataset):
         
         # get patches
         patchtriplet = self.get_patches(patch_starts, images, triplet_pairidxs)
+        
+        # augmentation
+        rot = np.random.randint(1,4)
+        flipud = np.random.randint(2)
+        fliplr = np.random.randint(2)
+        patchtriplet['patch0'] = np.rot90(patchtriplet['patch0'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch1'] = np.rot90(patchtriplet['patch1'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch2'] = np.rot90(patchtriplet['patch2'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchtriplet['patch0'] = np.flipud(patchtriplet['patch0']).copy()
+            patchtriplet['patch1'] = np.flipud(patchtriplet['patch1']).copy()
+            patchtriplet['patch2'] = np.flipud(patchtriplet['patch2']).copy()
+        if not flipud:
+            if fliplr:
+                patchtriplet['patch0'] = np.fliplr(patchtriplet['patch0']).copy()
+                patchtriplet['patch1'] = np.fliplr(patchtriplet['patch1']).copy()
+                patchtriplet['patch2'] = np.fliplr(patchtriplet['patch2']).copy()
+        
 
         # rearange axis (channels first)
         patchtriplet = channelsfirst(patchtriplet)
