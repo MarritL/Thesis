@@ -48,7 +48,10 @@ def train(directories, dataset_settings, network_settings, train_settings):
             filewriter.writeheader()
             
     # init save-file for patch starts during training
-    fieldnames_trainpatches = ['epoch', 'im_idx', 'patch_starts']
+    fieldnames_trainpatches = ['epoch', 'im_idx', 
+                           'row_patch0', 'col_patch0',
+                           'row_patch1', 'col_patch1',
+                           'row_patch2', 'col_patch2']
     if not os.path.exists(os.path.join(directories['model_dir'],
                         'network-{}_date-{}_trainpatches.csv'.format(network_name, outputtime))):
         with open(os.path.join(directories['model_dir'],
@@ -288,12 +291,12 @@ def train(directories, dataset_settings, network_settings, train_settings):
         dataset_train, 
         batch_size=train_settings['batch_size'], 
         shuffle=True,
-        num_workers = 2)
+        num_workers = 8)
     dataloader_val = DataLoader(
         dataset_val, 
         batch_size=train_settings['batch_size'], 
         shuffle=False,
-        num_workers = 1)
+        num_workers = 4)
          
     # save history
     history = {'train': {'epoch': [], 'loss': [], 'acc': []}, 
@@ -915,8 +918,22 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
         with open(os.path.join(directories['model_dir'],
                 'network-{}_date-{}_trainpatches.csv'.format(network_name, outputtime)), 'a') as file2:
             filewriter = csv.DictWriter(file2, fieldnames_trainpatches, delimiter = ",", extrasaction='ignore')
-            for j in range(len(im_idx)):
-                filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],'patch_starts':starts[j]})  
+            for j in range(len(im_idx)): 
+                row_patch0 = starts[j][0][0]
+                col_patch0 = starts[j][0][1]
+                row_patch1 = starts[j][1][0]
+                col_patch1 = starts[j][1][1]
+                if n_branches == 3:
+                    row_patch2 = starts[j][2][0]
+                    col_patch2 = starts[j][2][1]
+                    filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
+                                         'row_patch1':row_patch1, 'col_patch1':col_patch1,
+                                         'row_patch2':row_patch2, 'col_patch2':col_patch2})  
+                else:
+                    filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
+                                         'row_patch1':row_patch1, 'col_patch1':col_patch1})  
 
         
 
@@ -1157,8 +1174,22 @@ def train_epoch_apn(network, n_branches, dataloader, optimizer, loss_func,
         with open(os.path.join(directories['model_dir'],
                 'network-{}_date-{}_trainpatches.csv'.format(network_name, outputtime)), 'a') as file2:
             filewriter = csv.DictWriter(file2, fieldnames_trainpatches, delimiter = ",", extrasaction='ignore')
-            for j in range(len(im_idx)):
-                filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],'patch_starts':starts[j]})  
+            for j in range(len(im_idx)): 
+                row_patch0 = starts[j][0][0]
+                col_patch0 = starts[j][0][1]
+                row_patch1 = starts[j][1][0]
+                col_patch1 = starts[j][1][1]
+                if n_branches == 3:
+                    row_patch2 = starts[j][2][0]
+                    col_patch2 = starts[j][2][1]
+                    filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
+                                         'row_patch1':row_patch1, 'col_patch1':col_patch1,
+                                         'row_patch2':row_patch2, 'col_patch2':col_patch2})  
+                else:
+                    filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
+                                         'row_patch1':row_patch1, 'col_patch1':col_patch1})  
 
 
         # calculate accuracy, and display
@@ -1408,8 +1439,22 @@ def train_epoch_unet(network, n_branches, dataloader, optimizer, loss_func,
         with open(os.path.join(directories['model_dir'],
                 'network-{}_date-{}_trainpatches.csv'.format(network_name, outputtime)), 'a') as file2:
             filewriter = csv.DictWriter(file2, fieldnames_trainpatches, delimiter = ",", extrasaction='ignore')
-            for j in range(len(im_idx)):
-                filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],'patch_starts':starts[j]})  
+            for j in range(len(im_idx)): 
+                row_patch0 = starts[j][0][0]
+                col_patch0 = starts[j][0][1]
+                row_patch1 = starts[j][1][0]
+                col_patch1 = starts[j][1][1]
+                if n_branches == 3:
+                    row_patch2 = starts[j][2][0]
+                    col_patch2 = starts[j][2][1]
+                    filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
+                                         'row_patch1':row_patch1, 'col_patch1':col_patch1,
+                                         'row_patch2':row_patch2, 'col_patch2':col_patch2})  
+                else:
+                    filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
+                                         'row_patch1':row_patch1, 'col_patch1':col_patch1})   
 
 
         # calculate accuracy, and display
