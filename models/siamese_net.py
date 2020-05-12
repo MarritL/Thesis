@@ -77,6 +77,8 @@ class SiameseNet(nn.Module):
         if n_branches == 3:
             x = torch.cat(x, torch.abs(res[2] - res[1]), 1)
         
+        if extract_features == 'diff':
+            return x
         # joint layers
         x = self.joint(x)
         if extract_features == 'joint': 
