@@ -42,7 +42,9 @@ def train(directories, dataset_settings, network_settings, train_settings):
                   'n_channels','patch_size','batch_norm','dataset','min_overlap',\
                   'max_overlap', 'best_acc','best_epoch', 'best_loss', 'weight', \
                   'global_avg_pool', 'basis', 'n_train_patches', 'patches_per_image', \
-                  'n_val_patches', 'n_eval_patches', 'eval_acc', 'eval_loss', 'eval_prob']
+                  'n_val_patches', 'n_eval_patches', 'eval_acc', 'eval_loss', 'eval_prob',\
+                  'tp_oscd_eval_triangle', 'tn_oscd_eval_triangle', 'fp_oscd_eval_triangle',\
+                  'fn_oscd_eval_triangle', 'f1_oscd_eval_triangle']
     if not os.path.exists(os.path.join(directories['intermediate_dir'],directories['csv_models'])):
         with open(os.path.join(directories['intermediate_dir'],directories['csv_models']), 'a') as file:
             filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
@@ -151,6 +153,10 @@ def train(directories, dataset_settings, network_settings, train_settings):
         for epoch in range(train_settings['start_epoch'], 
                            train_settings['start_epoch']+train_settings['num_epoch']):
             
+            # early stopping
+            if (epoch - best_epoch) > 20:
+                break
+            
             #training epoch
             train_func(
                 network=net, 
@@ -173,8 +179,6 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 outputtime=outputtime)
             
             # validation epoch
-            if (epoch - best_epoch) > 20:
-                break
             best_net_wts, best_acc, best_epoch, best_loss = val_func(
                 network=net, 
                 n_branches=n_branches,
