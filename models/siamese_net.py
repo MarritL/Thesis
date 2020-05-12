@@ -173,7 +173,7 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
     branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm)
     if cfg['top'] is not None:
         joint = make_layers(cfg['top'],
-                            int(cfg['branch'][cfg['branch'] != 'M'][-1])*(n_branches-1),
+                            int(cfg['branch'][cfg['branch'][cfg['branch'] != 'M'] != 'D'][-1])*(n_branches-1),
                             batch_norm=batch_norm)
     else:
         # does nothing because next layer is the same
