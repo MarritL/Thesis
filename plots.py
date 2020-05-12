@@ -144,7 +144,7 @@ def plot_detectedlines(image, h, theta, d):
     
     assert len(image.shape) == 2 or image.shape[2] == 3, "only greyscale or 3-band images allowed"
     
-    fig, ax = plt.subplots(1, 1, figsize=(15, 6))
+    fig, ax = plt.subplots(constrained_layout=True, figsize=(15,15))
 
     ax.imshow(image, cmap=cm.gray)
     origin = np.array((0, image.shape[1]))
@@ -154,7 +154,7 @@ def plot_detectedlines(image, h, theta, d):
     ax.set_xlim(origin)
     ax.set_ylim((image.shape[0], 0))
     ax.set_axis_off()
-    ax.set_title('Detected lines')
+    #ax.set_title('Detected lines')
     
     return fig, ax
 
