@@ -181,6 +181,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
             
             # validation epoch
             best_net_wts, best_acc, best_epoch, best_loss = val_func(
+                network_settings,
                 network=net, 
                 n_branches=n_branches,
                 dataloader=dataloader_val, 
@@ -284,6 +285,7 @@ def evaluate(model_settings, directories, dataset_settings, network_settings, tr
     
     # validation epoch
     best_acc, best_loss, best_prob = validate_epoch(
+        network_settings,
         network=net, 
         n_branches=n_branches,
         dataloader=dataloader, 
