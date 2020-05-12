@@ -159,6 +159,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
             
             #training epoch
             train_func(
+                network_settings,
                 network=net, 
                 n_branches=n_branches,
                 dataloader=dataloader_train, 
@@ -494,7 +495,7 @@ def finetune(model_settings, directories, dataset_settings, network_settings, tr
     writer.close()
     
     
-def train_epoch(network, n_branches, dataloader, optimizer, loss_func, 
+def train_epoch(network_settings, network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
                 gpu, im_size, directories, network_name, outputtime, 
                 fieldnames_trainpatches=['epoch', 'im_idx', 'patch_starts'],
@@ -549,7 +550,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
         if gpu != None:
             labels = labels.cuda()
             
-        # forward pass
+        # forward pass          
         outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
 # =============================================================================
 #         if torch.any(torch.isnan(outputs[0])) or torch.any(torch.isnan(outputs[1])):
@@ -571,7 +572,10 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
 #             
 #         # =====================================================================    
 # =============================================================================
-        loss = loss_func(outputs, labels)
+        if network_settings['loss'] == 'bce_sigmoid+l1reg':  
+            loss = loss_func(outputs, labels, network.parameters())
+        else:
+            loss = loss_func(outputs, labels)
         #loss, loss1, loss2 = loss_func(outputs, labels)
         #loss = loss_func(outputs[0], outputs[1], outputs[2])
         #print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}, min: {3:.3f}-{4:.3f}, max: {5:.3f}-{6:.3f}, mean: {7:.3f}-{8:.3f}".format(loss, loss1, loss2, min0, min1, max0, max1, mean0, mean1))
@@ -662,7 +666,7 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
 
 
     
-def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history, 
+def validate_epoch(network_settings, network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, 
              extract_features=None, avg_pool=False, evaluate=False):    
@@ -719,7 +723,10 @@ def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history
                 correct = labels*prob
                 prob_correct = torch.sum(correct)/len(outputs)       
                 probability.update(prob_correct.item())
-            loss = loss_func(outputs, labels)
+            if network_settings['loss'] == 'bce_sigmoid+l1reg':  
+                loss = loss_func(outputs, labels, network.parameters())
+            else:
+                loss = loss_func(outputs, labels)
             #loss, loss1, loss2  = loss_func(outputs, labels)
             #loss = loss_func(outputs[0], outputs[1], outputs[2])
             acc = acc_func(outputs, labels, im_size)
@@ -767,7 +774,7 @@ def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history
         
         return(best_net_wts, best_acc, best_epoch, best_loss)
 
-def train_epoch_apn(network, n_branches, dataloader, optimizer, loss_func, 
+def train_epoch_apn(network_settings, network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
                 gpu, im_size, directories, network_name, outputtime, 
                 fieldnames_trainpatches=['epoch', 'im_idx', 'patch_starts'],
@@ -934,7 +941,7 @@ def train_epoch_apn(network, n_branches, dataloader, optimizer, loss_func,
 
 
     
-def validate_epoch_apn(network, n_branches, dataloader, loss_func, acc_func, history, 
+def validate_epoch_apn(network_settings, network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, 
              extract_features=None, avg_pool=False, evaluate=False):    
@@ -1043,7 +1050,7 @@ def validate_epoch_apn(network, n_branches, dataloader, loss_func, acc_func, his
         
         return(best_net_wts, best_acc, best_epoch, best_loss)
 
-def train_epoch_unet(network, n_branches, dataloader, optimizer, loss_func, 
+def train_epoch_unet(network_settings, network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
                 gpu, im_size, directories, network_name, outputtime, 
                 fieldnames_trainpatches=['epoch', 'im_idx', 'patch_starts'],
@@ -1216,7 +1223,7 @@ def train_epoch_unet(network, n_branches, dataloader, optimizer, loss_func,
 
 
     
-def validate_epoch_unet(network, n_branches, dataloader, loss_func, acc_func, history, 
+def validate_epoch_unet(network_settings, network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, 
              extract_features=None, avg_pool=False, evaluate=False):    
@@ -1461,11 +1468,12 @@ def determine_branches(network_settings, dataset_settings):
     return n_branches, pos_weight
 
 def evaluate_features(model_settings, directories, dataset_settings, network_settings, train_settings):
-    
+    from matplotlib.gridspec import GridSpec
+    import matplotlib.pyplot as plt
     # get_network
     n_branches, pos_weight = determine_branches(network_settings, dataset_settings)
     net = get_network(model_settings) 
-    
+    net.eval()
     # get dataset
     dataset_eval = get_dataset(
         data_path=directories['data_path'], 
@@ -1491,24 +1499,23 @@ def evaluate_features(model_settings, directories, dataset_settings, network_set
         data = [im_a.float(), im_b.float()]
        
         # get features
-        features = net(
-            data, 
-            n_branches=n_branches, 
-            extract_features=network_settings['extract_features'])       
+        with torch.no_grad():
+            features = net(
+                data, 
+                n_branches=n_branches, 
+                extract_features=network_settings['extract_features'])       
         
         features = features.squeeze().detach().numpy()
         rmse = np.sqrt(np.mean(np.square(features), axis=(1,2)))
-# =============================================================================
-#         fig = plt.figure(figsize=(100,100))
-#         n_rows = int(np.ceil(np.sqrt(features.shape[0]+1)))
-#         n_cols = int(np.ceil(np.sqrt(features.shape[0])))
-#         gs = GridSpec(n_rows, n_cols)
-#         for i, a_map in enumerate(features):
-#                   
-#             ax = fig.add_subplot(gs[i+n_cols])
-#             ax.imshow(a_map)
-#             ax.axis('off')
-#         plt.show()
-# =============================================================================
+        fig = plt.figure(figsize=(100,100))
+        n_rows = int(np.ceil(np.sqrt(features.shape[0]+1)))
+        n_cols = int(np.ceil(np.sqrt(features.shape[0])))
+        gs = GridSpec(n_rows, n_cols)
+        for i, a_map in enumerate(features):
+                  
+            ax = fig.add_subplot(gs[i+n_cols])
+            ax.imshow(a_map)
+            ax.axis('off')
+        plt.show()
 
         

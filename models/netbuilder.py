@@ -161,11 +161,16 @@ def create_loss_function(lossfunction, pos_weight=1):
         one_hot = False
         loss_func = nn.MSELoss()
         acc_func = acc_functions['accuracy_fake']
+    elif lossfunction == 'bce_sigmoid+l1reg':
+        pos_weight = torch.tensor(pos_weight)
+        one_hot = True
+        loss_func = BCEl1RegLoss(pos_weight=pos_weight)
+        acc_func = acc_functions['accuracy_onehot']      
     else:
         raise Exception('loss function not implemented! \n \
                         Choose one of: "cross_entropy", "bce_sigmoid" \
                             "l1+triplet", "nll", "nll_finetune" \
-                            "l1+triplet+bce", "mse"')
+                            "l1+triplet+bce", "mse", "bce_sigmoid+l1reg"')
         
     return loss_func, acc_func, one_hot
 
@@ -337,6 +342,21 @@ class CombinedL1TripletBCE(nn.Module):
         
         return loss, loss1, loss2, loss3
 
+class BCEl1RegLoss(nn.Module):
+    def __init__(self, pos_weight):
+        super(BCEl1RegLoss, self).__init__()
+        self.l1 = nn.L1Loss(reduction='sum')
+        self.bce = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    
+    def forward(self, inputs, targets, params):
+        bce = self.bce(inputs, targets)
+        l1_reg = 0
+        for param in params:
+            l1_reg += self.l1(param,torch.zeros_like(param))
+            
+        loss = bce + 1e-4*l1_reg
+        return loss
+    
 # =============================================================================
 # class CombinedLoss(nn.Module):
 #     def __init__(self, margin = 1.0, weight=1):
