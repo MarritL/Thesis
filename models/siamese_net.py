@@ -165,7 +165,7 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
     n_mpool = np.sum(cfg['branch'] == 'M') + np.sum(cfg['top'] == 'M')    
 
     if cfg['top'] is not None:
-        n_channels_lin = int(cfg['top'][cfg['top'] != 'CU'][cfg['top'] != 'BU'][-1])
+        n_channels_lin = int(cfg['top'][cfg['top'][cfg['top'] != 'CU'][cfg['top'] != 'BU'] != 'D'][-1])
     else:
         n_channels_lin = int(cfg['branch'][cfg['branch'] != 'M'][-1])*n_branches
     
