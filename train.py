@@ -24,6 +24,7 @@ import csv
 import copy
 import numpy as np
 from extract_features import get_network
+torch.manual_seed(211)
 
 def train(directories, dataset_settings, network_settings, train_settings):
 
@@ -41,7 +42,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
                   'n_channels','patch_size','batch_norm','dataset','min_overlap',\
                   'max_overlap', 'best_acc','best_epoch', 'best_loss', 'weight', \
                   'global_avg_pool', 'basis', 'n_train_patches', 'patches_per_image', \
-                  'n_val_patches']
+                  'n_val_patches', 'n_eval_patches', 'eval_acc', 'eval_loss', 'eval_prob']
     if not os.path.exists(os.path.join(directories['intermediate_dir'],directories['csv_models'])):
         with open(os.path.join(directories['intermediate_dir'],directories['csv_models']), 'a') as file:
             filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
@@ -52,6 +53,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
                            'row_patch0', 'col_patch0',
                            'row_patch1', 'col_patch1',
                            'row_patch2', 'col_patch2']
+    if not os.path.exists(directories['model_dir']):
+        os.mkdir(directories['model_dir'])
     if not os.path.exists(os.path.join(directories['model_dir'],
                         'network-{}_date-{}_trainpatches.csv'.format(network_name, outputtime))):
         with open(os.path.join(directories['model_dir'],
@@ -60,47 +63,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
             filewriter.writeheader()
                 
     # build network
-    pos_weight = 1
     network_settings['im_size'] = (1,1)
-    if network_settings['network'] == 'siamese':
-        print('n_branches = 2')
-        n_branches = 2
-    elif network_settings['network'] == 'siamese_concat':
-        print('n_branches = 2')
-        n_branches = 2
-    elif network_settings['network'] == 'triplet':
-        print('n_branches = 3')
-        n_branches = 3
-        network_settings['network'] = 'siamese'    
-    elif network_settings['network'] == 'hypercolumn':
-        print('n_branches = 2')
-        n_branches = 2
-        mean_overlap = np.mean([dataset_settings['min_overlap'], 
-                                dataset_settings['max_overlap']])
-        pos_weight = (1-mean_overlap)/mean_overlap
-    elif network_settings['network'] == 'siamese_unet_diff':
-        print('n_branches = 2')
-        n_branches = 2
-    elif network_settings['network'] == 'triplet_apn':
-        print('n_branches = 3')
-        n_branches = 3 
-    elif network_settings['network'] == 'siamese_unet':
-        print('n_branches = 2')
-        n_branches = 2
-    elif network_settings['network'] == 'triplet_unet':
-        print('n_branches = 3')
-        n_branches = 3
-    elif network_settings['network'] == 'siamese_dilated':
-        print('n_branches = 2')
-        n_branches = 2
-    elif network_settings['network'] == 'triplet_apn_dilated':
-        print('n_branches = 3')
-        n_branches = 3
-    else:
-        raise Exception('Architecture undefined! \n \
-                        Choose one of: "siamese", "triplet", "hypercolumn", \
-                        "siamese_unet_diff", "triplet_apn", "siamese_unet",\
-                        "siamese_concat"')
+    n_branches, pos_weight = determine_branches(network_settings, dataset_settings)
                 
     net = NetBuilder.build_network(
         net=network_settings['network'],
@@ -141,150 +105,6 @@ def train(directories, dataset_settings, network_settings, train_settings):
         one_hot=one_hot, 
         dataset_settings=dataset_settings, 
         network_settings=network_settings)
-# =============================================================================
-#     if dataset_settings['dataset_type'] == 'pair':
-#         dataset_train = PairDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_train'], 
-#             channels=dataset_settings['channels'])      
-#         dataset_val = PairDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_val'], 
-#             channels=dataset_settings['channels'])       
-#     elif dataset_settings['dataset_type'] == 'triplet':
-#         in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
-#         dataset_train = TripletDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_train'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot,
-#             min_overlap = dataset_settings['min_overlap'],
-#             max_overlap = dataset_settings['max_overlap'],
-#             in_memory = in_memory)     
-#         dataset_val = TripletDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_val'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot,
-#             min_overlap = dataset_settings['min_overlap'],
-#             max_overlap = dataset_settings['max_overlap'],
-#             in_memory = in_memory)
-#     elif dataset_settings['dataset_type'] == 'triplet_saved':
-#         print("construct from presaved dataset")
-#         dataset_train = TripletDatasetPreSaved(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_train'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot)           
-#         dataset_val = TripletDatasetPreSaved(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_val'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot)  
-#     elif dataset_settings['dataset_type'] == 'overlap':
-#         dataset_train = PartlyOverlapDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_train'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot)           
-#         dataset_val = PartlyOverlapDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_val'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot) 
-#     elif dataset_settings['dataset_type'] == 'triplet_apn':
-#         second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
-#         in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
-#         dataset_train = TripletAPNDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_train'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot,
-#             second_label=second_label,
-#             in_memory=in_memory)#,
-#             #batch_size = 5)           # TODO: hardcoded
-#         dataset_val = TripletAPNDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_val'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot,
-#             second_label=second_label,
-#             in_memory=in_memory)#,
-#             #batch_size = 5)  # TODO: hardcoded
-#     elif dataset_settings['dataset_type'] == 'triplet_oscd':
-#         dataset_train = OSCDDataset(
-#             data_dir=directories['data_path'], 
-#             indices = dataset_settings['indices_train'], 
-#             patch_size=network_settings['patch_size'], 
-#             stride = dataset_settings['stride'], 
-#             transform = transforms.Compose([RandomFlip(), RandomRot()]), 
-#             one_hot=one_hot, 
-#             alt_label=True, 
-#             mode='train')
-#         dataset_val = OSCDDataset(
-#             data_dir=directories['data_path'], 
-#             indices = dataset_settings['indices_val'], 
-#             patch_size=network_settings['patch_size'], 
-#             stride = dataset_settings['stride'], 
-#             transform = transforms.Compose([RandomFlip(), RandomRot()]), 
-#             one_hot=one_hot, 
-#             alt_label=True, 
-#             mode='train')
-#     elif dataset_settings['dataset_type'] == 'overlap_regression':
-#         in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
-#         dataset_train = PairDatasetOverlap(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_train'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=False,
-#             min_overlap = dataset_settings['min_overlap'],
-#             max_overlap = dataset_settings['max_overlap'],
-#             in_memory=in_memory)          
-#         dataset_val = PairDatasetOverlap(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_val'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=False,
-#             min_overlap = dataset_settings['min_overlap'],
-#             max_overlap = dataset_settings['max_overlap'],
-#             in_memory=in_memory)  
-#     elif dataset_settings['dataset_type'] == 'pair_hard_neg':
-#         in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
-#         dataset_train = PairHardNegDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_train'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot,
-#             in_memory = in_memory)
-#         dataset_val = PairHardNegDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_val'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot,
-#             in_memory = in_memory)
-#     elif dataset_settings['dataset_type'] == 'triplet_apn_hard_neg':
-#         second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
-#         in_memory = True if len(np.unique(dataset_settings['indices_train'])) < 21 else False
-#         dataset_train = TripletAPNHardNegDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_train'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot,
-#             second_label=second_label,
-#             in_memory=in_memory)
-#         dataset_val = TripletAPNHardNegDataset(
-#             data_dir=directories['data_path'], 
-#             indices=dataset_settings['indices_val'], 
-#             channels=dataset_settings['channels'], 
-#             one_hot=one_hot,
-#             second_label=second_label,
-#             in_memory=in_memory)
-#     else:
-#         raise Exception('dataset_type undefined! \n \
-#                         Choose one of: "pair", "triplet", "triplet_saved",\
-#                         "overlap", "triplet_apn", "triplet_oscd", "overlap_regression" \
-#                         , "pair_hard_neg", "triplet_apn_hard_neg"')
-# =============================================================================
 
     # Data loaders
     dataloader_train = DataLoader(
@@ -353,6 +173,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 outputtime=outputtime)
             
             # validation epoch
+            if (epoch - best_epoch) > 20:
+                break
             best_net_wts, best_acc, best_epoch, best_loss = val_func(
                 network=net, 
                 n_branches=n_branches,
@@ -420,194 +242,43 @@ def train(directories, dataset_settings, network_settings, train_settings):
     print('Training Done!')
     writer.close()
     
-def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network_settings):
-        # Datasets
-    if dataset_settings['dataset_type'] == 'pair':
-        dataset = PairDataset(
-            data_dir=data_path,
-            indices=indices,
-            channels=channels)       
-    elif dataset_settings['dataset_type'] == 'triplet':
-        in_memory = True if len(np.unique(indices)) < 21 else False
-        dataset = TripletDataset(
-            data_dir=data_path,
-            indices=indices,
-            channels=channels, 
-            one_hot=one_hot,
-            min_overlap = dataset_settings['min_overlap'],
-            max_overlap = dataset_settings['max_overlap'],
-            in_memory = in_memory)     
-    elif dataset_settings['dataset_type'] == 'triplet_saved':
-        print("construct from presaved dataset")
-        dataset = TripletDatasetPreSaved(
-            data_dir=data_path,
-            indices=indices,
-            channels=channels, 
-            one_hot=one_hot)           
-    elif dataset_settings['dataset_type'] == 'overlap':
-        dataset = PartlyOverlapDataset(
-            data_dir=data_path,
-            indices=indices,
-            channels=channels, 
-            one_hot=one_hot)           
-    elif dataset_settings['dataset_type'] == 'triplet_apn':
-        second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
-        in_memory = True if len(np.unique(indices)) < 21 else False
-        dataset = TripletAPNDataset(
-            data_dir=data_path,
-            indices=indices,
-            channels=channels, 
-            one_hot=one_hot,
-            second_label=second_label,
-            in_memory=in_memory)#,
-            #batch_size = 5)           # TODO: hardcoded
-    elif dataset_settings['dataset_type'] == 'triplet_oscd':
-        dataset = OSCDDataset(
-            data_dir=data_path,
-            indices=indices,
-            patch_size=network_settings['patch_size'], 
-            stride = dataset_settings['stride'], 
-            transform = transforms.Compose([RandomFlip(), RandomRot()]), 
-            one_hot=one_hot, 
-            alt_label=True, 
-            mode='train')
-    elif dataset_settings['dataset_type'] == 'overlap_regression':
-        in_memory = True if len(np.unique(indices)) < 21 else False
-        dataset = PairDatasetOverlap(
-            data_dir=data_path,
-            indices=indices,
-            channels=channels, 
-            one_hot=False,
-            min_overlap = dataset_settings['min_overlap'],
-            max_overlap = dataset_settings['max_overlap'],
-            in_memory=in_memory)          
-    elif dataset_settings['dataset_type'] == 'pair_hard_neg':
-        in_memory = True if len(np.unique(indices)) < 21 else False
-        dataset = PairHardNegDataset(
-            data_dir=data_path,
-            indices=indices,
-            channels=channels, 
-            one_hot=one_hot,
-            in_memory = in_memory)
-    elif dataset_settings['dataset_type'] == 'triplet_apn_hard_neg':
-        second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
-        in_memory = True if len(np.unique(indices)) < 21 else False
-        dataset = TripletAPNHardNegDataset(
-            data_dir=data_path,
-            indices=indices,
-            channels=channels, 
-            one_hot=one_hot,
-            second_label=second_label,
-            in_memory=in_memory)
-    else:
-        raise Exception('dataset_type undefined! \n \
-                        Choose one of: "pair", "triplet", "triplet_saved",\
-                        "overlap", "triplet_apn", "triplet_oscd", "overlap_regression" \
-                        , "pair_hard_neg", "triplet_apn_hard_neg"')
-    
-    return dataset
 
-def validate(model_settings, eval_settings):
+def evaluate(model_settings, directories, dataset_settings, network_settings, train_settings):
+    
     # build network
-    model_settings['network'] = model_settings['networkname']
-    if model_settings['networkname'] == 'siamese':
-        n_branches = 2
-        pos_weight = 1
-        model_settings['im_size'] = (1,1)
-    elif model_settings['networkname'] == 'triplet':
-        print('n_branches = 3')
-        n_branches = 3
-        pos_weight=1
-        model_settings['network'] = 'siamese'
-        model_settings['im_size'] = (1,1)        
-    elif model_settings['networkname'] == 'hypercolumn':
-        print('n_branches = 2')
-        n_branches = 2
-        mean_overlap = np.mean([model_settings['min_overlap'], 
-                                model_settings['max_overlap']])
-        pos_weight = (1-mean_overlap)/mean_overlap
-    else:
-        raise Exception('Architecture undefined! \n \
-                        Choose one of: "siamese", "triplet", "hypercolumn", \
-                        "siamese_unet_diff"')
-        
-    # cfgs are saved as strings, cast back to list
-    branch = model_settings['cfg_branch'].split("[" )[1]
-    branch = branch.split("]" )[0]
-    branch = branch.replace("'", "")
-    branch = branch.replace(" ", "")
-    branch = branch.split(",")
-    top = model_settings['cfg_top'].split("[" )[1]
-    top = top.split("]" )[0]
-    top = top.replace("'", "")
-    top = top.replace(" ", "")
-    top = top.split(",")
-    classifier = model_settings['cfg_classifier'].split("[" )[1]
-    classifier = classifier.split("]" )[0]
-    classifier = classifier.replace("'", "")
-    classifier = classifier.replace(" ", "")
-    classifier = classifier.split(",")
-    # save in model_settigns
-    model_settings['cfg'] = {'branch': np.array(branch, dtype='object'), 
-                             'top': np.array(top,dtype='object'),
-                             'classifier': np.array(classifier, dtype='object')}
+    network_settings['im_size'] = (1,1)
+    n_branches, pos_weight = determine_branches(network_settings, dataset_settings)
+    net = get_network(model_settings)
     
-    # batch_norm saved as string cast back to bool
-    if model_settings['batch_norm'] == 'False' : 
-        model_settings['batch_norm'] = False
-    elif model_settings['batch_norm'] == 'True' : 
-        model_settings['batch_norm'] = True
-
-    
-    net = NetBuilder.build_network(
-        net=model_settings['network'],
-        cfg=model_settings['cfg'],
-        n_channels=model_settings['n_channels'], 
-        n_classes=model_settings['n_classes'],
-        patch_size=model_settings['patch_size'],
-        im_size=model_settings['im_size'],
-        batch_norm=model_settings['batch_norm'],
-        n_branches=n_branches,
-        weights=model_settings['filename'])  
-       
-    loss_func, acc_func, one_hot = create_loss_function(model_settings['loss'], pos_weight=pos_weight)
+    loss_func, acc_func, one_hot = create_loss_function(model_settings['loss'])
     
     # load net to GPU     
-    if eval_settings['gpu'] != None:
-        torch.cuda.set_device(eval_settings['gpu'])
+    if train_settings['gpu'] != None:
+        torch.cuda.set_device(train_settings['gpu'])
         net.cuda()
         loss_func = loss_func.cuda()
-                     
-    # Datasets
-    if model_settings['dataset'] == 'pair':
-        dataset_val = PairDataset(
-            data_dir=eval_settings['data_path'], 
-            indices=eval_settings['indices_eval'], 
-            channels=np.arange(13))       
-    elif model_settings['dataset'] == 'triplet' or model_settings['dataset'] == 'triplet_saved': 
-        dataset_val = TripletDataset(
-            data_dir=eval_settings['data_path'], 
-            indices=eval_settings['indices_eval'], 
-            channels=np.arange(13), 
-            one_hot=one_hot,
-            min_overlap = model_settings['min_overlap'],
-            max_overlap = model_settings['max_overlap'])  
-    else:
-        raise Exception('dataset_type undefined! \n \
-                        Choose one of: "pair", "triplet", "triplet_saved"')
     
+    # get dataset
+    dataset_eval = get_dataset(
+        data_path=directories['data_path'], 
+        indices=dataset_settings['indices_eval'], 
+        channels=dataset_settings['channels'], 
+        one_hot=one_hot, 
+        dataset_settings=dataset_settings, 
+        network_settings=network_settings)
+                        
     # Data loaders
     dataloader = DataLoader(
-        dataset_val, 
-        batch_size=eval_settings['batch_size'], 
+        dataset_eval, 
+        batch_size=train_settings['batch_size'], 
         shuffle=False,
         num_workers = 1)
     
-    val_epoch_iters = max(len(dataset_val) // eval_settings['batch_size'],1)
+    val_epoch_iters = max(len(dataset_eval) // train_settings['batch_size'],1)
     best_net_wts = copy.deepcopy(net.state_dict())
     
     # validation epoch
-    best_net_wts, best_acc, best_epoch, best_loss = validate_epoch(
+    best_acc, best_loss, best_prob = validate_epoch(
         network=net, 
         n_branches=n_branches,
         dataloader=dataloader, 
@@ -621,11 +292,16 @@ def validate(model_settings, eval_settings):
         best_acc=0.0,
         best_epoch=0,
         best_loss=99999,
-        gpu = eval_settings['gpu'],
-        im_size = (1,1),
-        extract_features=None)
+        gpu = train_settings['gpu'],
+        im_size = network_settings['im_size'],
+        extract_features=None,
+        avg_pool=network_settings['avg_pool'],
+        directories=directories, 
+        network_name=model_settings['networkname'], 
+        outputtime=model_settings['filename'].split('-')[-1],
+        evaluate=True)
 
-    return best_acc, best_loss
+    return best_acc, best_loss, best_prob
 
 def finetune(model_settings, directories, dataset_settings, network_settings, train_settings):
     # init tensorboard
@@ -985,15 +661,20 @@ def train_epoch(network, n_branches, dataloader, optimizer, loss_func,
 def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, 
-             extract_features=None, avg_pool=False):    
+             extract_features=None, avg_pool=False, evaluate=False):    
 
+    time_meter = AverageMeter()
     ave_loss = AverageMeter()
     ave_acc = AverageMeter()
-    time_meter = AverageMeter()
+    
+    if evaluate:
+        probability = AverageMeter()
+        sigmoid = torch.nn.Sigmoid()
 
     network.eval()
     
     iterator = iter(dataloader)
+
 
     # main loop
     tic = time.time()
@@ -1029,6 +710,11 @@ def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history
         with torch.no_grad():
             # forward pass
             outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
+            if evaluate:
+                prob = sigmoid(outputs)
+                correct = labels*prob
+                prob_correct = torch.sum(correct)/len(outputs)       
+                probability.update(prob_correct.item())
             loss = loss_func(outputs, labels)
             #loss, loss1, loss2  = loss_func(outputs, labels)
             #loss = loss_func(outputs[0], outputs[1], outputs[2])
@@ -1051,25 +737,31 @@ def validate_epoch(network, n_branches, dataloader, loss_func, acc_func, history
           .format(epoch, time_meter.value(),
                   ave_loss.average(), ave_acc.average()))
     
-    if writer != None:
-        writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
-        writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
-    
-    if ave_loss.average() < best_loss:
+    if evaluate:
         best_acc = ave_acc.average()
-        best_net_wts = copy.deepcopy(network.state_dict())
-        best_epoch = epoch
         best_loss = ave_loss.average()
-        torch.save(best_net_wts, os.path.join(directories['model_dir'],
-                        'network-{}_date-{}_epoch-{}_loss-{}_acc-{}'.format(
-                            network_name, outputtime, epoch, ave_loss.average(), ave_acc.average())))
+        best_prob = probability.average()
+        return best_acc, best_loss, best_prob
+    else:
+        if writer != None:
+            writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
+            writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
     
-    if history != None:
-        history['val']['epoch'].append(epoch)
-        history['val']['loss'].append(ave_loss.average())
-        history['val']['acc'].append(ave_acc.average())
-    
-    return(best_net_wts, best_acc, best_epoch, best_loss)
+        if ave_loss.average() < best_loss:
+            best_acc = ave_acc.average()
+            best_net_wts = copy.deepcopy(network.state_dict())
+            best_epoch = epoch
+            best_loss = ave_loss.average()
+            torch.save(best_net_wts, os.path.join(directories['model_dir'],
+                            'network-{}_date-{}_epoch-{}_loss-{}_acc-{}'.format(
+                                network_name, outputtime, epoch, ave_loss.average(), ave_acc.average())))
+        
+        if history != None:
+            history['val']['epoch'].append(epoch)
+            history['val']['loss'].append(ave_loss.average())
+            history['val']['acc'].append(ave_acc.average())
+        
+        return(best_net_wts, best_acc, best_epoch, best_loss)
 
 def train_epoch_apn(network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
@@ -1241,13 +933,17 @@ def train_epoch_apn(network, n_branches, dataloader, optimizer, loss_func,
 def validate_epoch_apn(network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, 
-             extract_features=None, avg_pool=False):    
+             extract_features=None, avg_pool=False, evaluate=False):    
 
     ave_loss = AverageMeter()
     ave_lossL1 = AverageMeter()
     ave_lossTriplet = AverageMeter()
     ave_acc = AverageMeter()
     time_meter = AverageMeter()
+    
+    if evaluate:
+        probability = AverageMeter()
+        sigmoid = torch.nn.Sigmoid()
 
     network.eval()
     
@@ -1288,6 +984,11 @@ def validate_epoch_apn(network, n_branches, dataloader, loss_func, acc_func, his
         with torch.no_grad():
             # forward pass
             outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
+            if evaluate:
+                prob = sigmoid(outputs)
+                correct = labels*prob
+                prob_correct = torch.sum(correct)/len(outputs)       
+                probability.update(prob_correct.item())
             #loss = loss_func(outputs, labels)
             loss, loss1, loss2  = loss_func(outputs, labels)
             #loss = loss_func(outputs[0], outputs[1], outputs[2])
@@ -1311,27 +1012,32 @@ def validate_epoch_apn(network, n_branches, dataloader, loss_func, acc_func, his
                   .format(epoch, time_meter.value(),
                   ave_loss.average(), ave_lossL1.average(), 
                   ave_lossTriplet.average()))
-
     
-    if writer != None:
-        writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
-        writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
-    
-    if ave_loss.average() < best_loss:
+    if evaluate:
         best_acc = ave_acc.average()
-        best_net_wts = copy.deepcopy(network.state_dict())
-        best_epoch = epoch
         best_loss = ave_loss.average()
-        torch.save(best_net_wts, os.path.join(directories['model_dir'],
-                        'network-{}_date-{}_epoch-{}_loss-{}_acc-{}'.format(
-                            network_name, outputtime, epoch, ave_loss.average(), ave_acc.average())))
-    
-    if history != None:
-        history['val']['epoch'].append(epoch)
-        history['val']['loss'].append(ave_loss.average())
-        history['val']['acc'].append(ave_acc.average())
-    
-    return(best_net_wts, best_acc, best_epoch, best_loss)
+        best_prob = probability.average()
+        return best_acc, best_loss, best_prob
+    else: 
+        if writer != None:
+            writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
+            writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
+        
+        if ave_loss.average() < best_loss:
+            best_acc = ave_acc.average()
+            best_net_wts = copy.deepcopy(network.state_dict())
+            best_epoch = epoch
+            best_loss = ave_loss.average()
+            torch.save(best_net_wts, os.path.join(directories['model_dir'],
+                            'network-{}_date-{}_epoch-{}_loss-{}_acc-{}'.format(
+                                network_name, outputtime, epoch, ave_loss.average(), ave_acc.average())))
+        
+        if history != None:
+            history['val']['epoch'].append(epoch)
+            history['val']['loss'].append(ave_loss.average())
+            history['val']['acc'].append(ave_acc.average())
+        
+        return(best_net_wts, best_acc, best_epoch, best_loss)
 
 def train_epoch_unet(network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
@@ -1509,7 +1215,7 @@ def train_epoch_unet(network, n_branches, dataloader, optimizer, loss_func,
 def validate_epoch_unet(network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, 
-             extract_features=None, avg_pool=False):    
+             extract_features=None, avg_pool=False, evaluate=False):    
 
     ave_loss = AverageMeter()
     ave_lossL1 = AverageMeter()
@@ -1517,6 +1223,11 @@ def validate_epoch_unet(network, n_branches, dataloader, loss_func, acc_func, hi
     ave_lossBCE = AverageMeter()
     ave_acc = AverageMeter()
     time_meter = AverageMeter()
+    
+    if evaluate:
+        probability = AverageMeter()
+        sigmoid = torch.nn.Sigmoid()
+
 
     network.eval()
     
@@ -1558,6 +1269,11 @@ def validate_epoch_unet(network, n_branches, dataloader, loss_func, acc_func, hi
         with torch.no_grad():
             # forward pass
             outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
+            if evaluate:
+                prob = sigmoid(outputs)
+                correct = labels*prob
+                prob_correct = torch.sum(correct)/len(outputs)       
+                probability.update(prob_correct.item())
             #loss = loss_func(outputs, labels)
             loss, loss1, loss2, loss3  = loss_func(outputs, labels, labels_bottle)
             #loss = loss_func(outputs[0], outputs[1], outputs[2])
@@ -1584,23 +1300,211 @@ def validate_epoch_unet(network, n_branches, dataloader, loss_func, acc_func, hi
                   ave_lossTriplet.average(), ave_lossBCE.average(),
                   ave_acc.average()))
 
-    
-    if writer != None:
-        writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
-        writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
-    
-    if ave_loss.average() < best_loss:
+    if evaluate:
         best_acc = ave_acc.average()
-        best_net_wts = copy.deepcopy(network.state_dict())
-        best_epoch = epoch
         best_loss = ave_loss.average()
-        torch.save(best_net_wts, os.path.join(directories['model_dir'],
-                        'network-{}_date-{}_epoch-{}_loss-{}_acc-{}'.format(
-                            network_name, outputtime, epoch, ave_loss.average(), ave_acc.average())))
+        best_prob = probability.average()
+        return best_acc, best_loss, best_prob
+    else: 
+        if writer != None:
+            writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
+            writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
+        
+        if ave_loss.average() < best_loss:
+            best_acc = ave_acc.average()
+            best_net_wts = copy.deepcopy(network.state_dict())
+            best_epoch = epoch
+            best_loss = ave_loss.average()
+            torch.save(best_net_wts, os.path.join(directories['model_dir'],
+                            'network-{}_date-{}_epoch-{}_loss-{}_acc-{}'.format(
+                                network_name, outputtime, epoch, ave_loss.average(), ave_acc.average())))
+        
+        if history != None:
+            history['val']['epoch'].append(epoch)
+            history['val']['loss'].append(ave_loss.average())
+            history['val']['acc'].append(ave_acc.average())
+        
+        return(best_net_wts, best_acc, best_epoch, best_loss)
+
+def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network_settings):
+        # Datasets
+    if dataset_settings['dataset_type'] == 'pair':
+        dataset = PairDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels)       
+    elif dataset_settings['dataset_type'] == 'triplet':
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = TripletDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot,
+            min_overlap = dataset_settings['min_overlap'],
+            max_overlap = dataset_settings['max_overlap'],
+            in_memory = in_memory)     
+    elif dataset_settings['dataset_type'] == 'triplet_saved':
+        print("construct from presaved dataset")
+        dataset = TripletDatasetPreSaved(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot)           
+    elif dataset_settings['dataset_type'] == 'overlap':
+        dataset = PartlyOverlapDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot)           
+    elif dataset_settings['dataset_type'] == 'triplet_apn':
+        second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = TripletAPNDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot,
+            second_label=second_label,
+            in_memory=in_memory)#,
+            #batch_size = 5)           # TODO: hardcoded
+    elif dataset_settings['dataset_type'] == 'triplet_oscd':
+        dataset = OSCDDataset(
+            data_dir=data_path,
+            indices=indices,
+            patch_size=network_settings['patch_size'], 
+            stride = dataset_settings['stride'], 
+            transform = transforms.Compose([RandomFlip(), RandomRot()]), 
+            one_hot=one_hot, 
+            alt_label=True, 
+            mode='train')
+    elif dataset_settings['dataset_type'] == 'overlap_regression':
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = PairDatasetOverlap(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=False,
+            min_overlap = dataset_settings['min_overlap'],
+            max_overlap = dataset_settings['max_overlap'],
+            in_memory=in_memory)          
+    elif dataset_settings['dataset_type'] == 'pair_hard_neg':
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = PairHardNegDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot,
+            in_memory = in_memory)
+    elif dataset_settings['dataset_type'] == 'triplet_apn_hard_neg':
+        second_label = True if network_settings['loss'] == 'l1+triplet+bce' else False
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = TripletAPNHardNegDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot,
+            second_label=second_label,
+            in_memory=in_memory)
+    else:
+        raise Exception('dataset_type undefined! \n \
+                        Choose one of: "pair", "triplet", "triplet_saved",\
+                        "overlap", "triplet_apn", "triplet_oscd", "overlap_regression" \
+                        , "pair_hard_neg", "triplet_apn_hard_neg"')
     
-    if history != None:
-        history['val']['epoch'].append(epoch)
-        history['val']['loss'].append(ave_loss.average())
-        history['val']['acc'].append(ave_acc.average())
+    return dataset
+
+def determine_branches(network_settings, dataset_settings):
+    pos_weight = 1
+    if network_settings['network'] == 'siamese':
+        print('n_branches = 2')
+        n_branches = 2
+    elif network_settings['network'] == 'siamese_concat':
+        print('n_branches = 2')
+        n_branches = 2
+    elif network_settings['network'] == 'triplet':
+        print('n_branches = 3')
+        n_branches = 3
+        network_settings['network'] = 'siamese'    
+    elif network_settings['network'] == 'hypercolumn':
+        print('n_branches = 2')
+        n_branches = 2
+        mean_overlap = np.mean([dataset_settings['min_overlap'], 
+                                dataset_settings['max_overlap']])
+        pos_weight = (1-mean_overlap)/mean_overlap
+    elif network_settings['network'] == 'siamese_unet_diff':
+        print('n_branches = 2')
+        n_branches = 2
+    elif network_settings['network'] == 'triplet_apn':
+        print('n_branches = 3')
+        n_branches = 3 
+    elif network_settings['network'] == 'siamese_unet':
+        print('n_branches = 2')
+        n_branches = 2
+    elif network_settings['network'] == 'triplet_unet':
+        print('n_branches = 3')
+        n_branches = 3
+    elif network_settings['network'] == 'siamese_dilated':
+        print('n_branches = 2')
+        n_branches = 2
+    elif network_settings['network'] == 'triplet_apn_dilated':
+        print('n_branches = 3')
+        n_branches = 3
+    else:
+        raise Exception('Architecture undefined! \n \
+                        Choose one of: "siamese", "triplet", "hypercolumn", \
+                        "siamese_unet_diff", "triplet_apn", "siamese_unet",\
+                        "siamese_concat"')
+    return n_branches, pos_weight
+
+def evaluate_features(model_settings, directories, dataset_settings, network_settings, train_settings):
     
-    return(best_net_wts, best_acc, best_epoch, best_loss)
+    # get_network
+    n_branches, pos_weight = determine_branches(network_settings, dataset_settings)
+    net = get_network(model_settings) 
+    
+    # get dataset
+    dataset_eval = get_dataset(
+        data_path=directories['data_path'], 
+        indices=dataset_settings['indices_eval'], 
+        channels=dataset_settings['channels'], 
+        one_hot=False, 
+        dataset_settings=dataset_settings, 
+        network_settings=network_settings)
+         
+    idxs = list()
+    for im in dataset_eval.images.keys():
+        idxs.append(im.split('_')[0])
+    
+    idxs = np.unique(idxs)
+
+    for idx in idxs:
+        im_a = np.moveaxis(dataset_eval.images[idx+'_a.npy'],-1,0)
+        im_b = np.moveaxis(dataset_eval.images[idx+'_b.npy'],-1,0)
+        rmse_raw = np.sqrt(np.mean(np.square(im_a-im_b), axis=(1,2)))
+
+        im_a = torch.as_tensor(np.expand_dims(im_a, axis=0))
+        im_b = torch.as_tensor(np.expand_dims(im_b, axis=0))
+        data = [im_a.float(), im_b.float()]
+       
+        # get features
+        features = net(
+            data, 
+            n_branches=n_branches, 
+            extract_features=network_settings['extract_features'])       
+        
+        features = features.squeeze().detach().numpy()
+        rmse = np.sqrt(np.mean(np.square(features), axis=(1,2)))
+# =============================================================================
+#         fig = plt.figure(figsize=(100,100))
+#         n_rows = int(np.ceil(np.sqrt(features.shape[0]+1)))
+#         n_cols = int(np.ceil(np.sqrt(features.shape[0])))
+#         gs = GridSpec(n_rows, n_cols)
+#         for i, a_map in enumerate(features):
+#                   
+#             ax = fig.add_subplot(gs[i+n_cols])
+#             ax.imshow(a_map)
+#             ax.axis('off')
+#         plt.show()
+# =============================================================================
+
+        

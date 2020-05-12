@@ -28,7 +28,7 @@ if computer == 'desktop':
         'csv_file_train_oscd' : 'OSCD_train.csv',
         'csv_file_test_oscd': 'OSCD_test.csv',
         'csv_file_patches_overlap': 'S21C_patches_overlap50-70.csv',
-        'csv_models': 'trained_models.csv',
+        'csv_models': 'trained_models_preliminary.csv',
         'csv_models_results': 'models_results.csv',
         'data_dir_S21C': 'data_S21C',
         'data_dir_barrax': 'data_barrax',
@@ -36,35 +36,35 @@ if computer == 'desktop':
         'data_dir_patches_overlap': 'patches_S21C_overlap50-70',
         'labels_dir_oscd' : 'labels_OSCD',
         'tb_dir': '/media/cordolo/marrit/Intermediate/tensorboard',
-        'model_dir': '/media/cordolo/marrit/Intermediate/trained_models'}
+        'model_dir': '/media/cordolo/marrit/Intermediate/trained_models_preliminary'}
 elif computer == 'optimus':
     directories = {
-        'intermediate_dir_training': '/media/marrit/Intermediate/training_S2',
-        'results_dir_training': '/media/marrit/results/training_S2',
-        'results_dir_cd': '/media/marrit/results/CD_OSCD',
-        'intermediate_dir_cd': '/media/marrit/Intermediate/CD_OSCD',
-        'intermediate_dir': '/media/marrit/Intermediate',
+        'intermediate_dir_training': '/marrit1/Intermediate/training_S2',
+        'results_dir_training': '/marrit1/results/training_S2',
+        'results_dir_cd': '/marrit1/results/CD_OSCD',
+        'intermediate_dir_cd': '/marrit1/Intermediate/CD_OSCD',
+        'intermediate_dir': '/marrit1/Intermediate',
         'csv_file_S21C': 'S21C_dataset.csv',
         'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
         'csv_file_oscd': 'OSCD_dataset.csv',
         'csv_file_train_oscd' : 'OSCD_train.csv',
         'csv_file_test_oscd': 'OSCD_test.csv',
         'csv_file_patches_overlap': 'S21C_patches_overlap90-100.csv',
-        'csv_models': 'trained_models.csv',
+        'csv_models': 'trained_models_preliminary.csv',
         'csv_models_results': 'models_results.csv',
         'data_dir_S21C': 'data_S21C',
         'data_dir_oscd': 'data_OSCD',
         'labels_dir_oscd' : 'labels_OSCD',
         'data_dir_patches_overlap': 'patches_S21C_overlap90-100',
-        'tb_dir': '/media/marrit/Intermediate/tensorboard',
-        'model_dir': '/media/marrit/Intermediate/trained_models'}
+        'tb_dir': '/marrit1/Intermediate/tensorboard',
+        'model_dir': '/marrit1/Intermediate/trained_models_preliminary'}
 
 network_settings = {
-    'network': 'triplet_apn', # siamese" | "triplet" | "hypercolumn" | "triplet_apn" | siamese_unet | "siamese_dilated" | "triplet_unet" | "siamese_concat"
+    'network': 'siamese', # siamese" | "triplet" | "hypercolumn" | "triplet_apn" | siamese_unet | "siamese_dilated" | "triplet_unet" | "siamese_concat"
     'optimizer': 'adam',
     'lr':1e-3,
     'weight_decay':1e-4,
-    'loss': 'l1+triplet', # "cross_entropy" | "bce_sigmoid" | "l1+triplet" | "nll" | "nll_finetune" | "triplet" | "l1+triplet" | "l1+triplet+bce" | "mse" 
+    'loss': 'bce_sigmoid', # "cross_entropy" | "bce_sigmoid" | "l1+triplet" | "nll" | "nll_finetune" | "triplet" | "l1+triplet" | "l1+triplet+bce" | "mse" 
     'n_classes': 2,
     'patch_size': 96,
     'im_size': (96,96),
@@ -80,8 +80,8 @@ network_settings = {
 # classifier in siamese/triplet network uses linear layers
 # classifier in hypercolumn network uses conv layers
 # note: first number of top should be 2* or 3* last conv layer of branch
-cfg = {'branch': np.array([32,64,128], dtype='object'), 
-       'top': np.array([128], dtype='object'),
+cfg = {'branch': np.array([32,32,32,32,32], dtype='object'), 
+       'top': np.array([32], dtype='object'),
        'classifier': np.array([128,64,network_settings['n_classes']])}
 network_settings['cfg'] = cfg
 
@@ -108,19 +108,19 @@ if network_settings['network'] == 'hypercolumn':
 
 train_settings = {
     'start_epoch': 0,
-    'num_epoch': 25,
+    'num_epoch': 100,
     'batch_size': 25, # 1 =  25 in triplet_apn_dataset
-    'disp_iter': 25,
+    'disp_iter': 5,
     'gpu': None}
 
 dataset_settings = {
-    'dataset_type' : 'triplet_apn_hard_neg', # "pair" | "triplet" | "triplet_saved" | "overlap" | "triplet_apn" | "triplet_oscd" | "overlap_regression" | "pair_hard_neg" | "triplet_apn_hard_neg"
+    'dataset_type' : 'triplet', # "pair" | "triplet" | "triplet_saved" | "overlap" | "triplet_apn" | "triplet_oscd" | "overlap_regression" | "pair_hard_neg" | "triplet_apn_hard_neg"
     'perc_train': 0.85,
     'channels': np.arange(13),
     'min_overlap': 1, 
     'max_overlap': 1,
     'stride': int(network_settings['patch_size']),
-    'patches_per_image': 5}
+    'patches_per_image': 25}
 
 #%%
 """ Train on S21C presaved dataset overlap """
@@ -283,9 +283,9 @@ np.random.seed(234)
 #np.random.seed(432)
 dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
 
-dataset_settings['indices_train'] = np.repeat(dataset[:-150],dataset_settings['patches_per_image'])
-dataset_settings['indices_val'] = np.repeat(dataset[-150:-10],dataset_settings['patches_per_image'])
-dataset_settings['indices_test'] = np.repeat(dataset[-10:],dataset_settings['patches_per_image'])
+dataset_settings['indices_train'] = np.repeat(dataset[:-250][:20],dataset_settings['patches_per_image'])
+dataset_settings['indices_val'] = np.repeat(dataset[-250:-100][:20],dataset_settings['patches_per_image'])
+dataset_settings['indices_test'] = np.repeat(dataset[-100:],dataset_settings['patches_per_image'])
 
 # =============================================================================
 # dataset = np.random.choice(dataset['im_idx'], 2, replace=False)
@@ -434,9 +434,9 @@ print("MODEL SETTINGS: \n", model_settings)
 history_file = os.path.join(directories['model_dir'], 'history_' + model_settings['filename'].split('/')[-1])
 history = torch.load(history_file)
 
-history_loss = pd.DataFrame(history['train']['loss'], columns= ['train'], index=history['train']['epoch'])
+history_loss = pd.DataFrame(history['train']['loss'][:-1], columns= ['train'], index=history['train']['epoch'][:-1])
 history_loss['val'] = history['val']['loss']
-history_acc = pd.DataFrame(history['train']['acc'], columns= ['train'], index=history['train']['epoch'])
+history_acc = pd.DataFrame(history['train']['acc'][:-1], columns= ['train'], index=history['train']['epoch'][:-1])
 history_acc['val'] = history['val']['acc']
 
 fig, ax = plt.subplots(ncols=2, figsize=(20, 10))
@@ -451,9 +451,212 @@ ax[0].set_xlabel('epoch')
 fig.suptitle(model_settings['filename'].split('/')[-1], fontsize=18)
 plt.show()
 
+#%%
+""" Evaluate (preliminary) network on training task"""
+from train import evaluate
+
+# get model files
+trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], 
+                                          directories['csv_models']))
+# get model info
+model_idx = -1
+model_settings = trained_models.iloc[model_idx] # TODO: change here the model
+print("MODEL SETTINGS: \n", model_settings)
+
+# get dataset
+directories['data_path'] = os.path.join(
+    directories['results_dir_training'], 
+    directories['data_dir_S21C'])
+
+dataset = pd.read_csv(os.path.join(directories['results_dir_training'],directories['csv_file_S21C']))
+dataset = dataset.loc[dataset['pair_idx'] == 'a']
+np.random.seed(234)
+dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
+dataset_settings['indices_eval'] = np.repeat(dataset[-250:-100][-20:],dataset_settings['patches_per_image'])
+
+# evaluate
+acc, loss, probability = evaluate(model_settings, directories, dataset_settings, network_settings, train_settings)
+print('accuracy: ', acc)
+print('loss: ', loss)
+print('probability: ', probability)
+
+# save
+trained_models.loc[trained_models.index[model_idx],'n_eval_patches'] = len(dataset_settings['indices_eval'])
+trained_models.loc[trained_models.index[model_idx],'eval_acc'] = acc
+trained_models.loc[trained_models.index[model_idx],'eval_loss'] = loss
+trained_models.loc[trained_models.index[model_idx],'eval_prob'] = probability
+trained_models.to_csv(os.path.join(directories['intermediate_dir'], 
+                                          directories['csv_models']),index=False)
+
+#%%
+""" Evaluate (preliminary) network on change detection task"""
+
+from change_detection import detect_changes
+
+# get model files
+trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], 
+                                          directories['csv_models']))
+# get model info
+model_idx = -1
+model_settings = trained_models.iloc[model_idx] # TODO: change here the model
+print("MODEL SETTINGS: \n", model_settings)
+
+# get dataset
+directories['data_path'] = os.path.join(
+    directories['intermediate_dir_cd'], 
+    directories['data_dir_oscd'])
+directories['labels_path'] = os.path.join(
+        directories['intermediate_dir_cd'], 
+        directories['labels_dir_oscd'])
+
+dataset = pd.read_csv(os.path.join(directories['intermediate_dir_cd'],directories['csv_file_train_oscd']))
+dataset = dataset.loc[dataset['pair_idx'] == 'a']
+np.random.seed(571)
+dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
+dataset_settings['indices_eval'] = dataset[:2]
+
+# set extraction layer
+network_settings['extract_features'] = 'joint'
+
+methods = ['triangle']
+tp, tn, fp, fn = detect_changes(
+    model_settings, 
+    directories, 
+    dataset_settings, 
+    network_settings, 
+    train_settings, 
+    threshold_methods=methods)
+
+for method in methods:
+    tp_temp = sum(tp[method].values())
+    tn_temp = sum(tn[method].values())
+    fp_temp = sum(fp[method].values())
+    fn_temp = sum(fn[method].values())
+   
+    sensitivity = tp_temp/(tp_temp+fn_temp) # prop of correctly identified changed pixels = recall
+    recall = sensitivity
+    specificity = tn_temp/(tn_temp+fp_temp) # prop of correctly identified unchanged pixels
+    precision = tp_temp/(tp_temp+fp_temp) # prop of changed pixels that are truly changed
+    F1 = 2 * (precision * recall) / (precision + recall)
+    acc = (tp_temp+tn_temp)/(tp_temp+tn_temp+fp_temp+tn_temp)
+    print('------------------------------')
+    print("RESULTS METHOD: {}:".format(method))
+    print("sensitivity: ", sensitivity)
+    print("specificity: ", specificity)
+    print("recall: ", sensitivity)
+    print("precision: ", precision)
+    print("F1: ", F1)
+    print("acc: ", acc)   
+    print('------------------------------')
+
+trained_models.loc[trained_models.index[model_idx],'tp_oscd_eval_triangle'] = sum(tp[method].values())
+trained_models.loc[trained_models.index[model_idx],'tn_oscd_eval_triangle'] = sum(tn[method].values())
+trained_models.loc[trained_models.index[model_idx],'fp_oscd_eval_triangle'] = sum(fp[method].values())
+trained_models.loc[trained_models.index[model_idx],'fn_oscd_eval_triangle'] = fn_temp = sum(fn[method].values())
+trained_models.loc[trained_models.index[model_idx],'f1_oscd_eval_triangle'] = F1
+trained_models.to_csv(os.path.join(directories['intermediate_dir'], 
+                                          directories['csv_models']),index=False)  
 
 
 
+
+
+
+
+
+
+
+
+
+
+#%%
+""" Check predictions of network """
+from extract_features import get_network
+from train import get_dataset
+from torch.utils.data import DataLoader
+
+# get model files
+trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], 
+                                          directories['csv_models']))
+
+train_settings['gpu'] = None
+# get model info
+model_settings = trained_models.iloc[-2] # TODO: change here the model
+n_branches = 2
+print("MODEL SETTINGS: \n", model_settings)
+network = get_network(model_settings)
+
+
+# Datasets
+directories['data_path'] = os.path.join(
+    directories['results_dir_training'], 
+    directories['data_dir_S21C'])
+
+dataset = pd.read_csv(os.path.join(directories['results_dir_training'],directories['csv_file_S21C']))
+dataset = dataset.loc[dataset['pair_idx'] == 'a']
+np.random.seed(234)
+#np.random.seed(432)
+dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
+
+dataset_settings['indices_train'] = np.repeat(dataset[:-150][:5],dataset_settings['patches_per_image'])
+dataset_settings['indices_val'] = np.repeat(dataset[-150:-10][:5],dataset_settings['patches_per_image'])
+dataset_settings['indices_test'] = np.repeat(dataset[-10:][:5],dataset_settings['patches_per_image'])
+dataset_test = get_dataset(
+    data_path=directories['data_path'], 
+    indices=dataset_settings['indices_train'], 
+    channels=dataset_settings['channels'], 
+    one_hot=False, 
+    dataset_settings=dataset_settings, 
+    network_settings=network_settings)
+
+# Data loaders
+dataloader = DataLoader(
+    dataset_test, 
+    batch_size=min(train_settings['batch_size'],len(dataset_test)), 
+    shuffle=True,
+    num_workers = 1)
+
+     
+network.eval() 
+  
+iterator = iter(dataloader)
+
+batch_data = next(iterator)
+
+for item in batch_data: 
+    batch_data[item] = torch.squeeze(batch_data[item])
+
+# get the inputs
+if n_branches == 2:
+    if train_settings['gpu'] != None:
+        inputs = [batch_data['patch0'].float().cuda(), 
+                  batch_data['patch1'].float().cuda()] 
+    else:
+        inputs = [batch_data['patch0'].float(), 
+                  batch_data['patch1'].float()] 
+
+elif n_branches == 3:
+    if train_settings['gpu'] != None:
+        inputs = [batch_data['patch0'].float().cuda(), 
+                  batch_data['patch1'].float().cuda(),
+                  batch_data['patch2'].float().cuda()] 
+    else:
+        inputs = [batch_data['patch0'].float(), 
+                  batch_data['patch1'].float(),
+                  batch_data['patch2'].float()] 
+labels = batch_data['label']
+
+# to gpu
+if train_settings['gpu'] != None:
+    labels = labels.cuda()
+    
+# forward pass
+with torch.no_grad():
+    outputs_full = network(inputs, n_branches)
+    
+loss_func = torch.nn.MSELoss()
+loss = loss_func(outputs_full, labels)
+print('loss: ', loss)
 
 #%% 
 """ Check accuracy model on OSCD dataset """
@@ -489,46 +692,74 @@ print("accuracy: ", acc)
 print("loss: ", loss)
 
 #%%
-import scipy.io
-import imageio
-mat = scipy.io.loadmat(os.path.join(directories['source_dir_barrax'],'preChangeImage.mat'))
-b4 = mat['preChangeImage'][:,:,2]
-b3 = mat['preChangeImage'][:,:,1]
-b2 = mat['preChangeImage'][:,:,0]
-b5 = mat['preChangeImage'][:,:,3]
-b6 = mat['preChangeImage'][:,:,4]
-b7 = mat['preChangeImage'][:,:,5]
-b8 = mat['preChangeImage'][:,:,6]
-b8a = mat['preChangeImage'][:,:,7]
-b11 = mat['preChangeImage'][:,:,8]
-b12 = mat['preChangeImage'][:,:,9]
-im0 = np.stack([b2,b3,b4,b5,b6,b7,b8,b8,b8a,b11,b12],axis=2)
-np.save(os.path.join(directories['intermediate_dir'],'CD_barrax',directories['data_dir_barrax'],'0_a.npy'),im0)
 
-mat = scipy.io.loadmat(os.path.join(directories['source_dir_barrax'],'postChangeImage.mat'))
-b4 = mat['postChangeImage'][:,:,2]
-b3 = mat['postChangeImage'][:,:,1]
-b2 = mat['postChangeImage'][:,:,0]
-b5 = mat['postChangeImage'][:,:,3]
-b6 = mat['postChangeImage'][:,:,4]
-b7 = mat['postChangeImage'][:,:,5]
-b8 = mat['postChangeImage'][:,:,6]
-b8a = mat['postChangeImage'][:,:,7]
-b11 = mat['postChangeImage'][:,:,8]
-b12 = mat['postChangeImage'][:,:,9]
-im1 = np.stack([b2,b3,b4,b5,b6,b7,b8,b8,b8a,b11,b12],axis=2)
-np.save(os.path.join(directories['intermediate_dir'],'CD_barrax',directories['data_dir_barrax'],'0_b.npy'),im1)
 
-labels = imageio.imread(os.path.join(directories['source_dir_barrax'],'referenceImage.png'))
-np.save(os.path.join(directories['intermediate_dir'],'CD_barrax','labels_barrax','0.npy'),labels[:,:,0])
-labels = labels[:,:,0]
-from extract_features import calculate_distancemap, calculate_changemap
-from matplotlib import cm
-from matplotlib import pyplot as plt
-distmap = calculate_distancemap(im1, im0)
-changemap = calculate_changemap(distmap, method='triangle', plot=True)
-plt.imshow(labels < 1, cmap=cm.gray)
-plt.imshow(distmap > 0.5, cmap=cm.gray)
+from change_detection import detect_changes
+
+# get model files
+trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], 
+                                          directories['csv_models']))
+# get model info
+model_idx = -1
+model_settings = trained_models.iloc[model_idx] # TODO: change here the model
+print("MODEL SETTINGS: \n", model_settings)
+
+# get dataset
+directories['data_path'] = os.path.join(
+    directories['intermediate_dir_cd'], 
+    directories['data_dir_oscd'])
+directories['labels_path'] = os.path.join(
+        directories['intermediate_dir_cd'], 
+        directories['labels_dir_oscd'])
+
+dataset = pd.read_csv(os.path.join(directories['intermediate_dir_cd'],directories['csv_file_train_oscd']))
+dataset = dataset.loc[dataset['pair_idx'] == 'a']
+np.random.seed(571)
+dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
+dataset_settings['indices_eval'] = dataset[:2]
+
+# set extraction layer
+network_settings['extract_features'] = 'joint'
+
+methods = ['triangle']
+tp, tn, fp, fn = detect_changes(
+    model_settings, 
+    directories, 
+    dataset_settings, 
+    network_settings, 
+    train_settings, 
+    threshold_methods=methods)
+
+for method in methods:
+    tp_temp = sum(tp[method].values())
+    tn_temp = sum(tn[method].values())
+    fp_temp = sum(fp[method].values())
+    fn_temp = sum(fn[method].values())
+   
+    sensitivity = tp_temp/(tp_temp+fn_temp) # prop of correctly identified changed pixels = recall
+    recall = sensitivity
+    specificity = tn_temp/(tn_temp+fp_temp) # prop of correctly identified unchanged pixels
+    precision = tp_temp/(tp_temp+fp_temp) # prop of changed pixels that are truly changed
+    F1 = 2 * (precision * recall) / (precision + recall)
+    acc = (tp_temp+tn_temp)/(tp_temp+tn_temp+fp_temp+tn_temp)
+    print('------------------------------')
+    print("RESULTS METHOD: {}:".format(method))
+    print("sensitivity: ", sensitivity)
+    print("specificity: ", specificity)
+    print("recall: ", sensitivity)
+    print("precision: ", precision)
+    print("F1: ", F1)
+    print("acc: ", acc)   
+    print('------------------------------')
+
+trained_models.loc[trained_models.index[model_idx],'tp_oscd_eval_triangle'] = sum(tp[method].values())
+trained_models.loc[trained_models.index[model_idx],'tn_oscd_eval_triangle'] = sum(tn[method].values())
+trained_models.loc[trained_models.index[model_idx],'fp_oscd_eval_triangle'] = sum(fp[method].values())
+trained_models.loc[trained_models.index[model_idx],'fn_oscd_eval_triangle'] = fn_temp = sum(fn[method].values())
+trained_models.loc[trained_models.index[model_idx],'f1_oscd_eval_triangle'] = F1
+trained_models.to_csv(os.path.join(directories['intermediate_dir'], 
+                                          directories['csv_models']),index=False)  
+
 #%%
 """ Extract Features """
 
@@ -1315,3 +1546,27 @@ for i, label in enumerate(lbl_bottle):
     elif label == 1:
         positives[i] = inputs[2][i]
         negatives[i] = inputs[1][i]
+
+#%%
+""" Evaluate network on feature level """
+# get model files
+trained_models = pd.read_csv(os.path.join(directories['intermediate_dir'], 
+                                          directories['csv_models']))
+# get model info
+model_idx = -1
+model_settings = trained_models.iloc[model_idx] # TODO: change here the model
+print("MODEL SETTINGS: \n", model_settings)
+
+# get dataset
+directories['data_path'] = os.path.join(
+    directories['results_dir_training'], 
+    directories['data_dir_S21C'])
+
+dataset = pd.read_csv(os.path.join(directories['results_dir_training'],directories['csv_file_S21C']))
+dataset = dataset.loc[dataset['pair_idx'] == 'a']
+np.random.seed(234)
+dataset = np.random.choice(dataset['im_idx'], len(dataset), replace=False)
+dataset_settings['indices_eval'] = np.repeat(dataset[-250:-100][20:40],dataset_settings['patches_per_image'])
+
+# set extraction layer
+network_settings['extract_features'] = 'diff'
