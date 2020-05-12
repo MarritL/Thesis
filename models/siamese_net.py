@@ -102,6 +102,8 @@ def make_layers(cfg, n_channels, batch_norm=False):
             layers += [nn.ConvTranspose2d(in_channels, v, kernel_size=2, stride=2)]
         elif v == 'BU':
             layers += [nn.Upsample(scale_factor=8, mode='bilinear')]        # TODO: scale factor hard-coded  
+        elif v == 'D':
+            layers += [nn.Dropout()]
         else:
             v = int(v)
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
