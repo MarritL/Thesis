@@ -255,7 +255,87 @@ class PairDataset(BaseDataset):
         patchpair['label'] = torch.as_tensor(lbl, dtype=torch.int64)
         
         return patchpair
+
+class ShuffleBandDataset(BaseDataset):
+    """ Generate dataset of patch_pairs using method inspired on Doersch"""
     
+    def __init__(self, data_dir, indices, channels=[1,2,3], patch_size=96, 
+                 percentile=99, one_hot=True, in_memory=False):
+        super(ShuffleBandDataset, self).__init__(data_dir, indices, channels, 
+                                          patch_size, percentile)
+    
+        self.one_hot = one_hot
+        self.in_memory = in_memory
+        
+        images = [str(i)+'_a.npy' for i in indices]
+        images.extend([str(i)+'_b.npy' for i in indices])
+        unique_images = np.unique(images)
+        if self.in_memory:
+            # 'reconstruct' the filenames
+            self.images = self.get_images_dict(unique_images)
+    
+    def __getitem__(self, index):
+        'Generates one patch pair'
+        # Select sample
+        im_idx = self.indices[index]
+            
+        # get random pairindex (i.e. a/b)
+        pair_idxs = np.random.choice(self.pair_indices, size=1, replace=False)
+        
+        # 'reconstruct' the filenames
+        filenames = get_filenames(im_idx, pair_idxs)
+    
+        # load image
+        if self.in_memory:
+            images = list()
+            for filename in filenames:
+                    images.append(self.images[filename])
+        else:
+            # load image
+            images = self.get_images(filenames)
+                    
+        # sample start location patches 
+        patch_starts = sample_patch(
+            images[0].shape, 
+            self.patch_size)
+        
+        # get patches
+        singlepatch = self.get_patches(patch_starts, images)
+        
+        # rearange axis (channels first)
+        singlepatch = channelsfirst(singlepatch)
+
+        lbl = np.random.randint(6)
+        r = singlepatch['patch0'][2]
+        g = singlepatch['patch0'][1]
+        b = singlepatch['patch0'][0]
+        labels = {0: [b,g,r],
+               1: [b,r,g],
+               2: [r,b,g],
+               3: [r,g,b],
+               4: [g,r,b],
+               5: [g,b,r]}
+        singlepatch['patch0'] = np.array(labels[lbl])
+        
+        if self.one_hot:
+            lbl = to_categorical(lbl, num_classes=6)
+            dtype = torch.float32
+        else: 
+            dtype = torch.int64
+                             
+        assert np.any(~np.isnan(singlepatch['patch0'])), \
+            "Nans in patch {}".format(im_idx)  
+        
+        # add image info
+        singlepatch['im_idx'] = torch.as_tensor(im_idx)
+        singlepatch['patch_starts'] = torch.as_tensor(patch_starts)
+        
+        # cast to tensors
+        singlepatch['patch0'] = torch.as_tensor(singlepatch['patch0'])
+        singlepatch['label'] = torch.as_tensor(lbl, dtype=dtype)
+        
+        return singlepatch
+  
 class PairDatasetOverlap(BaseDataset):
     """ Generate dataset of patch_pairs using method inspired on Doersch"""
     
@@ -1492,7 +1572,7 @@ def sample_patchpair_overlap(im1_shape, patch_size=96, min_overlap=0.2,
     # determine min and max shift based on overlap
     min_shift_pix = patch_size - patch_size*max_overlap
     max_shift_pix = patch_size - patch_size*min_overlap
- 
+   
     # sample starting point of the central patch = patch1
     patch0_row = np.random.randint(
         np.ceil(max_shift_pix), 
@@ -1596,7 +1676,7 @@ def sample_patchpair_ap(im1_shape, patch_size=96):
     Returns
     -------
     patch_starts : list
-        list of upper left corners of patch 0 to 2. 
+        list of upper left corners of patch 0 to 1. 
         patch_starts[0] : starting point of patch 0, described by numpy.ndarray 
             of shape (2,) representing resp. row, column
         patch_starts[1] : starting point of patch 1, described by numpy.ndarray
@@ -1610,5 +1690,33 @@ def sample_patchpair_ap(im1_shape, patch_size=96):
     patch_starts.append(np.concatenate([patch0_row,patch0_col]))
     # patch start 0 and 1 are the same (100% overlap)
     patch_starts.append(np.concatenate([patch0_row,patch0_col])) 
+    
+    return patch_starts
+
+def sample_patch(im1_shape, patch_size=96):
+    """
+    Samples 1 patch from image. 
+    
+    Parameters
+    ----------
+    im1_shape : tuple
+        tuple of shape of the image to smaple the patches from
+    patch_size : int, optional
+        width and height of the patches in pixels, patches are squared. 
+        The default is 96.
+
+    Returns
+    -------
+    patch_starts : list
+        list of upper left corners of patch 0 
+        patch_starts[0] : starting point of patch 0, described by numpy.ndarray 
+            of shape (2,) representing resp. row, column
+    """
+    patch_starts = list()
+ 
+    # sample starting point of the central patch = patch1
+    patch0_row = np.random.randint(0,im1_shape[0]-patch_size, size = 1)
+    patch0_col = np.random.randint(0,im1_shape[1]-patch_size, size = 1)
+    patch_starts.append(np.concatenate([patch0_row,patch0_col]))
     
     return patch_starts
