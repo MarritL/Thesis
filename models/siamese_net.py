@@ -73,9 +73,12 @@ class SiameseNet(nn.Module):
                 res.append(self.branches(x))
         
         # concatenate the output of difference of branches
-        x = torch.abs(res[1] - res[0])
+        if n_branches == 2:
+            x = torch.abs(res[1] - res[0])
         if n_branches == 3:
             x = torch.cat(x, torch.abs(res[2] - res[1]), 1)
+        else: 
+            x = res[0]
         
         if extract_features == 'diff':
             return x
@@ -173,7 +176,7 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
     branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm)
     if cfg['top'] is not None:
         joint = make_layers(cfg['top'],
-                            int(cfg['branch'][cfg['branch'][cfg['branch'] != 'M'] != 'D'][-1])*(n_branches-1),
+                            int(cfg['branch'][cfg['branch'][cfg['branch'] != 'M'] != 'D'][-1])*max(1,(n_branches-1)),
                             batch_norm=batch_norm)
     else:
         # does nothing because next layer is the same
