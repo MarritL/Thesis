@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 from models.netbuilder import NetBuilder, create_loss_function, create_optimizer
 from data_generator import PairDataset, TripletDataset, TripletDatasetPreSaved
 from data_generator import PartlyOverlapDataset, TripletAPNDataset, PairHardNegDataset
-from data_generator import TripletAPNHardNegDataset
+from data_generator import TripletAPNHardNegDataset, ShuffleBandDataset
 from data_generator import TripletAPNFinetuneDataset, PairDatasetOverlap
 from OSCDDataset import OSCDDataset, RandomFlip, RandomRot
 from models.siameseNetAPNFinetune import siameseNetAPNFinetune
@@ -23,7 +23,6 @@ import time
 import csv
 import copy
 import numpy as np
-from extract_features import get_network
 torch.manual_seed(211)
 
 def train(directories, dataset_settings, network_settings, train_settings):
@@ -154,7 +153,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
                            train_settings['start_epoch']+train_settings['num_epoch']):
             
             # early stopping
-            if (epoch - best_epoch) > 20:
+            if (epoch - best_epoch) > train_settings['early_stopping']:
                 break
             
             #training epoch
@@ -527,7 +526,12 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
         optimizer.zero_grad()
         
         # get the inputs
-        if n_branches == 2:
+        if n_branches == 1:
+            if gpu != None:
+                inputs = [batch_data['patch0'].float().cuda()]                        
+            else:
+                inputs = [batch_data['patch0'].float()] 
+        elif n_branches == 2:
             if gpu != None:
                 inputs = [batch_data['patch0'].float().cuda(), 
                           batch_data['patch1'].float().cuda()] 
@@ -599,6 +603,7 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
         
         # save the starting points in csvfile for reproducability
         starts = batch_data['patch_starts'].detach().numpy()
+        #print(starts)
         im_idx = batch_data['im_idx'].detach().numpy()
     
         with open(os.path.join(directories['model_dir'],
@@ -607,9 +612,13 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
             for j in range(len(im_idx)): 
                 row_patch0 = starts[j][0][0]
                 col_patch0 = starts[j][0][1]
-                row_patch1 = starts[j][1][0]
-                col_patch1 = starts[j][1][1]
-                if n_branches == 3:
+                if n_branches == 2: 
+                    row_patch1 = starts[j][1][0]
+                    col_patch1 = starts[j][1][1]
+                    filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
+                                         'row_patch1':row_patch1, 'col_patch1':col_patch1})  
+                elif n_branches == 3:
                     row_patch2 = starts[j][2][0]
                     col_patch2 = starts[j][2][1]
                     filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
@@ -618,8 +627,7 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
                                          'row_patch2':row_patch2, 'col_patch2':col_patch2})  
                 else:
                     filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
-                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
-                                         'row_patch1':row_patch1, 'col_patch1':col_patch1})  
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0})  
 
         
 
@@ -694,7 +702,12 @@ def validate_epoch(network_settings, network, n_branches, dataloader, loss_func,
             batch_data[item] = torch.squeeze(batch_data[item])
         
         # get the inputs
-        if n_branches == 2:
+        if n_branches == 1:
+            if gpu != None:
+                inputs = [batch_data['patch0'].float().cuda()] 
+            else:
+                inputs = [batch_data['patch0'].float()]
+        elif n_branches == 2:
             if gpu != None:
                 inputs = [batch_data['patch0'].float().cuda(), 
                           batch_data['patch1'].float().cuda()] 
@@ -882,8 +895,12 @@ def train_epoch_apn(network_settings, network, n_branches, dataloader, optimizer
             for j in range(len(im_idx)): 
                 row_patch0 = starts[j][0][0]
                 col_patch0 = starts[j][0][1]
-                row_patch1 = starts[j][1][0]
-                col_patch1 = starts[j][1][1]
+                if n_branches == 2: 
+                    row_patch1 = starts[j][1][0]
+                    col_patch1 = starts[j][1][1]
+                    filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
+                                         'row_patch1':row_patch1, 'col_patch1':col_patch1})  
                 if n_branches == 3:
                     row_patch2 = starts[j][2][0]
                     col_patch2 = starts[j][2][1]
@@ -893,8 +910,7 @@ def train_epoch_apn(network_settings, network, n_branches, dataloader, optimizer
                                          'row_patch2':row_patch2, 'col_patch2':col_patch2})  
                 else:
                     filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
-                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
-                                         'row_patch1':row_patch1, 'col_patch1':col_patch1})  
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0})  
 
 
         # calculate accuracy, and display
@@ -1161,8 +1177,12 @@ def train_epoch_unet(network_settings, network, n_branches, dataloader, optimize
             for j in range(len(im_idx)): 
                 row_patch0 = starts[j][0][0]
                 col_patch0 = starts[j][0][1]
-                row_patch1 = starts[j][1][0]
-                col_patch1 = starts[j][1][1]
+                if n_branches == 2: 
+                    row_patch1 = starts[j][1][0]
+                    col_patch1 = starts[j][1][1]
+                    filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
+                                         'row_patch1':row_patch1, 'col_patch1':col_patch1})  
                 if n_branches == 3:
                     row_patch2 = starts[j][2][0]
                     col_patch2 = starts[j][2][1]
@@ -1172,8 +1192,7 @@ def train_epoch_unet(network_settings, network, n_branches, dataloader, optimize
                                          'row_patch2':row_patch2, 'col_patch2':col_patch2})  
                 else:
                     filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
-                                         'row_patch0':row_patch0, 'col_patch0':col_patch0,
-                                         'row_patch1':row_patch1, 'col_patch1':col_patch1})   
+                                         'row_patch0':row_patch0, 'col_patch0':col_patch0})  
 
 
         # calculate accuracy, and display
@@ -1418,6 +1437,14 @@ def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network
             one_hot=one_hot,
             second_label=second_label,
             in_memory=in_memory)
+    elif dataset_settings['dataset_type'] == 'shuffle_band':
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = ShuffleBandDataset(
+            data_dir=data_path,
+            indices=indices,
+            channels=channels, 
+            one_hot=one_hot,
+            in_memory=in_memory)
     else:
         raise Exception('dataset_type undefined! \n \
                         Choose one of: "pair", "triplet", "triplet_saved",\
@@ -1437,6 +1464,10 @@ def determine_branches(network_settings, dataset_settings):
     elif network_settings['network'] == 'triplet':
         print('n_branches = 3')
         n_branches = 3
+        network_settings['network'] = 'siamese'  
+    elif network_settings['network'] == 'single':
+        print('n_branches = 1')
+        n_branches = 1
         network_settings['network'] = 'siamese'    
     elif network_settings['network'] == 'hypercolumn':
         print('n_branches = 2')
@@ -1462,11 +1493,14 @@ def determine_branches(network_settings, dataset_settings):
     elif network_settings['network'] == 'triplet_apn_dilated':
         print('n_branches = 3')
         n_branches = 3
+    elif network_settings['network'] == 'logistic_regression':
+        print('n_branches = 2')
+        n_branches = 2
     else:
         raise Exception('Architecture undefined! \n \
                         Choose one of: "siamese", "triplet", "hypercolumn", \
                         "siamese_unet_diff", "triplet_apn", "siamese_unet",\
-                        "siamese_concat"')
+                        "siamese_concat", "logistic_regression"')
     return n_branches, pos_weight
 
 def evaluate_features(model_settings, directories, dataset_settings, network_settings, train_settings):
@@ -1510,7 +1544,7 @@ def evaluate_features(model_settings, directories, dataset_settings, network_set
         features = features.squeeze().detach().numpy()
         rmse = np.sqrt(np.mean(np.square(features), axis=(1,2)))
         fig = plt.figure(figsize=(100,100))
-        n_rows = int(np.ceil(np.sqrt(features.shape[0]+1)))
+        n_rows = int(np.ceil(np.sqrt(features.shape[0])))+1
         n_cols = int(np.ceil(np.sqrt(features.shape[0])))
         gs = GridSpec(n_rows, n_cols)
         for i, a_map in enumerate(features):
@@ -1520,4 +1554,51 @@ def evaluate_features(model_settings, directories, dataset_settings, network_set
             ax.axis('off')
         plt.show()
 
+def get_network(model_settings):
+    
+    # cfgs are saved as strings, cast back to list
+    branch = model_settings['cfg_branch'].split("[" )[1]
+    branch = branch.split("]" )[0]
+    branch = branch.replace("'", "")
+    branch = branch.replace(" ", "")
+    branch = branch.split(",")
+    top = model_settings['cfg_top'].split("[" )[1]
+    top = top.split("]" )[0]
+    top = top.replace("'", "")
+    top = top.replace(" ", "")
+    top = top.split(",")
+    classifier = model_settings['cfg_classifier'].split("[" )[1]
+    classifier = classifier.split("]" )[0]
+    classifier = classifier.replace("'", "")
+    classifier = classifier.replace(" ", "")
+    classifier = classifier.split(",")
+    # save in model_settigns
+    model_settings['cfg'] = {'branch': np.array(branch, dtype='object'), 
+                             'top': np.array(top,dtype='object'),
+                             'classifier': np.array(classifier, dtype='object')}
+    
+    # batch_norm saved as string cast back to bool
+    if model_settings['batch_norm'] == 'False' : 
+        model_settings['batch_norm'] = False
+    elif model_settings['batch_norm'] == 'True' : 
+        model_settings['batch_norm'] = True
+          
+    # build network
+    model_settings['network'] = model_settings['networkname']
+   
+    extra_settings = {'min_overlap': 1,
+                      'max_overlap': 1}
+    n_branches, pos_weight = determine_branches(model_settings, extra_settings)
         
+    net = NetBuilder.build_network(
+        net=model_settings['network'],
+        cfg=model_settings['cfg'],
+        n_channels=int(model_settings['n_channels']), 
+        n_classes=int(model_settings['n_classes']),
+        patch_size=int(model_settings['patch_size']),
+        im_size=(96,96),
+        batch_norm=model_settings['batch_norm'],
+        n_branches=n_branches,
+        weights=model_settings['filename'])  
+        
+    return net
