@@ -13,7 +13,8 @@ from torch.nn import functional as F
 
 
 from models import siamese_net, hypercolumn_net, siamese_unet_diff, siamese_net_apn, \
-    siamese_unet, triplet_unet, siamese_net_dilated, siamese_net_apn_dilated, siamese_net_concat
+    siamese_unet, triplet_unet, siamese_net_dilated, siamese_net_apn_dilated, \
+        siamese_net_concat, logistic_regression
 
 class NetBuilder:
     # custom weights initialization
@@ -98,12 +99,17 @@ class NetBuilder:
                 n_channels=n_channels,
                 n_classes=n_classes, 
                 batch_norm=batch_norm)
+        elif net == 'logistic_regression':
+            net = logistic_regression.__dict__['logistic_regression'](
+                n_channels=n_channels,
+                n_classes=n_classes, 
+                patch_size=patch_size)
         else:
             raise Exception('Architecture undefined!\n \
                         Choose one of: "siamese", "hypercolumn", \
                             "siamese_unet_diff", "triplet_apn", "siamese_unet",\
                             "siamese_dilated", "siamese_apn_dilated", "triplet_unet",\
-                            "siamese_concat"')
+                            "siamese_concat", "logistic_regression"')
 
         # initiate weighs 
         if len(weights) > 0:
