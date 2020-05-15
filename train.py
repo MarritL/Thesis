@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 from models.netbuilder import NetBuilder, create_loss_function, create_optimizer
 from data_generator import PairDataset, TripletDataset, TripletDatasetPreSaved
 from data_generator import PartlyOverlapDataset, TripletAPNDataset, PairHardNegDataset
-from data_generator import TripletAPNHardNegDataset, ShuffleBandDataset
+from data_generator import TripletAPNHardNegDataset, ShuffleBandDataset, TripletFromFileDataset
 from data_generator import TripletAPNFinetuneDataset, PairDatasetOverlap
 from OSCDDataset import OSCDDataset, RandomFlip, RandomRot
 from models.siameseNetAPNFinetune import siameseNetAPNFinetune
@@ -902,6 +902,8 @@ def train_epoch_apn(network_settings, network, n_branches, dataloader, optimizer
                                          'row_patch0':row_patch0, 'col_patch0':col_patch0,
                                          'row_patch1':row_patch1, 'col_patch1':col_patch1})  
                 if n_branches == 3:
+                    row_patch1 = starts[j][1][0]
+                    col_patch1 = starts[j][1][1]
                     row_patch2 = starts[j][2][0]
                     col_patch2 = starts[j][2][1]
                     filewriter.writerow({'epoch': epoch, 'im_idx': im_idx[j],
@@ -1443,6 +1445,15 @@ def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network
             data_dir=data_path,
             indices=indices,
             channels=channels, 
+            one_hot=one_hot,
+            in_memory=in_memory)
+    elif dataset_settings['dataset_type'] == 'triplet_from_file':
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = TripletFromFileDataset(
+            data_dir = data_path,
+            indices = indices,
+            patch_starts_df = dataset_settings['dataset_eval_df'],
+            channels=channels,
             one_hot=one_hot,
             in_memory=in_memory)
     else:
