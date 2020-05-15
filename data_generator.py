@@ -532,6 +532,122 @@ class TripletDataset(BaseDataset):
         
         return patchtriplet
     
+class TripletFromFileDataset(BaseDataset):
+    """ Generate dataset with patch triplets, based on partial overlap """
+    
+    def __init__(self, data_dir, indices, patch_starts_df,
+                 channels=np.arange(14), patch_size=96, 
+                 percentile=99, one_hot=True, in_memory=False):
+        super(TripletFromFileDataset, self).__init__(data_dir, indices, channels, 
+                                             patch_size, percentile)
+        
+        self.patch_starts_df = patch_starts_df
+        self.one_hot = one_hot
+        self.in_memory = in_memory
+        
+        images = [str(i)+'_a.npy' for i in indices]
+        images.extend([str(i)+'_b.npy' for i in indices])
+        unique_images = np.unique(images)
+        if self.in_memory:
+            # 'reconstruct' the filenames
+            self.images = self.get_images_dict(unique_images)
+    
+    def __getitem__(self, index):
+        'Generates one patch triplet'
+        patches_data = self.patch_starts_df.iloc[index]
+        # Select sample
+        im_idx = patches_data['im_idx']
+            
+        # get random image-pair index (i.e. a/b)
+        triplet_pairidxs = np.array([patches_data['im_patch0'], patches_data['im_patch1'], patches_data['im_patch2']])
+
+        # 'reconstruct' the filenames
+        filenames = get_filenames(im_idx, triplet_pairidxs)
+        unique_images = np.unique(filenames)
+        n_images = len(unique_images)
+    
+        # load image
+        if self.in_memory:
+            images = list()
+            for filename in unique_images:
+                    images.append(self.images[filename])
+        else:
+            # load image
+            images = self.get_images(unique_images)
+
+        # check if all images have the same shape
+        if n_images > 1:
+            for i in range(n_images-1):
+                assert images[i].shape == images[i+1].shape,\
+                    'Shape not matching in image pair {}'.format(im_idx)
+
+        # read start locations patches        
+        patch_starts = [np.array([patches_data['row_patch0'], patches_data['col_patch0']]),
+                        np.array([patches_data['row_patch1'], patches_data['col_patch1']]),
+                        np.array([patches_data['row_patch2'], patches_data['col_patch2']])]
+        
+        # read random order
+        lbl = patches_data['lbl']
+        if lbl == 1:
+            patch_starts[1], patch_starts[2] = patch_starts[2], patch_starts[1]
+        
+        if self.one_hot:
+            lbl = to_categorical(lbl, num_classes=2)
+            dtype = torch.float32
+        else: 
+            dtype = torch.int64
+        
+        # get patches
+        patchtriplet = self.get_patches(patch_starts, images, triplet_pairidxs)
+        
+        # augmentation
+        rot = patches_data['rot']
+        flipud = patches_data['flipud']
+        fliplr = patches_data['fliplr']
+        patchtriplet['patch0'] = np.rot90(patchtriplet['patch0'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch1'] = np.rot90(patchtriplet['patch1'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch2'] = np.rot90(patchtriplet['patch2'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchtriplet['patch0'] = np.flipud(patchtriplet['patch0']).copy()
+            patchtriplet['patch1'] = np.flipud(patchtriplet['patch1']).copy()
+            patchtriplet['patch2'] = np.flipud(patchtriplet['patch2']).copy()
+        if not flipud:
+            if fliplr:
+                patchtriplet['patch0'] = np.fliplr(patchtriplet['patch0']).copy()
+                patchtriplet['patch1'] = np.fliplr(patchtriplet['patch1']).copy()
+                patchtriplet['patch2'] = np.fliplr(patchtriplet['patch2']).copy()
+        
+
+        # rearange axis (channels first)
+        patchtriplet = channelsfirst(patchtriplet)
+                             
+        assert patchtriplet['patch0'].shape == \
+            patchtriplet['patch1'].shape == \
+            patchtriplet['patch2'].shape, \
+            "Shape not matching in patch triplet {}, shape: 0:{} 1:{} 2:{}"\
+            .format(
+                im_idx, 
+                patchtriplet['patch0'].shape, 
+                patchtriplet['patch1'].shape,
+                patchtriplet['patch2'].shape)
+        assert np.any(~np.isnan(patchtriplet['patch0'])) \
+            & np.any(~np.isnan(patchtriplet['patch1'])) \
+            & np.any(~np.isnan(patchtriplet['patch2'])), \
+            "Nans in patch triplet {}".format(im_idx)  
+        
+        # add image info
+        patchtriplet['im_idx'] = torch.as_tensor(im_idx)
+        patchtriplet['patch_starts'] = torch.as_tensor(patch_starts)
+        
+        # cast to tensors
+        patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
+        patchtriplet['patch1'] = torch.as_tensor(patchtriplet['patch1'])
+        patchtriplet['patch2'] = torch.as_tensor(patchtriplet['patch2'])
+        patchtriplet['label'] = torch.as_tensor(lbl, dtype=dtype)
+        
+        
+        return patchtriplet
+    
 class PairHardNegDataset(BaseDataset):
     """ Generate dataset with patch pairs, 100% overlap, second possible rotated """
     
