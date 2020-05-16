@@ -76,7 +76,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
         im_size=network_settings['im_size'],
         batch_norm=network_settings['batch_norm'],
         n_branches=n_branches,
-        weights=network_settings['weights_file'])  
+        weights=network_settings['weights_file'],
+        gpu=train_settings['gpu'])  
     #net = net.float()
        
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], pos_weight=pos_weight)
@@ -156,29 +157,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
             if (epoch - best_epoch) > train_settings['early_stopping']:
                 break
             
-            #training epoch
-            train_func(
-                network_settings,
-                network=net, 
-                n_branches=n_branches,
-                dataloader=dataloader_train, 
-                optimizer=optim, 
-                loss_func=loss_func,
-                acc_func=acc_func,
-                history=history, 
-                epoch=epoch, 
-                writer=writer,
-                epoch_iters=epoch_iters, 
-                disp_iter=train_settings['disp_iter'],
-                gpu = train_settings['gpu'],
-                im_size = network_settings['im_size'],
-                extract_features=network_settings['extract_features'],
-                avg_pool=network_settings['avg_pool'],
-                directories=directories, 
-                network_name=network_name, 
-                outputtime=outputtime)
-            
-            # validation epoch
+                        # validation epoch
             best_net_wts, best_acc, best_epoch, best_loss = val_func(
                 network_settings,
                 network=net, 
@@ -201,6 +180,54 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 directories=directories, 
                 network_name=network_name, 
                 outputtime=outputtime)
+            
+            #training epoch
+            train_func(
+                network_settings,
+                network=net, 
+                n_branches=n_branches,
+                dataloader=dataloader_train, 
+                optimizer=optim, 
+                loss_func=loss_func,
+                acc_func=acc_func,
+                history=history, 
+                epoch=epoch, 
+                writer=writer,
+                epoch_iters=epoch_iters, 
+                disp_iter=train_settings['disp_iter'],
+                gpu = train_settings['gpu'],
+                im_size = network_settings['im_size'],
+                extract_features=network_settings['extract_features'],
+                avg_pool=network_settings['avg_pool'],
+                directories=directories, 
+                network_name=network_name, 
+                outputtime=outputtime)
+            
+# =============================================================================
+#             # validation epoch
+#             best_net_wts, best_acc, best_epoch, best_loss = val_func(
+#                 network_settings,
+#                 network=net, 
+#                 n_branches=n_branches,
+#                 dataloader=dataloader_val, 
+#                 loss_func=loss_func,
+#                 acc_func=acc_func,
+#                 history=history, 
+#                 epoch=epoch, 
+#                 writer=writer,
+#                 val_epoch_iters=val_epoch_iters,
+#                 best_net_wts=best_net_wts,
+#                 best_acc=best_acc,
+#                 best_epoch=best_epoch,
+#                 best_loss=best_loss,
+#                 gpu = train_settings['gpu'],
+#                 im_size = network_settings['im_size'],
+#                 extract_features=network_settings['extract_features'],
+#                 avg_pool=network_settings['avg_pool'],
+#                 directories=directories, 
+#                 network_name=network_name, 
+#                 outputtime=outputtime)
+# =============================================================================
     
     # on keyboard interupt continue the script: saves the best model until interrupt
     except KeyboardInterrupt:
@@ -252,8 +279,9 @@ def evaluate(model_settings, directories, dataset_settings, network_settings, tr
     
     # build network
     network_settings['im_size'] = (1,1)
-    n_branches, pos_weight = determine_branches(network_settings, dataset_settings)
-    net = get_network(model_settings)
+    model_settings['network'] = model_settings['networkname']
+    n_branches, pos_weight = determine_branches(model_settings, dataset_settings)
+    net = get_network(model_settings, train_settings['gpu'])
     
     loss_func, acc_func, one_hot = create_loss_function(model_settings['loss'])
     
@@ -343,7 +371,7 @@ def finetune(model_settings, directories, dataset_settings, network_settings, tr
     last_in = int(branch[-1])
     
     # get network
-    net = get_network(model_settings)  
+    net = get_network(model_settings, train_settings['gpu'])  
     finetune_net = siameseNetAPNFinetune(
         net, 
         last_in=last_in,
@@ -556,7 +584,7 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
         if gpu != None:
             labels = labels.cuda()
             
-        # forward pass          
+        # forward pass  
         outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
 # =============================================================================
 #         if torch.any(torch.isnan(outputs[0])) or torch.any(torch.isnan(outputs[1])):
@@ -738,6 +766,7 @@ def validate_epoch(network_settings, network, n_branches, dataloader, loss_func,
                 correct = labels*prob
                 prob_correct = torch.sum(correct)/len(outputs)       
                 probability.update(prob_correct.item())
+                
             if network_settings['loss'] == 'bce_sigmoid+l1reg':  
                 loss = loss_func(outputs, labels, network.parameters())
             else:
@@ -1519,7 +1548,7 @@ def evaluate_features(model_settings, directories, dataset_settings, network_set
     import matplotlib.pyplot as plt
     # get_network
     n_branches, pos_weight = determine_branches(network_settings, dataset_settings)
-    net = get_network(model_settings) 
+    net = get_network(model_settings, train_settings['gpu']) 
     net.eval()
     # get dataset
     dataset_eval = get_dataset(
@@ -1565,7 +1594,7 @@ def evaluate_features(model_settings, directories, dataset_settings, network_set
             ax.axis('off')
         plt.show()
 
-def get_network(model_settings):
+def get_network(model_settings, gpu):
     
     # cfgs are saved as strings, cast back to list
     branch = model_settings['cfg_branch'].split("[" )[1]
@@ -1610,6 +1639,7 @@ def get_network(model_settings):
         im_size=(96,96),
         batch_norm=model_settings['batch_norm'],
         n_branches=n_branches,
-        weights=model_settings['filename'])  
+        weights=model_settings['filename'],
+        gpu=gpu)  
         
     return net

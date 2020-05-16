@@ -39,7 +39,7 @@ class NetBuilder:
     @staticmethod
     def build_network(net, cfg, weights='', n_channels=13,n_classes=8, 
                       patch_size=96, batch_norm=False, n_branches=2,
-                      im_size=(96,96)):
+                      im_size=(96,96), gpu=None):
         
         if net == 'siamese':
             net = siamese_net.__dict__['siamese_net'](
@@ -114,9 +114,17 @@ class NetBuilder:
         # initiate weighs 
         if len(weights) > 0:
             print('Loading weights for network...')
+# =============================================================================
+#             if gpu == None:
+#                 net.load_state_dict(
+#                     torch.load(weights), strict=False)
+#                     #torch.load(weights,map_location=torch.device('cpu')), strict=False)
+#             else:
+# =============================================================================
             net.load_state_dict(
-                torch.load(weights), strict=False)
+                torch.load(weights))
         else:
+            print("Initialize weights for network...")
             net.apply(NetBuilder.init_weight)
         
         return net
