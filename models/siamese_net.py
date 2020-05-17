@@ -71,17 +71,12 @@ class SiameseNet(nn.Module):
             # if in training or validation phase forward images through branch   
             else:
                 res.append(self.branches(x))
-        
+                
         # concatenate the output of difference of branches
-        if n_branches == 2:
-            x = torch.abs(res[1] - res[0])
+        x = torch.abs(res[1] - res[0])
         if n_branches == 3:
             x = torch.cat(x, torch.abs(res[2] - res[1]), 1)
-        else: 
-            x = res[0]
         
-        if extract_features == 'diff':
-            return x
         # joint layers
         x = self.joint(x)
         if extract_features == 'joint': 
@@ -91,12 +86,19 @@ class SiameseNet(nn.Module):
         # classification layers
         x = self.classifier(x)
         return x
-
-             
-    
-def make_layers(cfg, n_channels, batch_norm=False):
+        
+     
+def make_layers(cfg, n_channels, batch_norm=False, first_77=False):
     layers = []
     in_channels = int(n_channels)    
+    if first_77:
+        v = int(cfg[0])
+        conv2d = nn.Conv2d(in_channels, v, kernel_size=7, padding=3)
+        if batch_norm:
+            layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
+        else:
+            layers += [conv2d, nn.ReLU(inplace=True)]
+        in_channels = v        
     # iterate over layers and add to sequential
     for v in cfg:
         if v == 'M':
@@ -105,8 +107,6 @@ def make_layers(cfg, n_channels, batch_norm=False):
             layers += [nn.ConvTranspose2d(in_channels, v, kernel_size=2, stride=2)]
         elif v == 'BU':
             layers += [nn.Upsample(scale_factor=8, mode='bilinear')]        # TODO: scale factor hard-coded  
-        elif v == 'D':
-            layers += [nn.Dropout()]
         else:
             v = int(v)
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
@@ -168,15 +168,15 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
     n_mpool = np.sum(cfg['branch'] == 'M') + np.sum(cfg['top'] == 'M')    
 
     if cfg['top'] is not None:
-        n_channels_lin = int(cfg['top'][cfg['top'][cfg['top'] != 'CU'][cfg['top'] != 'BU'] != 'D'][-1])
+        n_channels_lin = int(cfg['top'][cfg['top'] != 'CU'][cfg['top'] != 'BU'][-1])
     else:
         n_channels_lin = int(cfg['branch'][cfg['branch'] != 'M'][-1])*n_branches
     
     # create layers
-    branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm)
+    branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm,first_77=False)
     if cfg['top'] is not None:
         joint = make_layers(cfg['top'],
-                            int(cfg['branch'][cfg['branch'][cfg['branch'] != 'M'] != 'D'][-1])*max(1,(n_branches-1)),
+                            int(cfg['branch'][cfg['branch'] != 'M'][-1])*(n_branches-1),
                             batch_norm=batch_norm)
     else:
         # does nothing because next layer is the same
