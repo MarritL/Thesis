@@ -6,7 +6,7 @@ Created on Tue Feb  4 16:21:16 2020
 @author: M. Leenstra
 """
 
-from tensorboardX import SummaryWriter
+#from tensorboardX import SummaryWriter
 from models.netbuilder import NetBuilder, create_loss_function, create_optimizer
 from data_generator import PairDataset, TripletDataset, TripletDatasetPreSaved
 from data_generator import PartlyOverlapDataset, TripletAPNDataset, PairHardNegDataset
@@ -30,10 +30,10 @@ def train(directories, dataset_settings, network_settings, train_settings):
     # init tensorboard
     network_name = network_settings['network']
     outputtime = '{}'.format(time.strftime("%d%m%Y_%H%M%S", time.localtime()))
-    tb_dir = os.path.join(directories['tb_dir'], 'network-{}_date-{}'
-                          .format(network_name, outputtime))
-    writer = SummaryWriter(logdir=tb_dir)
-    print("tensorboard --logdir {}".format(tb_dir))
+    #tb_dir = os.path.join(directories['tb_dir'], 'network-{}_date-{}'
+    #                      .format(network_name, outputtime))
+    #writer = SummaryWriter(logdir=tb_dir)
+    #print("tensorboard --logdir {}".format(tb_dir))
     
     # init save-file
     fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', 'cfg_classifier', \
@@ -168,7 +168,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 acc_func=acc_func,
                 history=history, 
                 epoch=epoch, 
-                writer=writer,
+                writer=None,
                 epoch_iters=epoch_iters, 
                 disp_iter=train_settings['disp_iter'],
                 gpu = train_settings['gpu'],
@@ -189,7 +189,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 acc_func=acc_func,
                 history=history, 
                 epoch=epoch, 
-                writer=writer,
+                writer=None,
                 val_epoch_iters=val_epoch_iters,
                 best_net_wts=best_net_wts,
                 best_acc=best_acc,
@@ -246,7 +246,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
                         'history_network-{}_date-{}'.format(network_name, outputtime)))
         
     print('Training Done!')
-    writer.close()
+    #writer.close()
     
 
 def evaluate(model_settings, directories, dataset_settings, network_settings, train_settings):
@@ -315,10 +315,10 @@ def finetune(model_settings, directories, dataset_settings, network_settings, tr
     # init tensorboard
     network_name = model_settings['networkname']+'_finetune'
     outputtime = '{}'.format(time.strftime("%d%m%Y_%H%M%S", time.localtime()))
-    tb_dir = os.path.join(directories['tb_dir'], 'network-{}_date-{}'
-                          .format(network_name, outputtime))
-    writer = SummaryWriter(logdir=tb_dir)
-    print("tensorboard --logdir {}".format(tb_dir))
+    #tb_dir = os.path.join(directories['tb_dir'], 'network-{}_date-{}'
+    #                      .format(network_name, outputtime))
+    #writer = SummaryWriter(logdir=tb_dir)
+    #print("tensorboard --logdir {}".format(tb_dir))
     
     # init save-file
     fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', 'cfg_classifier', \
@@ -423,7 +423,7 @@ def finetune(model_settings, directories, dataset_settings, network_settings, tr
                 acc_func=acc_func,
                 history=None, 
                 epoch=epoch, 
-                writer=writer,
+                writer=None,
                 epoch_iters=epoch_iters, 
                 disp_iter=train_settings['disp_iter'],
                 gpu = train_settings['gpu'],
@@ -443,7 +443,7 @@ def finetune(model_settings, directories, dataset_settings, network_settings, tr
                 acc_func=acc_func,
                 history=None, 
                 epoch=epoch, 
-                writer=writer,
+                writer=None,
                 val_epoch_iters=val_epoch_iters,
                 best_net_wts=best_net_wts,
                 best_acc=best_acc,
@@ -495,7 +495,7 @@ def finetune(model_settings, directories, dataset_settings, network_settings, tr
     torch.save(best_net_wts, savedata['filename'])
         
     print('Training Done!')
-    writer.close()
+    #writer.close()
     
     
 def train_epoch(network_settings, network, n_branches, dataloader, optimizer, loss_func, 
