@@ -23,7 +23,7 @@ import time
 import csv
 import copy
 import numpy as np
-torch.manual_seed(211)
+#torch.manual_seed(211)
 
 def train(directories, dataset_settings, network_settings, train_settings):
 
@@ -67,7 +67,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
     network_settings['im_size'] = (1,1)
     n_branches, pos_weight = determine_branches(network_settings, dataset_settings)
                 
-    net = NetBuilder.build_network(
+    network = NetBuilder.build_network(
         net=network_settings['network'],
         cfg=network_settings['cfg'],
         n_channels=len(dataset_settings['channels']), 
@@ -85,10 +85,10 @@ def train(directories, dataset_settings, network_settings, train_settings):
     # load net to GPU     
     if train_settings['gpu'] != None:
         torch.cuda.set_device(train_settings['gpu'])
-        net.cuda()
+        network.cuda()
         loss_func = loss_func.cuda()
 
-    optim = create_optimizer(network_settings['optimizer'], net.parameters(), 
+    optim = create_optimizer(network_settings['optimizer'], network.parameters(), 
                              network_settings['lr'], 
                              weight_decay=network_settings['weight_decay'])
 
@@ -127,7 +127,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
     epoch_iters =  max(len(dataset_train) // train_settings['batch_size'],1)
     val_epoch_iters = max(len(dataset_val) // train_settings['batch_size'],1)
     
-    best_net_wts = copy.deepcopy(net.state_dict())
+    best_net_wts = copy.deepcopy(network.state_dict())
     best_acc = 0.0
     best_epoch = 0
     best_loss = 99999
@@ -156,11 +156,33 @@ def train(directories, dataset_settings, network_settings, train_settings):
             # early stopping
             if (epoch - best_epoch) > train_settings['early_stopping']:
                 break
+                       
+            #training epoch
+            train_func(
+                network_settings,
+                network=network, 
+                n_branches=n_branches,
+                dataloader=dataloader_train, 
+                optimizer=optim, 
+                loss_func=loss_func,
+                acc_func=acc_func,
+                history=history, 
+                epoch=epoch, 
+                writer=writer,
+                epoch_iters=epoch_iters, 
+                disp_iter=train_settings['disp_iter'],
+                gpu = train_settings['gpu'],
+                im_size = network_settings['im_size'],
+                extract_features=network_settings['extract_features'],
+                avg_pool=network_settings['avg_pool'],
+                directories=directories, 
+                network_name=network_name, 
+                outputtime=outputtime)
             
-                        # validation epoch
+            # validation epoch
             best_net_wts, best_acc, best_epoch, best_loss = val_func(
                 network_settings,
-                network=net, 
+                network=network, 
                 n_branches=n_branches,
                 dataloader=dataloader_val, 
                 loss_func=loss_func,
@@ -180,54 +202,6 @@ def train(directories, dataset_settings, network_settings, train_settings):
                 directories=directories, 
                 network_name=network_name, 
                 outputtime=outputtime)
-            
-            #training epoch
-            train_func(
-                network_settings,
-                network=net, 
-                n_branches=n_branches,
-                dataloader=dataloader_train, 
-                optimizer=optim, 
-                loss_func=loss_func,
-                acc_func=acc_func,
-                history=history, 
-                epoch=epoch, 
-                writer=writer,
-                epoch_iters=epoch_iters, 
-                disp_iter=train_settings['disp_iter'],
-                gpu = train_settings['gpu'],
-                im_size = network_settings['im_size'],
-                extract_features=network_settings['extract_features'],
-                avg_pool=network_settings['avg_pool'],
-                directories=directories, 
-                network_name=network_name, 
-                outputtime=outputtime)
-            
-# =============================================================================
-#             # validation epoch
-#             best_net_wts, best_acc, best_epoch, best_loss = val_func(
-#                 network_settings,
-#                 network=net, 
-#                 n_branches=n_branches,
-#                 dataloader=dataloader_val, 
-#                 loss_func=loss_func,
-#                 acc_func=acc_func,
-#                 history=history, 
-#                 epoch=epoch, 
-#                 writer=writer,
-#                 val_epoch_iters=val_epoch_iters,
-#                 best_net_wts=best_net_wts,
-#                 best_acc=best_acc,
-#                 best_epoch=best_epoch,
-#                 best_loss=best_loss,
-#                 gpu = train_settings['gpu'],
-#                 im_size = network_settings['im_size'],
-#                 extract_features=network_settings['extract_features'],
-#                 avg_pool=network_settings['avg_pool'],
-#                 directories=directories, 
-#                 network_name=network_name, 
-#                 outputtime=outputtime)
-# =============================================================================
     
     # on keyboard interupt continue the script: saves the best model until interrupt
     except KeyboardInterrupt:
@@ -333,7 +307,7 @@ def evaluate(model_settings, directories, dataset_settings, network_settings, tr
         directories=directories, 
         network_name=model_settings['networkname'], 
         outputtime=model_settings['filename'].split('-')[-1],
-        evaluate=True)
+        inference=True)
 
     return best_acc, best_loss, best_prob
 
@@ -541,8 +515,7 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
 
     # main loop
     tic = time.time()
-    epoch_start = time.time()
-    #for i in range(epoch_iters):
+    epoch_start = time.time()   
     for i, batch_data in enumerate(iterator): 
         
         for item in batch_data: 
@@ -578,41 +551,18 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
                           batch_data['patch2'].float()] 
         labels = batch_data['label']
 
-        #labels = batch_data['gt']
     
         # to gpu
         if gpu != None:
             labels = labels.cuda()
             
-        # forward pass  
+        # forward pass 
         outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
-# =============================================================================
-#         if torch.any(torch.isnan(outputs[0])) or torch.any(torch.isnan(outputs[1])):
-#             print("outputs is nan")
-#             import ipdb
-#             ipdb.set_trace()
-# # =============================================================================
-# =============================================================================
-#         # =====================================================================
-#         anchor = outputs[0]
-#         positive = outputs[1]
-#         negative = outputs[2]
-# 
-#         anchor_mean = anchor.mean((2,3))  
-#         positive_mean = positive.mean((2,3))
-#         negative_mean = negative.mean((2,3))            
-#         
-#         out = [output.mean((2,3)) for output in outputs]
-#             
-#         # =====================================================================    
-# =============================================================================
+
         if network_settings['loss'] == 'bce_sigmoid+l1reg':  
             loss = loss_func(outputs, labels, network.parameters())
         else:
             loss = loss_func(outputs, labels)
-        #loss, loss1, loss2 = loss_func(outputs, labels)
-        #loss = loss_func(outputs[0], outputs[1], outputs[2])
-        #print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}, min: {3:.3f}-{4:.3f}, max: {5:.3f}-{6:.3f}, mean: {7:.3f}-{8:.3f}".format(loss, loss1, loss2, min0, min1, max0, max1, mean0, mean1))
         acc = acc_func(outputs, labels, im_size)
 
         # Backward
@@ -625,8 +575,6 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
 
         # update average loss and acc
         ave_loss.update(loss.data.item())
-        #ave_lossL1.update(loss1.data.item())
-        #ave_lossTriplet.update(loss2.data.item())
         ave_acc.update(acc.item())
         
         # save the starting points in csvfile for reproducability
@@ -668,20 +616,6 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
                           ave_loss.average(), ave_acc.average()))
             ave_loss_all.update(ave_loss.average())
             ave_loss = AverageMeter()
-
-            #print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}".format(loss, loss1, loss2))
-# =============================================================================
-#             print('Epoch: [{}][{}/{}], Batch-time: {:.2f}, Data-time: {:.2f}, '
-#                   'Loss: {:.4f}, Acc: {:.4f}, L1: {:.4f}, LTriplet: {:.4f}'
-#                   .format(epoch, i+1, epoch_iters,
-#                           batch_time.average(), data_time.average(),
-#                           ave_loss.average(), ave_acc.average(), 
-#                           ave_lossL1.average(), ave_lossTriplet.average()))
-#             ave_loss_all.update(ave_loss.average())
-#             ave_loss = AverageMeter()
-#             ave_lossL1 = AverageMeter()
-#             ave_lossTriplet = AverageMeter()
-# =============================================================================
             
     if (i+1) < disp_iter:
         ave_loss_all_print = ave_loss.average()
@@ -691,8 +625,7 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
           'Train_Loss: {:.4f}, Train_Accuracy: {:0.4f}'
           .format(epoch, time.time()-epoch_start,
                   ave_loss_all_print, ave_acc.average()))
-
-     
+    
     if writer != None:
         writer.add_scalar('Train/Loss', ave_loss_all.average(), epoch)
         writer.add_scalar('Train/Acc', ave_acc.average(), epoch)
@@ -707,34 +640,34 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
 def validate_epoch(network_settings, network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, 
-             extract_features=None, avg_pool=False, evaluate=False):    
+             extract_features=None, avg_pool=False, inference=False):    
 
     time_meter = AverageMeter()
     ave_loss = AverageMeter()
     ave_acc = AverageMeter()
     
-    if evaluate:
+    if inference: 
         probability = AverageMeter()
         sigmoid = torch.nn.Sigmoid()
-
-    network.eval()
+        
+    network.eval() 
     
     iterator = iter(dataloader)
 
-
     # main loop
     tic = time.time()
-    for i, batch_data in enumerate(iterator):  
-
+    #for i in range(epoch_iters):
+    for i, batch_data in enumerate(iterator): 
+        
         for item in batch_data: 
-            batch_data[item] = torch.squeeze(batch_data[item])
+            batch_data[item] = torch.squeeze(batch_data[item])      
         
         # get the inputs
         if n_branches == 1:
             if gpu != None:
-                inputs = [batch_data['patch0'].float().cuda()] 
+                inputs = [batch_data['patch0'].float().cuda()]                        
             else:
-                inputs = [batch_data['patch0'].float()]
+                inputs = [batch_data['patch0'].float()] 
         elif n_branches == 2:
             if gpu != None:
                 inputs = [batch_data['patch0'].float().cuda(), 
@@ -742,6 +675,7 @@ def validate_epoch(network_settings, network, n_branches, dataloader, loss_func,
             else:
                 inputs = [batch_data['patch0'].float(), 
                           batch_data['patch1'].float()] 
+
         elif n_branches == 3:
             if gpu != None:
                 inputs = [batch_data['patch0'].float().cuda(), 
@@ -752,31 +686,26 @@ def validate_epoch(network_settings, network, n_branches, dataloader, loss_func,
                           batch_data['patch1'].float(),
                           batch_data['patch2'].float()] 
         labels = batch_data['label']
-
-        #labels = batch_data['gt']
-        # to GPU
+    
+        # to gpu
         if gpu != None:
             labels = labels.cuda()
-      
+            
+        # forward pass 
         with torch.no_grad():
-            # forward pass
             outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
-            if evaluate:
-                prob = sigmoid(outputs)
-                correct = labels*prob
-                prob_correct = torch.sum(correct)/len(outputs)       
-                probability.update(prob_correct.item())
-                
-            if network_settings['loss'] == 'bce_sigmoid+l1reg':  
-                loss = loss_func(outputs, labels, network.parameters())
-            else:
-                loss = loss_func(outputs, labels)
-            #loss, loss1, loss2  = loss_func(outputs, labels)
-            #loss = loss_func(outputs[0], outputs[1], outputs[2])
-            acc = acc_func(outputs, labels, im_size)
+
+        if network_settings['loss'] == 'bce_sigmoid+l1reg':  
+            loss = loss_func(outputs, labels, network.parameters())
+        else:
+            loss = loss_func(outputs, labels)
+        acc = acc_func(outputs, labels, im_size)    
         
-        loss = loss.mean()
-        acc = acc.mean()
+        if inference:
+            prob = sigmoid(outputs)
+            correct = labels*prob
+            prob_correct = torch.sum(correct)/len(outputs)       
+            probability.update(prob_correct.item())
 
         # update average loss and acc
         ave_loss.update(loss.data.item())
@@ -792,7 +721,7 @@ def validate_epoch(network_settings, network, n_branches, dataloader, loss_func,
           .format(epoch, time_meter.value(),
                   ave_loss.average(), ave_acc.average()))
     
-    if evaluate:
+    if inference:
         best_acc = ave_acc.average()
         best_loss = ave_loss.average()
         best_prob = probability.average()
