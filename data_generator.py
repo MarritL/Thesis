@@ -235,6 +235,19 @@ class PairDataset(BaseDataset):
         
         # get patches
         patchpair = self.get_patches(patch_starts, impair)
+        
+        # augmentation
+        rot = np.random.randint(0,4)
+        flipud = np.random.randint(2)
+        fliplr = np.random.randint(2)
+        patchpair['patch0'] = np.rot90(patchpair['patch0'], rot, axes=(0, 1)).copy()
+        patchpair['patch1'] = np.rot90(patchpair['patch1'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchpair['patch0'] = np.flipud(patchpair['patch0']).copy()
+            patchpair['patch1'] = np.flipud(patchpair['patch1']).copy()
+        if fliplr:
+            patchpair['patch0'] = np.fliplr(patchpair['patch0']).copy()
+            patchpair['patch1'] = np.fliplr(patchpair['patch1']).copy()
 
         # rearange axis (channels first)
         patchpair = channelsfirst(patchpair)
@@ -389,6 +402,19 @@ class PairDatasetOverlap(BaseDataset):
         
         # get patches
         patchpair = self.get_patches(patch_starts, images)
+        
+        # augmentation
+        rot = np.random.randint(0,4)
+        flipud = np.random.randint(2)
+        fliplr = np.random.randint(2)
+        patchpair['patch0'] = np.rot90(patchpair['patch0'], rot, axes=(0, 1)).copy()
+        patchpair['patch1'] = np.rot90(patchpair['patch1'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchpair['patch0'] = np.flipud(patchpair['patch0']).copy()
+            patchpair['patch1'] = np.flipud(patchpair['patch1']).copy()
+        if fliplr:
+            patchpair['patch0'] = np.fliplr(patchpair['patch0']).copy()
+            patchpair['patch1'] = np.fliplr(patchpair['patch1']).copy()
 
         # rearange axis (channels first)
         patchpair = channelsfirst(patchpair)
@@ -484,26 +510,22 @@ class TripletDataset(BaseDataset):
         # get patches
         patchtriplet = self.get_patches(patch_starts, images, triplet_pairidxs)
         
-# =============================================================================
-#         # augmentation
-#         rot = np.random.randint(1,4)
-#         flipud = np.random.randint(2)
-#         fliplr = np.random.randint(2)
-#         patchtriplet['patch0'] = np.rot90(patchtriplet['patch0'], rot, axes=(0, 1)).copy()
-#         patchtriplet['patch1'] = np.rot90(patchtriplet['patch1'], rot, axes=(0, 1)).copy()
-#         patchtriplet['patch2'] = np.rot90(patchtriplet['patch2'], rot, axes=(0, 1)).copy()
-#         if flipud:
-#             patchtriplet['patch0'] = np.flipud(patchtriplet['patch0']).copy()
-#             patchtriplet['patch1'] = np.flipud(patchtriplet['patch1']).copy()
-#             patchtriplet['patch2'] = np.flipud(patchtriplet['patch2']).copy()
-#         if not flipud:
-#             if fliplr:
-#                 patchtriplet['patch0'] = np.fliplr(patchtriplet['patch0']).copy()
-#                 patchtriplet['patch1'] = np.fliplr(patchtriplet['patch1']).copy()
-#                 patchtriplet['patch2'] = np.fliplr(patchtriplet['patch2']).copy()
-# =============================================================================
-        
-
+        # augmentation
+        rot = np.random.randint(0,4)
+        flipud = np.random.randint(2)
+        fliplr = np.random.randint(2)
+        patchtriplet['patch0'] = np.rot90(patchtriplet['patch0'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch1'] = np.rot90(patchtriplet['patch1'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch2'] = np.rot90(patchtriplet['patch2'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchtriplet['patch0'] = np.flipud(patchtriplet['patch0']).copy()
+            patchtriplet['patch1'] = np.flipud(patchtriplet['patch1']).copy()
+            patchtriplet['patch2'] = np.flipud(patchtriplet['patch2']).copy()
+        if fliplr:
+            patchtriplet['patch0'] = np.fliplr(patchtriplet['patch0']).copy()
+            patchtriplet['patch1'] = np.fliplr(patchtriplet['patch1']).copy()
+            patchtriplet['patch2'] = np.fliplr(patchtriplet['patch2']).copy()
+    
         # rearange axis (channels first)
         patchtriplet = channelsfirst(patchtriplet)
                              
@@ -602,25 +624,23 @@ class TripletFromFileDataset(BaseDataset):
         # get patches
         patchtriplet = self.get_patches(patch_starts, images, triplet_pairidxs)
         
-# =============================================================================
-#         # augmentation
-#         rot = patches_data['rot']
-#         flipud = patches_data['flipud']
-#         fliplr = patches_data['fliplr']
-#         patchtriplet['patch0'] = np.rot90(patchtriplet['patch0'], rot, axes=(0, 1)).copy()
-#         patchtriplet['patch1'] = np.rot90(patchtriplet['patch1'], rot, axes=(0, 1)).copy()
-#         patchtriplet['patch2'] = np.rot90(patchtriplet['patch2'], rot, axes=(0, 1)).copy()
-#         if flipud:
-#             patchtriplet['patch0'] = np.flipud(patchtriplet['patch0']).copy()
-#             patchtriplet['patch1'] = np.flipud(patchtriplet['patch1']).copy()
-#             patchtriplet['patch2'] = np.flipud(patchtriplet['patch2']).copy()
-#         if not flipud:
-#             if fliplr:
-#                 patchtriplet['patch0'] = np.fliplr(patchtriplet['patch0']).copy()
-#                 patchtriplet['patch1'] = np.fliplr(patchtriplet['patch1']).copy()
-#                 patchtriplet['patch2'] = np.fliplr(patchtriplet['patch2']).copy()
-#         
-# =============================================================================
+        # augmentation
+        rot = patches_data['rot']
+        flipud = patches_data['flipud']
+        fliplr = patches_data['fliplr']
+        patchtriplet['patch0'] = np.rot90(patchtriplet['patch0'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch1'] = np.rot90(patchtriplet['patch1'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch2'] = np.rot90(patchtriplet['patch2'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchtriplet['patch0'] = np.flipud(patchtriplet['patch0']).copy()
+            patchtriplet['patch1'] = np.flipud(patchtriplet['patch1']).copy()
+            patchtriplet['patch2'] = np.flipud(patchtriplet['patch2']).copy()
+        if not flipud:
+            if fliplr:
+                patchtriplet['patch0'] = np.fliplr(patchtriplet['patch0']).copy()
+                patchtriplet['patch1'] = np.fliplr(patchtriplet['patch1']).copy()
+                patchtriplet['patch2'] = np.fliplr(patchtriplet['patch2']).copy()
+        
 
         # rearange axis (channels first)
         patchtriplet = channelsfirst(patchtriplet)
@@ -742,109 +762,6 @@ class PairHardNegDataset(BaseDataset):
         
         return patchpair
     
-# =============================================================================
-# class TripletAPNDataset(BaseDataset):
-#     """ Generate dataset with patch triplets, anchor and positive 100% overlap """
-#     
-#     def __init__(self, data_dir, indices, channels=np.arange(14), patch_size=96, 
-#                  percentile=99, one_hot=True, batch_size=25):
-#         super(TripletAPNDataset, self).__init__(data_dir, indices, channels, 
-#                                              patch_size, percentile)
-#         
-#         self.one_hot = one_hot
-#         self.batch_size = batch_size
-#         self.patch_starts = list()
-#     
-#     def __getitem__(self, index):
-#         'Generates one patch triplet'
-#         # Select sample
-#         im_idx = self.indices[index]
-#             
-#         # get random image-pair index (i.e. a/b)
-#         #triplet_pairidxs = np.random.choice(self.pair_indices, size=3, replace=True)
-#         triplet_pairidxs = np.array(['a', 'b', 'a'])
-# 
-#         # 'reconstruct' the filenames
-#         filenames = get_filenames(im_idx, triplet_pairidxs)
-#         unique_images = np.unique(filenames)
-#         n_images = len(unique_images)
-#     
-#         # load image
-#         images = self.get_images(unique_images)
-# 
-#         # check if all images have the same shape
-#         if n_images > 1:
-#             for i in range(n_images-1):
-#                 assert images[i].shape == images[i+1].shape,\
-#                     'Shape not matching in image pair {}'.format(im_idx)
-# 
-#         batch_of_patch0 = torch.zeros(
-#             (self.batch_size, self.n_channels, self.patch_size, self.patch_size), 
-#             dtype=torch.float)
-#         batch_of_patch1 = torch.zeros(
-#             (self.batch_size, self.n_channels, self.patch_size, self.patch_size), 
-#             dtype=torch.float)
-#         batch_of_patch2 = torch.zeros(
-#             (self.batch_size, self.n_channels, self.patch_size, self.patch_size), 
-#             dtype=torch.float)
-#         batch_of_labels = torch.zeros(
-#             (self.batch_size, self.patch_size, self.patch_size), 
-#             dtype=torch.long)
-#         
-#         for i in range(self.batch_size):
-# 
-#             # sample start locations patches
-#             patch_starts = sample_patchtriplet_apn(
-#                 images[0].shape, 
-#                 self.patch_size)
-#             
-#             self.patch_starts.extend(patch_starts)
-#             # label for l1 loss
-#             # lbl = 0 # if using mean of distance image
-#             lbl = np.zeros((self.patch_size, self.patch_size)) # if calculating pixelwise
-#             
-#             # get patches
-#             patchtriplet = self.get_patches(patch_starts, images, triplet_pairidxs)
-#     
-#             # rearange axis (channels first)
-#             patchtriplet = channelsfirst(patchtriplet)
-#                                  
-#             assert patchtriplet['patch0'].shape == \
-#                 patchtriplet['patch1'].shape == \
-#                 patchtriplet['patch2'].shape, \
-#                 "Shape not matching in patch triplet {}, shape: 0:{} 1:{} 2:{}"\
-#                 .format(
-#                     im_idx, 
-#                     patchtriplet['patch0'].shape, 
-#                     patchtriplet['patch1'].shape,
-#                     patchtriplet['patch2'].shape)
-#             assert np.any(~np.isnan(patchtriplet['patch0'])) \
-#                 & np.any(~np.isnan(patchtriplet['patch1'])) \
-#                 & np.any(~np.isnan(patchtriplet['patch2'])), \
-#                 "Nans in patch triplet {}".format(im_idx)  
-#             
-#             # add image info
-#             patchtriplet['im_idx'] = im_idx
-#             
-#             # cast to tensors
-#             patchtriplet['patch0'] = torch.as_tensor(patchtriplet['patch0'])
-#             patchtriplet['patch1'] = torch.as_tensor(patchtriplet['patch1'])
-#             patchtriplet['patch2'] = torch.as_tensor(patchtriplet['patch2'])
-#             patchtriplet['label'] = torch.as_tensor(lbl)
-#             
-#             batch_of_patch0[i] = patchtriplet['patch0']
-#             batch_of_patch1[i] = patchtriplet['patch1']
-#             batch_of_patch2[i] = patchtriplet['patch2']
-#             batch_of_labels[i] = patchtriplet['label']
-#             
-#         batch = dict()
-#         batch['patch0'] = batch_of_patch0
-#         batch['patch1'] = batch_of_patch1
-#         batch['patch2'] = batch_of_patch2
-#         batch['label'] = batch_of_labels
-#             
-#         return batch
-# =============================================================================
 
 class TripletAPNDataset(BaseDataset):
     """ Generate dataset with patch triplets, anchor and positive 100% overlap """
@@ -915,6 +832,22 @@ class TripletAPNDataset(BaseDataset):
         
         # get patches
         patchtriplet = self.get_patches(patch_starts, images, triplet_pairidxs)
+        
+        # augmentation
+        rot = np.random.randint(0,4)
+        flipud = np.random.randint(2)
+        fliplr = np.random.randint(2)
+        patchtriplet['patch0'] = np.rot90(patchtriplet['patch0'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch1'] = np.rot90(patchtriplet['patch1'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch2'] = np.rot90(patchtriplet['patch2'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchtriplet['patch0'] = np.flipud(patchtriplet['patch0']).copy()
+            patchtriplet['patch1'] = np.flipud(patchtriplet['patch1']).copy()
+            patchtriplet['patch2'] = np.flipud(patchtriplet['patch2']).copy()
+        if fliplr:
+            patchtriplet['patch0'] = np.fliplr(patchtriplet['patch0']).copy()
+            patchtriplet['patch1'] = np.fliplr(patchtriplet['patch1']).copy()
+            patchtriplet['patch2'] = np.fliplr(patchtriplet['patch2']).copy()
 
         # rearange axis (channels first)
         patchtriplet = channelsfirst(patchtriplet)
@@ -1122,6 +1055,21 @@ class TripletDatasetPreSaved(BaseDataset):
         patchtriplet['patch0'] = images[0]
         patchtriplet['patch1'] = images[1]
         patchtriplet['patch2'] = images[2]
+        
+        rot = np.random.randint(0,4)
+        flipud = np.random.randint(2)
+        fliplr = np.random.randint(2)
+        patchtriplet['patch0'] = np.rot90(patchtriplet['patch0'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch1'] = np.rot90(patchtriplet['patch1'], rot, axes=(0, 1)).copy()
+        patchtriplet['patch2'] = np.rot90(patchtriplet['patch2'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchtriplet['patch0'] = np.flipud(patchtriplet['patch0']).copy()
+            patchtriplet['patch1'] = np.flipud(patchtriplet['patch1']).copy()
+            patchtriplet['patch2'] = np.flipud(patchtriplet['patch2']).copy()
+        if fliplr:
+            patchtriplet['patch0'] = np.fliplr(patchtriplet['patch0']).copy()
+            patchtriplet['patch1'] = np.fliplr(patchtriplet['patch1']).copy()
+            patchtriplet['patch2'] = np.fliplr(patchtriplet['patch2']).copy()
 
         # rearange axis (channels first)
         patchtriplet = channelsfirst(patchtriplet)
@@ -1196,6 +1144,22 @@ class PartlyOverlapDataset(BaseDataset):
         patchpair['patch0'] = images[0]
         patchpair['patch1'] = images[1]
         patchpair['label'] = gt
+        
+        # augmentation
+        rot = np.random.randint(0,4)
+        flipud = np.random.randint(2)
+        fliplr = np.random.randint(2)
+        patchpair['patch0'] = np.rot90(patchpair['patch0'], rot, axes=(0, 1)).copy()
+        patchpair['patch1'] = np.rot90(patchpair['patch1'], rot, axes=(0, 1)).copy()
+        patchpair['label'] = np.rot90(patchpair['label'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchpair['patch0'] = np.flipud(patchpair['patch0']).copy()
+            patchpair['patch1'] = np.flipud(patchpair['patch1']).copy()
+            patchpair['label'] = np.flipud(patchpair['label']).copy()
+        if fliplr:
+            patchpair['patch0'] = np.fliplr(patchpair['patch0']).copy()
+            patchpair['patch1'] = np.fliplr(patchpair['patch1']).copy()
+            patchpair['label'] = np.fliplr(patchpair['label']).copy()
 
         # rearange axis (channels first)
         patchpair = channelsfirst(patchpair)

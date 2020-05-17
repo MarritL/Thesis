@@ -114,15 +114,12 @@ class NetBuilder:
         # initiate weighs 
         if len(weights) > 0:
             print('Loading weights for network...')
-# =============================================================================
-#             if gpu == None:
-#                 net.load_state_dict(
-#                     torch.load(weights), strict=False)
-#                     #torch.load(weights,map_location=torch.device('cpu')), strict=False)
-#             else:
-# =============================================================================
-            net.load_state_dict(
-                torch.load(weights))
+            if gpu == None:
+                net.load_state_dict(
+                    torch.load(weights,map_location=torch.device('cpu')))
+            else:
+                net.load_state_dict(
+                    torch.load(weights))
         else:
             print("Initialize weights for network...")
             net.apply(NetBuilder.init_weight)
