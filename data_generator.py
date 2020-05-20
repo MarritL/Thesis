@@ -92,7 +92,7 @@ class BaseDataset(Dataset):
                 'Nans in image {} after normalization'.format(filename)     
 
         return images
-    
+     
     
     def normalize(self, image, percentile):
         """
@@ -762,6 +762,125 @@ class PairHardNegDataset(BaseDataset):
         
         return patchpair
     
+class SupervisedDataset(BaseDataset):
+    """ Generate dataset with patch triplets, anchor and positive 100% overlap """
+    
+    def __init__(self, data_dir,labels_dir, indices, channels=np.arange(13), patch_size=96, 
+                 percentile=99, one_hot=True, in_memory=False):
+        super(SupervisedDataset, self).__init__(data_dir, indices, channels, 
+                                             patch_size, percentile)
+        
+        self.one_hot = one_hot
+        self.in_memory = in_memory
+        self.labels_dir = labels_dir
+        
+        gt = [str(i)+'.npy' for i in indices]
+        unique_gt = np.unique(gt)
+        images = [str(i)+'_a.npy' for i in indices]
+        images.extend([str(i)+'_b.npy' for i in indices])
+        unique_images = np.unique(images)
+
+        if self.in_memory:
+            # 'reconstruct' the filenames
+            self.allimages = self.get_images_dict(unique_images)
+            self.allgt = get_gt_dict(unique_gt, labels_dir)
+            #self.pos_weight = 1
+            changes = 0
+            tot_pix = 0
+            for filename in unique_gt:
+                tot_pix += self.allgt[filename].shape[0]*self.allgt[filename].shape[1]
+                changes += np.sum(self.allgt[filename])
+            self.pos_weight = [1 * 2 * changes / tot_pix, 2 * (tot_pix - changes) / tot_pix]
+        else:
+            self.pos_weight = [0.05, 1.95]
+    
+    def __getitem__(self, index):
+        'Generates one patch triplet'
+        # Select sample
+        im_idx = self.indices[index]
+            
+        # shuffle pair indices (i.e. a/b)
+        pairidxs = np.random.choice(self.pair_indices, size=2, replace=False)
+
+        # load image
+        filenames = get_filenames(im_idx, pairidxs)
+        gtname = str(im_idx)+'.npy'
+        unique_images = np.unique(filenames)
+        n_images = len(unique_images)
+        if self.in_memory:
+            images = list()
+            for filename in unique_images:
+                    images.append(self.allimages[filename])
+            gts = self.allgt[gtname]
+        else:         
+            # load image
+            images = self.get_images(unique_images)
+            gts = get_gt_dict([gtname], self.labels_dir)[gtname]
+
+        # check if all images have the same shape
+        if n_images > 1:
+            for i in range(n_images-1):
+                assert images[i].shape == images[i+1].shape,\
+                    'Shape not matching in image pair {}'.format(im_idx)
+
+        # sample start locations patches
+        patch_starts = sample_patchpair_ap(
+            images[0].shape, 
+            self.patch_size)
+                
+        # get patches
+        patchpair = self.get_patches_gt(patch_starts, gts, images)
+        
+        # augmentation
+        rot = np.random.randint(0,4)
+        flipud = np.random.randint(2)
+        fliplr = np.random.randint(2)
+        patchpair['patch0'] = np.rot90(patchpair['patch0'], rot, axes=(0, 1)).copy()
+        patchpair['patch1'] = np.rot90(patchpair['patch1'], rot, axes=(0, 1)).copy()
+        patchpair['label'] = np.rot90(patchpair['label'], rot, axes=(0, 1)).copy()
+        if flipud:
+            patchpair['patch0'] = np.flipud(patchpair['patch0']).copy()
+            patchpair['patch1'] = np.flipud(patchpair['patch1']).copy()
+            patchpair['label'] = np.flipud(patchpair['label']).copy()
+        if fliplr:
+            patchpair['patch0'] = np.fliplr(patchpair['patch0']).copy()
+            patchpair['patch1'] = np.fliplr(patchpair['patch1']).copy()
+            patchpair['label'] = np.fliplr(patchpair['label']).copy()
+
+        if self.one_hot:
+            patchpair['label'] = to_categorical(patchpair['label'], num_classes=2)
+            dtype = torch.float32
+        else: 
+            dtype = torch.int64
+            lbl = patchpair['label']
+        
+        # rearange axis (channels first)
+        patchpair = channelsfirst(patchpair)
+        if not self.one_hot:
+            patchpair['label'] = lbl
+                             
+        assert patchpair['patch0'].shape == \
+            patchpair['patch1'].shape, \
+            "Shape not matching in patch pair {}, shape: 0:{} 1:{}"\
+            .format(
+                im_idx, 
+                patchpair['patch0'].shape, 
+                patchpair['patch1'].shape)
+        assert np.any(~np.isnan(patchpair['patch0'])) \
+            & np.any(~np.isnan(patchpair['patch1'])), \
+            "Nans in patch pair {}".format(im_idx)  
+        
+        # add image info
+        patchpair['im_idx'] = torch.as_tensor(im_idx)
+        patchpair['patch_starts'] = torch.as_tensor(patch_starts)
+        
+        # cast to tensors
+        patchpair['patch0'] = torch.as_tensor(patchpair['patch0'])
+        patchpair['patch1'] = torch.as_tensor(patchpair['patch1'])
+        patchpair['label'] = torch.as_tensor(patchpair['label'], dtype=dtype)
+        
+        return patchpair
+
 
 class TripletAPNDataset(BaseDataset):
     """ Generate dataset with patch triplets, anchor and positive 100% overlap """
@@ -1804,3 +1923,32 @@ def sample_patch(im1_shape, patch_size=96):
     patch_starts.append(np.concatenate([patch0_row,patch0_col]))
     
     return patch_starts
+
+def get_gt_dict(filenames, labels_dir):
+    """
+    loads ground truth into memory
+
+    Parameters
+    ----------
+    filenames : list
+        list of filenames (strings)
+
+    Returns
+    -------
+    images : dict
+        dict of np.ndarrays of shape (N,M), filenames are keys
+    """        
+    gt = {}
+    for filename in filenames:
+        gt[filename] = np.load(
+            os.path.join(labels_dir, filename))
+
+        # replace potential nan values 
+        gt[filename][np.isnan(gt[filename])] = 0
+        
+        # normalize
+        gt[filename] -= 1
+        assert np.any(~np.isnan(gt[filename])), \
+            'Nans in image {} after normalization'.format(filename)     
+
+    return gt
