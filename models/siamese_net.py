@@ -24,7 +24,8 @@ class SiameseNet(nn.Module):
         self.classifier = classifier
 
 
-    def forward(self, data, n_branches, extract_features=None, **kwargs):
+    def forward(self, data, n_branches, extract_features=None, 
+                conv_classifier=False, use_softmax=False, **kwargs):
         """
         forward pass through network
 
@@ -81,10 +82,17 @@ class SiameseNet(nn.Module):
         x = self.joint(x)
         if extract_features == 'joint': 
             return x
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        # classification layers
-        x = self.classifier(x)
+        x = nn.functional.adaptive_avg_pool2d(x, (data[0].shape[2], data[0].shape[3]))
+        if not conv_classifier:
+            x = torch.flatten(x, 1)
+            x = self.classifier(x)
+        else:
+            x = self.classifier(x)
+            if use_softmax: # is True during inference
+                x = nn.functional.softmax(x, dim=1)
+            else:
+                x = nn.functional.log_softmax(x, dim=1)
+
         return x
         
      
@@ -117,6 +125,32 @@ def make_layers(cfg, n_channels, batch_norm=False, first_77=False):
             in_channels = v
     return nn.Sequential(*layers)
 
+def make_conv_classifier(cfg, in_channels, batch_norm=False):
+    layers = []
+    in_channels = int(in_channels)    
+    # iterate over layers and add to sequential
+    for v in cfg[:-1]: 
+        if v == 'M':
+            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+        elif v == 'CU':
+            layers += [nn.ConvTranspose2d(in_channels, v, kernel_size=2, stride=2)]
+        elif v == 'BU':
+            layers += [nn.Upsample(scale_factor=8, mode='bilinear')]        # TODO: scale factor hard-coded  
+        else:
+            v = int(v)
+            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
+            if batch_norm:
+                layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
+            else:
+                layers += [conv2d, nn.ReLU(inplace=True)]
+            in_channels = v
+            
+    # last layer no ReLU, 1x1 kernel
+    v = int(cfg[-1])
+    conv2d = nn.Conv2d(in_channels, v, kernel_size=1, padding=0)
+    layers += [conv2d]           
+    return nn.Sequential(*layers)
+
 def make_classifier(cfg, n_channels):
     layers = []
     in_channels = int(n_channels)    
@@ -136,7 +170,8 @@ def make_classifier(cfg, n_channels):
     layers += [linear]        
     return nn.Sequential(*layers)
 
-def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False, n_branches=2):
+
+def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=True, n_branches=2):
     """
     Create network
 
@@ -165,12 +200,13 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
 
     """
     # determine number of max-pool layers
-    n_mpool = np.sum(cfg['branch'] == 'M') + np.sum(cfg['top'] == 'M')    
-
-    if cfg['top'] is not None:
-        n_channels_lin = int(cfg['top'][cfg['top'] != 'CU'][cfg['top'] != 'BU'][-1])
-    else:
-        n_channels_lin = int(cfg['branch'][cfg['branch'] != 'M'][-1])*n_branches
+    n_mpool = np.sum(cfg['branch'] == 'M') + np.sum(cfg['top'] == 'M')   
+    
+    # determine input sizes for input classification layers
+    patch_size_lin = patch_size
+    if len(cfg['top'][cfg['top'] == 'BU'] or cfg['top'][cfg['top'] == 'CU']) == 0:
+        for i in range(n_mpool):
+            patch_size_lin = int(patch_size_lin/2)    
     
     # create layers
     branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm,first_77=False)
@@ -182,16 +218,18 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=False,
         # does nothing because next layer is the same
         joint = nn.AdaptiveAvgPool2d((patch_size, patch_size)) 
     
-    # determine input sizes for input classification layers
-    patch_size_lin = patch_size
-    if len(cfg['top'][cfg['top'] == 'BU'] or cfg['top'][cfg['top'] == 'CU']) == 0:
-        for i in range(n_mpool):
-            patch_size_lin = int(patch_size_lin/2)
-    n_channels_classifier = n_channels_lin * patch_size_lin * patch_size_lin
-    
-    classifier = make_classifier(cfg['classifier'], n_channels_classifier)
+    if cfg['classifier'][0] != 'C':
+        if cfg['top'] is not None:
+            n_channels_lin = int(cfg['top'][cfg['top'] != 'CU'][cfg['top'] != 'BU'][-1])
+        else:
+            n_channels_lin = int(cfg['branch'][cfg['branch'] != 'M'][-1])*n_branches
+        n_channels_classifier = n_channels_lin * patch_size_lin * patch_size_lin  
+        classifier = make_classifier(cfg['classifier'], n_channels_classifier)
+    else:
+       in_channels = cfg['top'][-1]
+       classifier = make_conv_classifier(cfg['classifier'][1:],in_channels,batch_norm=batch_norm)
+        
     # create network
-    #net = SiameseNet(branches, joint, n_channels_lin, n_classes, n_mpool, patch_size) 
     net = SiameseNet(branches, joint, classifier, patch_size_lin) 
     
     print(net)
