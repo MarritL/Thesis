@@ -28,9 +28,11 @@ import numpy as np
 
 def train(directories, dataset_settings, network_settings, train_settings):
 
-    # init tensorboard
+    # init 
     network_name = network_settings['network']
     outputtime = '{}'.format(time.strftime("%d%m%Y_%H%M%S", time.localtime()))
+    if network_settings['cfg2'] != None:
+        outputtime2 = 'N2_{}'.format(time.strftime("%d%m%Y_%H%M%S", time.localtime()))
     #tb_dir = os.path.join(directories['tb_dir'], 'network-{}_date-{}'
     #                      .format(network_name, outputtime))
     #writer = SummaryWriter(logdir=tb_dir)
@@ -78,8 +80,22 @@ def train(directories, dataset_settings, network_settings, train_settings):
         batch_norm=network_settings['batch_norm'],
         n_branches=n_branches,
         weights=network_settings['weights_file'],
-        gpu=train_settings['gpu'])  
+        gpu=train_settings['gpu'])     
     conv_classifier = True if network_settings['cfg']['classifier'][0] == 'C' else False
+    
+    if network_settings['cfg2'] != None:
+        network2 = NetBuilder.build_network(
+            net=network_settings['network'],
+            cfg=network_settings['cfg2'],
+            n_channels=len(dataset_settings['channels']), 
+            n_classes=network_settings['n_classes'],
+            patch_size=network_settings['patch_size'],
+            im_size=network_settings['im_size'],
+            batch_norm=network_settings['batch_norm'],
+            n_branches=n_branches,
+            weights=network_settings['weights_file'],
+            gpu=train_settings['gpu'])     
+        conv_classifier2 = True if network_settings['cfg']['classifier'][0] == 'C' else False
     
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], pos_weight=pos_weight)
     
@@ -88,8 +104,16 @@ def train(directories, dataset_settings, network_settings, train_settings):
         torch.cuda.set_device(train_settings['gpu'])
         network.cuda()
         loss_func = loss_func.cuda()
+        
+        if network_settings['cfg2'] != None:
+            network2.cuda() 
 
     optim = create_optimizer(network_settings['optimizer'], network.parameters(), 
+                             network_settings['lr'], 
+                             weight_decay=network_settings['weight_decay'])
+    
+    if network_settings['cfg2'] != None:
+        optim2 = create_optimizer(network_settings['optimizer'], network2.parameters(), 
                              network_settings['lr'], 
                              weight_decay=network_settings['weight_decay'])
     
@@ -128,6 +152,9 @@ def train(directories, dataset_settings, network_settings, train_settings):
     # save history
     history = {'train': {'epoch': [], 'loss': [], 'acc': []}, 
                'val':{'epoch': [], 'loss': [], 'acc': []}}
+    if network_settings['cfg2'] != None:
+        history2 = {'train': {'epoch': [], 'loss': [], 'acc': []}, 
+               'val':{'epoch': [], 'loss': [], 'acc': []}}
     
     epoch_iters =  max(len(dataset_train) // train_settings['batch_size'],1)
     val_epoch_iters = max(len(dataset_val) // train_settings['batch_size'],1)
@@ -136,6 +163,11 @@ def train(directories, dataset_settings, network_settings, train_settings):
     best_acc = 0.0
     best_epoch = 0
     best_loss = 99999
+    if network_settings['cfg2'] != None:
+        best_net_wts2 = copy.deepcopy(network2.state_dict())
+        best_acc2 = 0.0
+        best_epoch2 = 0
+        best_loss2 = 99999
     
     train_functions = {'train_normal': train_epoch,
                        'train_apn': train_epoch_apn,
@@ -159,56 +191,117 @@ def train(directories, dataset_settings, network_settings, train_settings):
                            train_settings['start_epoch']+train_settings['num_epoch']):
             
             # early stopping
-            if (epoch - best_epoch) > train_settings['early_stopping']:
-                break
-                       
-            #training epoch
-            train_func(
-                network_settings,
-                network=network, 
-                n_branches=n_branches,
-                dataloader=dataloader_train, 
-                optimizer=optim, 
-                loss_func=loss_func,
-                acc_func=acc_func,
-                history=history, 
-                epoch=epoch, 
-                writer=None,
-                epoch_iters=epoch_iters, 
-                disp_iter=train_settings['disp_iter'],
-                gpu = train_settings['gpu'],
-                im_size = network_settings['im_size'],
-                extract_features=network_settings['extract_features'],
-                avg_pool=network_settings['avg_pool'],
-                directories=directories, 
-                network_name=network_name, 
-                outputtime=outputtime,
-                conv_classifier=conv_classifier)
-            
-            # validation epoch
-            best_net_wts, best_acc, best_epoch, best_loss = val_func(
-                network_settings,
-                network=network, 
-                n_branches=n_branches,
-                dataloader=dataloader_val, 
-                loss_func=loss_func,
-                acc_func=acc_func,
-                history=history, 
-                epoch=epoch, 
-                writer=None,
-                val_epoch_iters=val_epoch_iters,
-                best_net_wts=best_net_wts,
-                best_acc=best_acc,
-                best_epoch=best_epoch,
-                best_loss=best_loss,
-                gpu = train_settings['gpu'],
-                im_size = network_settings['im_size'],
-                extract_features=network_settings['extract_features'],
-                avg_pool=network_settings['avg_pool'],
-                directories=directories, 
-                network_name=network_name, 
-                outputtime=outputtime,
-                conv_classifier=conv_classifier)
+            #if (epoch - best_epoch) > train_settings['early_stopping']:
+            #    break
+                                   
+            if network_settings['cfg2'] != None:
+                #training epoch
+                train_func(
+                    network_settings,
+                    network=network, 
+                    network2=network2,
+                    n_branches=n_branches,
+                    dataloader=dataloader_train, 
+                    optimizer=optim, 
+                    optimizer2=optim2, 
+                    loss_func=loss_func,
+                    acc_func=acc_func,
+                    history=history, 
+                    history2=history2, 
+                    epoch=epoch, 
+                    writer=None,
+                    epoch_iters=epoch_iters, 
+                    disp_iter=train_settings['disp_iter'],
+                    gpu = train_settings['gpu'],
+                    im_size = network_settings['im_size'],
+                    extract_features=network_settings['extract_features'],
+                    avg_pool=network_settings['avg_pool'],
+                    directories=directories, 
+                    network_name=network_name, 
+                    outputtime=outputtime,
+                    outputtime2=outputtime2,
+                    conv_classifier=conv_classifier,
+                    conv_classifier2=conv_classifier2)
+                
+                # validation epoch
+                best_net_wts, best_acc, best_epoch, best_loss, best_net_wts2, best_acc2, best_epoch2, best_loss2 = val_func(
+                    network_settings,
+                    network=network,
+                    network2=network2, 
+                    n_branches=n_branches,
+                    dataloader=dataloader_val, 
+                    loss_func=loss_func,
+                    acc_func=acc_func,
+                    history=history,
+                    history2=history2, 
+                    epoch=epoch, 
+                    writer=None,
+                    val_epoch_iters=val_epoch_iters,
+                    best_net_wts=best_net_wts,
+                    best_acc=best_acc,
+                    best_epoch=best_epoch,
+                    best_loss=best_loss,
+                    best_net_wts2=best_net_wts2,
+                    best_acc2=best_acc2,
+                    best_epoch2=best_epoch2,
+                    best_loss2=best_loss2,
+                    gpu = train_settings['gpu'],
+                    im_size = network_settings['im_size'],
+                    extract_features=network_settings['extract_features'],
+                    avg_pool=network_settings['avg_pool'],
+                    directories=directories, 
+                    network_name=network_name, 
+                    outputtime=outputtime,
+                    outputtime2=outputtime2,
+                    conv_classifier=conv_classifier,
+                    conv_classifier2=conv_classifier2)
+            else:
+                train_func(
+                    network_settings,
+                    network=network, 
+                    n_branches=n_branches,
+                    dataloader=dataloader_train, 
+                    optimizer=optim, 
+                    loss_func=loss_func,
+                    acc_func=acc_func,
+                    history=history, 
+                    epoch=epoch, 
+                    writer=None,
+                    epoch_iters=epoch_iters, 
+                    disp_iter=train_settings['disp_iter'],
+                    gpu = train_settings['gpu'],
+                    im_size = network_settings['im_size'],
+                    extract_features=network_settings['extract_features'],
+                    avg_pool=network_settings['avg_pool'],
+                    directories=directories, 
+                    network_name=network_name, 
+                    outputtime=outputtime,
+                    conv_classifier=conv_classifier)
+                
+                # validation epoch
+                best_net_wts, best_acc, best_epoch, best_loss = val_func(
+                    network_settings,
+                    network=network,
+                    n_branches=n_branches,
+                    dataloader=dataloader_val, 
+                    loss_func=loss_func,
+                    acc_func=acc_func,
+                    history=history,
+                    epoch=epoch, 
+                    writer=None,
+                    val_epoch_iters=val_epoch_iters,
+                    best_net_wts=best_net_wts,
+                    best_acc=best_acc,
+                    best_epoch=best_epoch,
+                    best_loss=best_loss,
+                    gpu = train_settings['gpu'],
+                    im_size = network_settings['im_size'],
+                    extract_features=network_settings['extract_features'],
+                    avg_pool=network_settings['avg_pool'],
+                    directories=directories, 
+                    network_name=network_name, 
+                    outputtime=outputtime,
+                    conv_classifier=conv_classifier)
     
     # on keyboard interupt continue the script: saves the best model until interrupt
     except KeyboardInterrupt:
@@ -251,7 +344,44 @@ def train(directories, dataset_settings, network_settings, train_settings):
     torch.save(best_net_wts, savedata['filename'])
     torch.save(history, os.path.join(directories['model_dir'],
                         'history_network-{}_date-{}'.format(network_name, outputtime)))
+    
+    if network_settings['cfg2'] != None:
+        savedata2 = {'filename':os.path.join(directories['model_dir'],
+                    'network-{}_date-{}'.format(network_name, outputtime2)), 
+                   'networkname': network_name, 
+                   'cfg_branch': str(list(network_settings['cfg2']['branch'])), 
+                   'cfg_top': str(list(network_settings['cfg2']['top'])),
+                   'cfg_classifier': str(list(network_settings['cfg2']['classifier'])),
+                   'optimizer': network_settings['optimizer'],
+                   'lr': network_settings['lr'], 
+                   'weight_decay': network_settings['weight_decay'],
+                   'loss': network_settings['loss'],
+                   'n_classes': network_settings['n_classes'],
+                   'n_channels' : len(dataset_settings['channels']),
+                   'patch_size': network_settings['patch_size'],
+                   'batch_norm': network_settings['batch_norm'],
+                   'dataset': dataset_settings['dataset_type'], 
+                   'min_overlap': dataset_settings['min_overlap'],
+                   'max_overlap': dataset_settings['max_overlap'],
+                   'best_acc': best_acc2,
+                   'best_epoch': best_epoch2, 
+                   'best_loss': best_loss2,
+                   'weight': None,
+                   'global_avg_pool': 'False', 
+                   'basis': None,
+                   'n_train_patches': len(dataset_settings['indices_train']), 
+                   'patches_per_image': dataset_settings['patches_per_image'],
+                   'n_val_patches': len(dataset_settings['indices_val'])}
+        with open(os.path.join(directories['intermediate_dir'], 
+                               directories['csv_models']), 'a') as file:
+                filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
+                filewriter.writerow(savedata2)  
         
+        # save best model's weights
+        torch.save(best_net_wts2, savedata2['filename'])
+        torch.save(history2, os.path.join(directories['model_dir'],
+                            'history_network-{}_date-{}'.format(network_name, outputtime2)))
+            
     print('Training Done!')
     #writer.close()
     
@@ -541,7 +671,9 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
                 gpu, im_size, directories, network_name, outputtime, 
                 fieldnames_trainpatches=['epoch', 'im_idx', 'patch_starts'],
-                extract_features=None, avg_pool=False, conv_classifier=False):
+                extract_features=None, avg_pool=False, conv_classifier=False,
+                network2=None, optimizer2=None, history2=None, outputtime2=None,
+                conv_classifier2=None):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     ave_loss = AverageMeter()
@@ -549,6 +681,12 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
     ave_acc = AverageMeter()
     
     network.train() 
+    if network2 != None:
+        batch_time2 = AverageMeter()
+        ave_loss2 = AverageMeter()
+        ave_loss_all2 = AverageMeter()
+        ave_acc2 = AverageMeter()
+        network2.train()
     
     iterator = iter(dataloader)
 
@@ -564,6 +702,8 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
         
         # set gradients to zero
         optimizer.zero_grad()
+        if optimizer2 != None:
+            optimizer2.zero_grad()
         
         # get the inputs
         if n_branches == 1:
@@ -657,31 +797,90 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
                           ave_loss.average(), ave_acc.average()))
             ave_loss_all.update(ave_loss.average())
             ave_loss = AverageMeter()
-            
-    if (i+1) < disp_iter:
-        ave_loss_all_print = ave_loss.average()
-    else:
-        ave_loss_all_print = ave_loss_all.average()
-    print('Train epoch: [{}], Time: {:.2f} ' 
-          'Train_Loss: {:.4f}, Train_Accuracy: {:0.4f}'
+    
+
+#       # NETWORK 2
+        # forward pass 
+        if network2 != None:
+            outputs2 = network2(inputs, n_branches, extract_features=extract_features, 
+                              avg_pool=avg_pool,conv_classifier=conv_classifier2, 
+                              use_softmax=False)
+    
+            if network_settings['loss'] == 'bce_sigmoid+l1reg':  
+                loss2 = loss_func(outputs2, labels, network2.parameters())
+            else:
+                loss2 = loss_func(outputs2, labels)
+            acc2 = acc_func(outputs2, labels, im_size)
+    
+            # Backward
+            loss2.backward()
+            optimizer2.step()
+    
+            # measure elapsed time
+            batch_time2.update(time.time() - tic)
+            tic = time.time()
+    
+            # update average loss and acc
+            ave_loss2.update(loss2.data.item())
+            ave_acc2.update(acc2.item())
+                   
+    
+            # calculate accuracy, and display
+            if (i+1) % disp_iter == 0:
+                print('Epoch N2: [{}][{}/{}], Batch-time: {:.2f}, Data-time: {:.2f}, '
+                      'Loss: {:.4f}, Acc: {:.4f}'
+                      .format(epoch, i+1, epoch_iters,
+                              batch_time2.average(), data_time.average(),
+                              ave_loss2.average(), ave_acc2.average()))
+                ave_loss_all2.update(ave_loss2.average())
+                ave_loss2 = AverageMeter()
+
+
+    if network2 !=None:
+        if (i+1) < disp_iter:
+            ave_loss_all_print = ave_loss.average()
+            ave_loss_all_print2 = ave_loss2.average()
+        else:
+            ave_loss_all_print = ave_loss_all.average()
+            ave_loss_all_print2 = ave_loss_all2.average()
+        print('Train epoch: [{}], Time: {:.2f} ' 
+          'Train_Loss: {:.4f}, Train_Accuracy: {:0.4f}, '
+          'Train_Loss_N2: {:.4f}, Train_Accuracy_N2: {:0.4f}'
           .format(epoch, time.time()-epoch_start,
-                  ave_loss_all_print, ave_acc.average()))
+                  ave_loss_all_print, ave_acc.average(),
+                  ave_loss_all_print2, ave_acc2.average()))
+    else:
+        if (i+1) < disp_iter:
+            ave_loss_all_print = ave_loss.average()
+        else:
+            ave_loss_all_print = ave_loss_all.average()
+        print('Train epoch: [{}], Time: {:.2f} ' 
+              'Train_Loss: {:.4f}, Train_Accuracy: {:0.4f}'
+              .format(epoch, time.time()-epoch_start,
+                      ave_loss_all_print, ave_acc.average()))
     
     if writer != None:
         writer.add_scalar('Train/Loss', ave_loss_all.average(), epoch)
         writer.add_scalar('Train/Acc', ave_acc.average(), epoch)
-    
+        
     if history != None:
         history['train']['epoch'].append(epoch)
         history['train']['loss'].append(ave_loss_all.average())
         history['train']['acc'].append(ave_acc.average())
+    
+    if history2 != None:
+        history2['train']['epoch'].append(epoch)
+        history2['train']['loss'].append(ave_loss_all2.average())
+        history2['train']['acc'].append(ave_acc2.average())
 
 
     
 def validate_epoch(network_settings, network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, 
-             extract_features=None, avg_pool=False, inference=False, conv_classifier=False):    
+             extract_features=None, avg_pool=False, inference=False, conv_classifier=False,
+             network2=None, history2=None, best_net_wts2=None, best_acc2=None, 
+             best_epoch2=None, best_loss2=None, outputtime2=None, conv_classifier2=None):    
 
     time_meter = AverageMeter()
     ave_loss = AverageMeter()
@@ -694,6 +893,12 @@ def validate_epoch(network_settings, network, n_branches, dataloader, loss_func,
         #use_softmax = True
         
     network.eval() 
+    if network2 != None:
+        time_meter2 = AverageMeter()
+        ave_loss2 = AverageMeter()
+        ave_acc2 = AverageMeter()
+        probability2 = AverageMeter()
+        network2.eval()
     
     iterator = iter(dataloader)
 
@@ -759,38 +964,116 @@ def validate_epoch(network_settings, network, n_branches, dataloader, loss_func,
         # measure elapsed time
         time_meter.update(time.time() - tic)
         tic = time.time()
+        
+#        ## NETWORK 2
+        if network2 != None:
+            # forward pass 
+            with torch.no_grad():
+                outputs2 = network2(inputs, n_branches, extract_features=extract_features, 
+                              avg_pool=avg_pool,conv_classifier=conv_classifier2, 
+                              use_softmax=use_softmax)
+    
+            if network_settings['loss'] == 'bce_sigmoid+l1reg':  
+                loss2 = loss_func(outputs2, labels, network2.parameters())
+            else:
+                loss2 = loss_func(outputs2, labels)
+            acc2 = acc_func(outputs2, labels, im_size)    
+            
+            if inference:
+                prob2 = sigmoid(outputs)
+                correct2 = labels*prob2
+                prob_correct2 = torch.sum(correct2)/len(outputs2)       
+                probability2.update(prob_correct2.item())
+    
+            # update average loss and acc
+            ave_loss2.update(loss2.data.item())
+            ave_acc2.update(acc2.item())
+    
+            # measure elapsed time
+            time_meter2.update(time.time() - tic)
+            tic = time.time()
 
-
-    print('Val epoch: [{}], Time: {:.2f}, ' 
+    
+    if network2 != None:
+        print('Val epoch: [{}], Time: {:.2f}, ' 
+          'Val_Loss: {:.4f}, Val_Accuracy: {:0.4f}, '
+          'Val_Loss_N2: {:.4f}, Val_Accuracy_N2: {:0.4f}'
+          .format(epoch, time_meter.value(),
+                  ave_loss.average(), ave_acc.average(),
+                  ave_loss2.average(), ave_acc2.average()))
+        if inference:
+            best_acc = ave_acc.average()
+            best_loss = ave_loss.average()
+            best_prob = probability.average()
+            best_acc2 = ave_acc2.average()
+            best_loss2 = ave_loss2.average()
+            best_prob2 = probability2.average()
+            return best_acc, best_loss, best_prob, best_acc2, best_loss2, best_prob2
+        else:
+            if writer != None:
+                writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
+                writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
+        
+            if ave_loss.average() < best_loss:
+                best_acc = ave_acc.average()
+                best_net_wts = copy.deepcopy(network.state_dict())
+                best_epoch = epoch
+                best_loss = ave_loss.average()
+                torch.save(best_net_wts, os.path.join(directories['model_dir'],
+                                'network-{}_date-{}_epoch-{}_loss-{}_acc-{}'.format(
+                                    network_name, outputtime, epoch, ave_loss.average(), ave_acc.average())))
+            if ave_loss2.average() < best_loss2:   
+                best_acc2 = ave_acc2.average()
+                best_net_wts2 = copy.deepcopy(network2.state_dict())
+                best_epoch2 = epoch
+                best_loss2 = ave_loss2.average()
+                torch.save(best_net_wts2, os.path.join(directories['model_dir'],
+                                'network-{}_date-{}_epoch-{}_loss-{}_acc-{}'.format(
+                                    network_name, outputtime2, epoch, ave_loss2.average(), ave_acc2.average())))
+            
+            if history != None:
+                history['val']['epoch'].append(epoch)
+                history['val']['loss'].append(ave_loss.average())
+                history['val']['acc'].append(ave_acc.average())
+            if history2 != None:
+                history2['val']['epoch'].append(epoch)
+                history2['val']['loss'].append(ave_loss2.average())
+                history2['val']['acc'].append(ave_acc2.average())
+            
+            return(best_net_wts, best_acc, best_epoch, best_loss,
+                   best_net_wts2, best_acc2, best_epoch2, best_loss2)
+        
+    else:
+        print('Val epoch: [{}], Time: {:.2f}, ' 
           'Val_Loss: {:.4f}, Val_Accuracy: {:0.4f}'
           .format(epoch, time_meter.value(),
                   ave_loss.average(), ave_acc.average()))
     
-    if inference:
-        best_acc = ave_acc.average()
-        best_loss = ave_loss.average()
-        best_prob = probability.average()
-        return best_acc, best_loss, best_prob
-    else:
-        if writer != None:
-            writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
-            writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
-    
-        if ave_loss.average() < best_loss:
+        if inference:
             best_acc = ave_acc.average()
-            best_net_wts = copy.deepcopy(network.state_dict())
-            best_epoch = epoch
             best_loss = ave_loss.average()
-            torch.save(best_net_wts, os.path.join(directories['model_dir'],
-                            'network-{}_date-{}_epoch-{}_loss-{}_acc-{}'.format(
-                                network_name, outputtime, epoch, ave_loss.average(), ave_acc.average())))
+            best_prob = probability.average()
+            return best_acc, best_loss, best_prob
+        else:
+            if writer != None:
+                writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
+                writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
         
-        if history != None:
-            history['val']['epoch'].append(epoch)
-            history['val']['loss'].append(ave_loss.average())
-            history['val']['acc'].append(ave_acc.average())
-        
-        return(best_net_wts, best_acc, best_epoch, best_loss)
+            if ave_loss.average() < best_loss:
+                best_acc = ave_acc.average()
+                best_net_wts = copy.deepcopy(network.state_dict())
+                best_epoch = epoch
+                best_loss = ave_loss.average()
+                torch.save(best_net_wts, os.path.join(directories['model_dir'],
+                                'network-{}_date-{}_epoch-{}_loss-{}_acc-{}'.format(
+                                    network_name, outputtime, epoch, ave_loss.average(), ave_acc.average())))
+            
+            if history != None:
+                history['val']['epoch'].append(epoch)
+                history['val']['loss'].append(ave_loss.average())
+                history['val']['acc'].append(ave_acc.average())
+            
+            return(best_net_wts, best_acc, best_epoch, best_loss)
 
 def train_epoch_apn(network_settings, network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
