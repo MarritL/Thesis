@@ -9,15 +9,25 @@ import numpy as np
 import os
 import torch
 
-from extract_features import get_network, calculate_distancemap, calculate_magnitudemap, calculate_changemap
+from train import get_network, determine_branches
+from extract_features import  calculate_distancemap, calculate_magnitudemap, calculate_changemap
 from train import determine_branches, get_dataset
 from plots import normalize2plot
 
 def detect_changes(model_settings, directories, dataset_settings, network_settings, train_settings, threshold_methods=['triangle']):
     
     # get_network
-    n_branches, pos_weight = determine_branches(network_settings, dataset_settings)
-    net = get_network(model_settings) 
+    if model_settings.loc['networkname'].endswith('finetune'): 
+        model_settings.loc['networkname'] = model_settings.loc['networkname'].split('_')[0]
+        model_settings.loc['network'] = model_settings.loc['networkname'].split('_')[0]
+    n_branches = 2
+    net = get_network(model_settings, gpu=train_settings['gpu']) 
+    classifier = model_settings['cfg_classifier'].split("[" )[1]
+    classifier = classifier.split("]" )[0]
+    classifier = classifier.replace("'", "")
+    classifier = classifier.replace(" ", "")
+    classifier = classifier.split(",")
+    conv_classifier = True if classifier[0] == 'C' else False
     
     tp = dict()
     tn = dict()
@@ -47,28 +57,40 @@ def detect_changes(model_settings, directories, dataset_settings, network_settin
         features = net(
             data, 
             n_branches=n_branches, 
-            extract_features=network_settings['extract_features'])       
+            extract_features=network_settings['extract_features'],
+            conv_classifier=conv_classifier, 
+            use_softmax=True)       
         
         features = features.squeeze().detach().numpy()
         
         # calculate the distancemap
-        if network_settings['extract_features'] == 'joint':
-            distmap = calculate_magnitudemap(features)
-        elif network_settings['extract_features'] == 'diff':
-            distmap = calculate_magnitudemap(features)
-        else:
-             raise Exception('distance map calculation not implemented for these settings of extract_features')
-        
-
-        for method in threshold_methods:
-            changemap, threshold = calculate_changemap(distmap, method=method, plot=True)
-            
+        if conv_classifier == True:
+            changemap = np.argmax(features, axis=0)
+            #changemap = features[1] > 0.9
             # calculate change detection accuracy
             cm_pos = changemap > 0    
             tp[method][str(idx)] = np.logical_and(cm_pos, gt_pos).sum()
             tn[method][str(idx)] = np.logical_and(np.logical_not(cm_pos), np.logical_not(gt_pos)).sum()
             fp[method][str(idx)] = np.logical_and(cm_pos, np.logical_not(gt_pos)).sum()
             fn[method][str(idx)] = np.logical_and(np.logical_not(cm_pos), gt_pos).sum()
+        else:
+            if network_settings['extract_features'] == 'joint':
+                distmap = calculate_magnitudemap(features)
+            elif network_settings['extract_features'] == 'diff':
+                distmap = calculate_magnitudemap(features)
+            else:
+                 raise Exception('distance map calculation not implemented for these settings of extract_features')
+            
+    
+            for method in threshold_methods:
+                changemap, threshold = calculate_changemap(distmap, method=method, plot=True)
+                
+                # calculate change detection accuracy
+                cm_pos = changemap > 0    
+                tp[method][str(idx)] = np.logical_and(cm_pos, gt_pos).sum()
+                tn[method][str(idx)] = np.logical_and(np.logical_not(cm_pos), np.logical_not(gt_pos)).sum()
+                fp[method][str(idx)] = np.logical_and(cm_pos, np.logical_not(gt_pos)).sum()
+                fn[method][str(idx)] = np.logical_and(np.logical_not(cm_pos), gt_pos).sum()
 
     return (tp, tn, fp, fn)
             
