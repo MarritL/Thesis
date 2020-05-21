@@ -114,12 +114,12 @@ def train(directories, dataset_settings, network_settings, train_settings):
         dataset_train, 
         batch_size=train_settings['batch_size'], 
         shuffle=True,
-        num_workers = 4)
+        num_workers = 16)
     dataloader_val = DataLoader(
         dataset_val, 
         batch_size=train_settings['batch_size'], 
         shuffle=False,
-        num_workers = 2)
+        num_workers = 16)
     
     if dataset_settings['dataset_type'] == 'supervised':
         pos_weight = dataset_train.pos_weight
