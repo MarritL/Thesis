@@ -796,7 +796,7 @@ def train_epoch_apn(network_settings, network, n_branches, dataloader, optimizer
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
                 gpu, im_size, directories, network_name, outputtime, 
                 fieldnames_trainpatches=['epoch', 'im_idx', 'patch_starts'],
-                extract_features=None, avg_pool=False):
+                extract_features=None, avg_pool=False, conv_classifier=False):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     ave_loss = AverageMeter()
@@ -967,7 +967,7 @@ def train_epoch_apn(network_settings, network, n_branches, dataloader, optimizer
 def validate_epoch_apn(network_settings, network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, 
-             extract_features=None, avg_pool=False, evaluate=False):    
+             extract_features=None, avg_pool=False, evaluate=False, conv_classifier=False):    
 
     ave_loss = AverageMeter()
     ave_lossL1 = AverageMeter()
@@ -1077,7 +1077,7 @@ def train_epoch_unet(network_settings, network, n_branches, dataloader, optimize
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
                 gpu, im_size, directories, network_name, outputtime, 
                 fieldnames_trainpatches=['epoch', 'im_idx', 'patch_starts'],
-                extract_features=None, avg_pool=False):
+                extract_features=None, avg_pool=False, conv_classifier=False):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     ave_loss = AverageMeter()
@@ -1252,7 +1252,7 @@ def train_epoch_unet(network_settings, network, n_branches, dataloader, optimize
 def validate_epoch_unet(network_settings, network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, 
-             extract_features=None, avg_pool=False, evaluate=False):    
+             extract_features=None, avg_pool=False, evaluate=False, conv_classifier=False):    
 
     ave_loss = AverageMeter()
     ave_lossL1 = AverageMeter()
