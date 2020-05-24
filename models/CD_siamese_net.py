@@ -131,9 +131,11 @@ def siamese_cd_net(network, layers_branches, layers_joint,
     if layers_joint != 0:
         last_conv = layers_joint-3
         in_channels = network.joint[last_conv].out_channels
-    else:
+    elif layers_branches != 0:
         last_conv = layers_branches-3
         in_channels = network.branches[last_conv].out_channels
+    else:
+        in_channels = network.branches[0].in_channels
     
     if cfg_classifier[0] != 'C':
         if layers_joint != 0:

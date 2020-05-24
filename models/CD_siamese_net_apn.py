@@ -101,9 +101,12 @@ def cd_siamese_net_apn(network, layers_branches, cfg_classifier,
 
     """
     
-    last_conv = layers_branches-3
-    in_channels = network.branches[last_conv].out_channels
-    
+    if layers_branches != 0:
+        last_conv = layers_branches-3
+        in_channels = network.branches[last_conv].out_channels
+    else:
+        in_channels = network.branches[0].in_channels
+
     if cfg_classifier[0] != 'C':
         n_channels_lin = int(in_channels)
         n_channels_classifier = n_channels_lin * patch_size * patch_size  
