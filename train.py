@@ -101,14 +101,16 @@ def train(directories, dataset_settings, network_settings, train_settings):
         channels=dataset_settings['channels'], 
         one_hot=one_hot, 
         dataset_settings=dataset_settings, 
-        network_settings=network_settings)
+        network_settings=network_settings,
+        directories=directories)
     dataset_val = get_dataset(
         data_path=directories['data_path'], 
         indices=dataset_settings['indices_val'], 
         channels=dataset_settings['channels'], 
         one_hot=one_hot, 
         dataset_settings=dataset_settings, 
-        network_settings=network_settings)
+        network_settings=network_settings,
+        directories=directories)
 
     # Data loaders
     dataloader_train = DataLoader(
@@ -288,7 +290,8 @@ def evaluate(model_settings, directories, dataset_settings, network_settings, tr
         channels=dataset_settings['channels'], 
         one_hot=one_hot, 
         dataset_settings=dataset_settings, 
-        network_settings=network_settings)
+        network_settings=network_settings,
+        directories=directories)
                         
     # Data loaders
     dataloader = DataLoader(
@@ -619,7 +622,8 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
         channels=dataset_settings['channels'], 
         one_hot=one_hot, 
         dataset_settings=dataset_settings, 
-        network_settings=network_settings)
+        network_settings=network_settings,
+        directories=directories)
     if dataset_settings['dataset_type'] == 'supervised_from_file':
          dataset_settings['df'] = dataset_settings['dataset_val_df']    
     dataset_val = get_dataset(
@@ -628,7 +632,8 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
         channels=dataset_settings['channels'], 
         one_hot=one_hot, 
         dataset_settings=dataset_settings, 
-        network_settings=network_settings)
+        network_settings=network_settings,
+        directories=directories)
 
     # Data loaders
     dataloader_train = DataLoader(
@@ -1589,7 +1594,7 @@ def validate_epoch_unet(network_settings, network, n_branches, dataloader, loss_
         
         return(best_net_wts, best_acc, best_epoch, best_loss)
 
-def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network_settings):
+def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network_settings, directories):
         # Datasets
     if dataset_settings['dataset_type'] == 'pair':
         dataset = PairDataset(
@@ -1690,7 +1695,7 @@ def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network
         dataset = SupervisedDataset(
             data_dir=data_path,
             indices=indices, 
-            labels_dir='/media/cordolo/marrit/Intermediate/CD_OSCD/labels_OSCD', 
+            labels_dir=directories['labels_path'], 
             channels=channels,
             one_hot=one_hot,
             in_memory=in_memory)
@@ -1700,7 +1705,7 @@ def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network
             data_dir=data_path,
             indices=indices, 
             patch_starts_df = dataset_settings['df'],
-            labels_dir='/media/cordolo/marrit/Intermediate/CD_OSCD/labels_OSCD', 
+            labels_dir=directories['labels_path'], 
             channels=channels,
             one_hot=one_hot,
             in_memory=in_memory)
@@ -1776,7 +1781,8 @@ def evaluate_features(model_settings, directories, dataset_settings, network_set
         channels=dataset_settings['channels'], 
         one_hot=False, 
         dataset_settings=dataset_settings, 
-        network_settings=network_settings)
+        network_settings=network_settings,
+        directories=directories)
          
     idxs = list()
     for im in dataset_eval.images.keys():
