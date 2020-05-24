@@ -602,17 +602,7 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
  
     
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], pos_weight=pos_weight)
-    
-    # load net to GPU     
-    if train_settings['gpu'] != None:
-        torch.cuda.set_device(train_settings['gpu'])
-        network.cuda()
-        loss_func = loss_func.cuda()
-
-    optim = create_optimizer(network_settings['optimizer'], network.parameters(), 
-                             network_settings['lr'], 
-                             weight_decay=network_settings['weight_decay'])
-    
+        
     # Datasets
     if dataset_settings['dataset_type'] == 'supervised_from_file':
          dataset_settings['df'] = dataset_settings['dataset_train_df']
@@ -650,6 +640,16 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
     if dataset_settings['dataset_type'] == 'supervised' or dataset_settings['dataset_type'] == 'supervised_from_file':
         pos_weight = dataset_train.pos_weight
         loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], pos_weight=pos_weight)
+        
+    # load net to GPU     
+    if train_settings['gpu'] != None:
+        torch.cuda.set_device(train_settings['gpu'])
+        network.cuda()
+        loss_func = loss_func.cuda()
+
+    optim = create_optimizer(network_settings['optimizer'], network.parameters(), 
+                             network_settings['lr'], 
+                             weight_decay=network_settings['weight_decay'])
      
     # save history
     history = {'train': {'epoch': [], 'loss': [], 'acc': []}, 
