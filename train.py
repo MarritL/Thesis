@@ -558,7 +558,7 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
                   'layers_branches', 'layers_joint', 'cfg_classifier_cd',\
                   'optimizer', 'lr', 'weight_decay', 'loss', 'n_classes', \
                   'n_channels','patch_size','batch_norm','dataset','min_overlap',\
-                  'max_overlap', 'best_f1','best_epoch', 'best_loss', 'weight', \
+                  'max_overlap', 'best_avg_acc','best_epoch', 'best_loss', 'weight', \
                   'global_avg_pool', 'n_train_patches', 'patches_per_image', \
                   'n_val_patches', 'kthfold', 'n_eval_patches', 'eval_acc', 'eval_loss', 'eval_prob',\
                   'tp_oscd_eval_triangle', 'tn_oscd_eval_triangle', 'fp_oscd_eval_triangle',\
@@ -744,7 +744,7 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
                 'dataset': dataset_settings['dataset_type'], 
                 'min_overlap': dataset_settings['min_overlap'],
                 'max_overlap': dataset_settings['max_overlap'],
-                'best_f1': best_acc,
+                'best_avg_acc': best_acc,
                 'best_epoch': best_epoch, 
                 'best_loss': best_loss,
                 'weight': None,
@@ -756,15 +756,13 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
                 'kthfold': dataset_settings['kthfold']}
 
     if finetune:
-        if not os.path.exists(os.path.join(directories['intermediate_dir'],directories['csv_models_finetune'])):
-            with open(os.path.join(directories['intermediate_dir'],directories['csv_models_finetune']), 'a') as file:
-                filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
-                filewriter.writerow(savedata)  
+        with open(os.path.join(directories['intermediate_dir'],directories['csv_models_finetune']), 'a') as file:
+            filewriter = csv.DictWriter(file, fieldnames, delimiter = ",", extrasaction='ignore')
+            filewriter.writerow(savedata)  
     else:
-        if not os.path.exists(os.path.join(directories['intermediate_dir'],directories['csv_models_downstream'])):
-            with open(os.path.join(directories['intermediate_dir'],directories['csv_models_downstream']), 'a') as file:
-                filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
-                filewriter.writerow(savedata)  
+        with open(os.path.join(directories['intermediate_dir'],directories['csv_models_downstream']), 'a') as file:
+            filewriter = csv.DictWriter(file, fieldnames, delimiter = ",", extrasaction='ignore')
+            filewriter.writerow(savedata)  
     
     # save best model's weights
     torch.save(best_net_wts, savedata['filename'])

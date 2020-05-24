@@ -158,7 +158,8 @@ def create_loss_function(lossfunction, pos_weight=1):
     acc_functions = {'accuracy': accuracy,
                     'accuracy_onehot':accuracy_onehot,
                     'accuracy_fake':accuracy_fake,
-                    'f1':F1}
+                    'f1':F1,
+                    'avg_accuracy':avg_accuracy}
     
     if lossfunction == 'cross_entropy':
         one_hot = False
@@ -178,7 +179,7 @@ def create_loss_function(lossfunction, pos_weight=1):
         #pos_weight = torch.tensor(pos_weight.clone().detach(), dtype=torch.float)
         pos_weight = torch.tensor(pos_weight)
         loss_func = nn.NLLLoss(pos_weight)
-        acc_func = acc_functions['f1']
+        acc_func = acc_functions['avg_accuracy']
     elif lossfunction == 'l1+triplet':
         one_hot = False
         loss_func = CombinedLossL1()
@@ -249,10 +250,21 @@ def F1(outputs, labels, im_size=(1,1)):
     fp = torch.sum((preds == 1) & (preds != labels))
     tn = torch.sum((preds == 0) & (preds == labels))
     fn = torch.sum((preds == 0) & (preds != labels))
-    precision = tp.float() / (tp.float()+fp.float())
-    recall = tp.float() / (tp.float()+fn.float())
-    f1 = 2 * (precision * recall) / (precision + recall)
+    precision = tp.float() / (tp.float()+fp.float()+1e-10)
+    recall = tp.float() / (tp.float()+fn.float()+1e-10)
+    f1 = 2 * (precision * recall) / (precision + recall+1e-10)
     return f1
+
+def avg_accuracy(outputs, labels, im_size=(1,1)):
+    val, preds = torch.max(outputs, dim=1)
+    tp = torch.sum((preds == 1) & (preds == labels))
+    fp = torch.sum((preds == 1) & (preds != labels))
+    tn = torch.sum((preds == 0) & (preds == labels))
+    fn = torch.sum((preds == 0) & (preds != labels))
+    neg_acc = tn.float() / (tn.float()+fp.float()+1e-10)
+    pos_acc = tp.float() / (tp.float()+fn.float()+1e-10)
+    avg_acc = (neg_acc+pos_acc)/2
+    return avg_acc
 
 class TripletLoss(nn.Module):
     def __init__(self, margin = 1.0):
