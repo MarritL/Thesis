@@ -33,7 +33,7 @@ class SiameseCDNetwork(nn.Module):
         
         if layers_joint > 0:
             self.joint = nn.Sequential(
-                *list(network.branches)[:layers_joint])
+                *list(network.joint)[:layers_joint])
         else:
             self.joint = Identity()
         
