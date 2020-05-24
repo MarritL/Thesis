@@ -14,7 +14,7 @@ from torch.nn import functional as F
 
 from models import siamese_net, hypercolumn_net, siamese_unet_diff, siamese_net_apn, \
     siamese_unet, triplet_unet, siamese_net_dilated, siamese_net_apn_dilated, \
-        siamese_net_concat, logistic_regression
+    siamese_net_concat, logistic_regression, CD_siamese_net, CD_siamese_net_apn
 
 class NetBuilder:
     # custom weights initialization
@@ -123,6 +123,33 @@ class NetBuilder:
         else:
             print("Initialize weights for network...")
             net.apply(NetBuilder.init_weight)
+        
+        return net
+ 
+    @staticmethod
+    def build_cd_network(network, network_name, network_settings):
+        
+        if network_name == 'CD_siamese':
+            net = CD_siamese_net.__dict__['siamese_cd_net'](
+                network=network, 
+                layers_branches=network_settings['layers_branches'], 
+                layers_joint=network_settings['layers_joint'], 
+                cfg_classifier=network_settings['cfg']['classifier_cd'])
+        elif network_name == 'CD_triplet_apn':
+            net = CD_siamese_net_apn.__dict__['cd_siamese_net_apn'](
+                network=network, 
+                layers_branches=network_settings['layers_branches'], 
+                cfg_classifier=network_settings['cfg']['classifier_cd'])
+        else:
+            raise Exception('Architecture undefined!\n \
+                        Choose one of: "siamese", "hypercolumn", \
+                            "siamese_unet_diff", "triplet_apn", "siamese_unet",\
+                            "siamese_dilated", "siamese_apn_dilated", "triplet_unet",\
+                            "siamese_concat", "logistic_regression"')
+
+        # initiate weighs 
+        print("Initialize weights classifier...")
+        net.classifier.apply(NetBuilder.init_weight)
         
         return net
 
@@ -367,7 +394,20 @@ class BCEl1RegLoss(nn.Module):
             
         loss = bce + 1e-4*l1_reg
         return loss
-    
+
+
+
+def init_weight(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.kaiming_normal_(m.weight.data)
+    elif classname.find('BatchNorm') != -1:
+        m.weight.data.fill_(1.)
+        m.bias.data.fill_(1e-4)
+    elif classname.find('Linear') != -1:
+        m.weight.data.normal_(0.0, 0.0001)
+        
+        
 # =============================================================================
 # class CombinedLoss(nn.Module):
 #     def __init__(self, margin = 1.0, weight=1):
