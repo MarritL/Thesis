@@ -69,10 +69,12 @@ def inference(directories, dataset_settings, model_settings, train_settings,
         prob_maps = out.squeeze().detach().cpu().numpy()
         
         save_networkname = model_settings['filename'].split('/')[-1]
-        if not os.path.exists(os.path.join(directories['restuls_dir_cd'], save_networkname,'probability_maps')):
-            os.mkdir(os.path.join(directories['restuls_dir_cd'], save_networkname,'probability_maps'))
+        if not os.path.exists(os.path.join(directories['resuls_dir_cd'], save_networkname)):
+            os.mkdir(os.path.join(directories['resuls_dir_cd'], save_networkname))
+        if not os.path.exists(os.path.join(directories['resuls_dir_cd'], save_networkname,'probability_maps')):
+            os.mkdir(os.path.join(directories['resuls_dir_cd'], save_networkname,'probability_maps'))
         
-        np.save(os.path.join(directories['restuls_dir_cd'], save_networkname,'probability_maps',str(idx)+'.png'), prob_maps)
+        np.save(os.path.join(directories['resuls_dir_cd'], save_networkname,'probability_maps',str(idx)+'.png'), prob_maps)
     
         print('\r {}/{}'.format(q+1, len(dataset_settings['indices_test'])))
         
