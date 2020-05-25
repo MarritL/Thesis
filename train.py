@@ -1939,4 +1939,5 @@ def get_downstream_network(model_settings, gpu, n_branches):
         weights=model_settings['filename'],
         gpu=gpu)  
         
-    return net
+    conv_classifier = True if model_settings['cfg']['classifier'][0] == 'C' else False
+    return net, conv_classifier
