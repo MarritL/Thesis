@@ -117,12 +117,12 @@ def train(directories, dataset_settings, network_settings, train_settings):
         dataset_train, 
         batch_size=train_settings['batch_size'], 
         shuffle=True,
-        num_workers = 16)
+        num_workers = 4)
     dataloader_val = DataLoader(
         dataset_val, 
         batch_size=train_settings['batch_size'], 
         shuffle=False,
-        num_workers = 16)
+        num_workers = 2)
     
     if dataset_settings['dataset_type'] == 'supervised':
         pos_weight = dataset_train.pos_weight
@@ -721,6 +721,11 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
                 outputtime=outputtime,
                 conv_classifier=conv_classifier,
                 model_dir=model_dir)
+            
+            if epoch+1 % 5 == 0:
+                torch.save(best_net_wts, os.path.join(model_dir,
+                            'network-{}_date-{}_epoch-{}'.format(
+                                network_name, outputtime, epoch)))
     
     # on keyboard interupt continue the script: saves the best model until interrupt
     except KeyboardInterrupt:
