@@ -45,7 +45,7 @@ def inference(directories, dataset_settings, model_settings, train_settings,
         torch.cuda.set_device(train_settings['gpu'])
         network.cuda()
        
-    for q, idx in enumerate(dataset_settings['test_indices']):
+    for q, idx in enumerate(dataset_settings['indices_test']):
         # get filenames
         filenames = [str(idx)+'_a.npy', str(idx)+'_b.npy']
         # prepare images
@@ -74,7 +74,7 @@ def inference(directories, dataset_settings, model_settings, train_settings,
         
         np.save(os.path.join(directories['restuls_dir_cd'], save_networkname,'probability_maps',str(idx)+'.png'), prob_maps)
     
-        print('\r {}/{}'.format(q+1, len(dataset_settings['test_indices'])))
+        print('\r {}/{}'.format(q+1, len(dataset_settings['indices_test'])))
         
     print('all probability maps saved!')
 
