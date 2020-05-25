@@ -332,6 +332,9 @@ def evaluate(model_settings, directories, dataset_settings, network_settings, tr
 
     return best_acc, best_loss, best_prob
 
+
+
+    
 # =============================================================================
 # def finetune(model_settings, directories, dataset_settings, network_settings, train_settings):
 # 
@@ -781,6 +784,8 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
         
     print('Done!')
     #writer.close()
+    
+    
     
 def train_epoch(network_settings, network, n_branches, dataloader, optimizer, loss_func, 
                 acc_func, history, epoch, writer, epoch_iters, disp_iter,
@@ -1859,6 +1864,68 @@ def get_network(model_settings, gpu):
     extra_settings = {'min_overlap': 1,
                       'max_overlap': 1}
     n_branches, pos_weight = determine_branches(model_settings, extra_settings)
+        
+    net = NetBuilder.build_network(
+        net=model_settings['network'],
+        cfg=model_settings['cfg'],
+        n_channels=int(model_settings['n_channels']), 
+        n_classes=int(model_settings['n_classes']),
+        patch_size=int(model_settings['patch_size']),
+        im_size=(96,96),
+        batch_norm=model_settings['batch_norm'],
+        n_branches=n_branches,
+        weights=model_settings['filename'],
+        gpu=gpu)  
+        
+    return net
+
+def get_downstream_network(model_settings, gpu, n_branches):
+    
+    # batch_norm saved as string cast back to bool
+    if model_settings['batch_norm'] == 'False' : 
+        model_settings['batch_norm'] = False
+    elif model_settings['batch_norm'] == 'True' : 
+        model_settings['batch_norm'] = True
+    
+    # cfgs are saved as strings, cast back to list
+    branch = model_settings['cfg_branch'].split("[" )[1]
+    branch = branch.split("]" )[0]
+    branch = branch.replace("'", "")
+    branch = branch.replace(" ", "")
+    branch = branch.split(",")
+    if model_settings['batch_norm']:
+        layers_branch = int(model_settings['layers_branches'] / 3)
+    else: 
+        layers_branch = int(model_settings['layers_branches'] / 2)
+    branch = branch[:layers_branch]   
+    classifier = model_settings['cfg_classifier_cd'].split("[" )[1]
+    classifier = classifier.split("]" )[0]
+    classifier = classifier.replace("'", "")
+    classifier = classifier.replace(" ", "")
+    classifier = classifier.split(",")
+    top = model_settings['cfg_top'].split("[" )[1]
+    top = top.split("]" )[0]
+    top = top.replace("'", "")
+    top = top.replace(" ", "")
+    top = top.split(",")
+    if model_settings['batch_norm']:
+        layers_joint= int(model_settings['layers_joint'] / 3)
+    else: 
+        layers_joint = int(model_settings['layers_joint'] / 2)
+    if layers_joint == 0:
+        model_settings['cfg'] = {'branch': np.array(branch, dtype='object'), 
+                             'top': None,
+                             'classifier': np.array(classifier, dtype='object')}
+    else:
+        top = top[:layers_joint]       
+        model_settings['cfg'] = {'branch': np.array(branch, dtype='object'), 
+                             'top': np.array(top,dtype='object'),
+                             'classifier': np.array(classifier, dtype='object')}
+   
+    # build network
+    model_settings['network'] = model_settings['networkname']
+   
+    n_branches = 2
         
     net = NetBuilder.build_network(
         net=model_settings['network'],

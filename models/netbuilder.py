@@ -104,12 +104,20 @@ class NetBuilder:
                 n_channels=n_channels,
                 n_classes=n_classes, 
                 patch_size=patch_size)
+        elif net == 'CD_siamese': 
+            net = siamese_net.__dict__['siamese_net'](
+                cfg=cfg, 
+                n_channels=n_channels,                                                       
+                n_classes=n_classes, 
+                patch_size=patch_size,
+                batch_norm=batch_norm,
+                n_branches=n_branches) 
         else:
             raise Exception('Architecture undefined!\n \
                         Choose one of: "siamese", "hypercolumn", \
                             "siamese_unet_diff", "triplet_apn", "siamese_unet",\
                             "siamese_dilated", "siamese_apn_dilated", "triplet_unet",\
-                            "siamese_concat", "logistic_regression"')
+                            "siamese_concat", "logistic_regression", "CD_siamese"')
 
         # initiate weighs 
         if len(weights) > 0:

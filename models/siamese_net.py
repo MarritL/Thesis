@@ -8,6 +8,7 @@ Created on Tue Jan 28 15:55:01 2020
 import torch
 import torch.nn as nn
 import numpy as np
+from CD_siamese_net import Identity
 torch.manual_seed(0)
 
 __all__ = ['siamese_net']
@@ -204,19 +205,24 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=True, 
     
     # determine input sizes for input classification layers
     patch_size_lin = patch_size
-    if len(cfg['top'][cfg['top'] == 'BU'] or cfg['top'][cfg['top'] == 'CU']) == 0:
+    if cfg['top'] is not None:
+        if len(cfg['top'][cfg['top'] == 'BU'] or cfg['top'][cfg['top'] == 'CU']) == 0:
+            for i in range(n_mpool):
+                patch_size_lin = int(patch_size_lin/2)    
+    else:
         for i in range(n_mpool):
-            patch_size_lin = int(patch_size_lin/2)    
+                patch_size_lin = int(patch_size_lin/2) 
     
     # create layers
     branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm,first_77=False)
-    if cfg['top'] is not None:
+    if cfg['top'] is not None: 
         joint = make_layers(cfg['top'],
                             int(cfg['branch'][cfg['branch'] != 'M'][-1])*(n_branches-1),
                             batch_norm=batch_norm)
     else:
         # does nothing because next layer is the same
-        joint = nn.AdaptiveAvgPool2d((patch_size, patch_size)) 
+        #joint = nn.AdaptiveAvgPool2d((patch_size, patch_size)) 
+        joint = Identity()
     
     if cfg['classifier'][0] != 'C':
         if cfg['top'] is not None:
@@ -226,8 +232,13 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=True, 
         n_channels_classifier = n_channels_lin * patch_size_lin * patch_size_lin  
         classifier = make_classifier(cfg['classifier'], n_channels_classifier)
     else:
-       in_channels = cfg['top'][-1]
-       classifier = make_conv_classifier(cfg['classifier'][1:],in_channels,batch_norm=batch_norm)
+        if cfg['top'] is not None:
+            in_channels = cfg['top'][-1]
+        elif cfg['branch'] is not None:
+            in_channels = int(cfg['branch'][cfg['branch'] != 'M'][-1])
+        else:
+            in_channels = n_channels
+        classifier = make_conv_classifier(cfg['classifier'][1:],in_channels,batch_norm=batch_norm)
         
     # create network
     net = SiameseNet(branches, joint, classifier, patch_size_lin) 
