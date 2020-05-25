@@ -49,7 +49,7 @@ def inference(directories, dataset_settings, model_settings, train_settings,
         # get filenames
         filenames = [str(idx)+'_a.npy', str(idx)+'_b.npy']
         # prepare images
-        images = load_images(directories['data_dir'], filenames, channels=channels)    
+        images = load_images(directories['data_path'], filenames, channels=channels)    
         for filename in filenames:
             images[filename] = normalize2plot(images[filename], percentile)      
         images = channelsfirst(images)
