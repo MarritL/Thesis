@@ -8,7 +8,7 @@ Created on Tue Jan 28 15:55:01 2020
 import torch
 import torch.nn as nn
 import numpy as np
-from CD_siamese_net import Identity
+from models.CD_siamese_net import Identity
 torch.manual_seed(0)
 
 __all__ = ['siamese_net']
