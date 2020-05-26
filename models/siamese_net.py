@@ -8,7 +8,7 @@ Created on Tue Jan 28 15:55:01 2020
 import torch
 import torch.nn as nn
 import numpy as np
-from models.CD_siamese_net import Identity
+#from models.CD_siamese_net import Identity
 torch.manual_seed(0)
 
 __all__ = ['siamese_net']
@@ -170,6 +170,13 @@ def make_classifier(cfg, n_channels):
     linear = nn.Linear(in_channels, v)
     layers += [linear]        
     return nn.Sequential(*layers)
+
+class Identity(nn.Module):
+    def __init__(self):
+        super(Identity, self).__init__()
+        
+    def forward(self, x):
+        return x
 
 
 def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=True, n_branches=2):
