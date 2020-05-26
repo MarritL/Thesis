@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from plots import normalize2plot, plot_changemap_colors
 from data_generator import channelsfirst
 from train import get_downstream_network
+from extract_features import calculate_changemap
 
 def load_images(data_dir, filenames, channels=np.arange(13)):
     
@@ -83,7 +84,29 @@ def inference(directories, dataset_settings, model_settings, train_settings,
         print('\r {}/{}'.format(q+1, len(dataset_settings['indices_test'])))
         
     print('all probability maps saved!')
+  
+def inference_on_images(network, images, conv_classifier, 
+                        n_branches=2, gpu=None, extract_features=None,
+                        avg_pool=None, use_softmax=False):
     
+    network.eval() 
+    
+    inputs = list()
+    for im in images: 
+        if gpu != None:
+            inputs.append(images[im].float().cuda())
+        else:
+            inputs.append(images[im].float())               
+         
+    # forward pass 
+    with torch.no_grad():
+        outputs = network(inputs, n_branches, extract_features=extract_features, 
+                      avg_pool=avg_pool,conv_classifier=conv_classifier, 
+                      use_softmax=use_softmax)
+
+    probabilities = softmax(outputs, dim=1)
+
+    return probabilities
     
 def find_best_threshold(directories, indices, model_settings):
     
@@ -223,29 +246,85 @@ def find_best_threshold(directories, indices, model_settings):
         print('\r {}/{}'.format(q+1, len(indices)))
     return thresholds_f1, f1s, recalls, precisions, thresholds_avg_acc, tnrs, tprs, avg_accs
 
-
+def apply_best_threshold(directories, indices, model_settings, threshold, threshold_name):
+    
+    save_networkname = model_settings['filename'].split('/')[-1]
+    prob_dir = os.path.join(directories['results_dir_cd'], save_networkname,'probability_maps')
+    
+    if not os.path.exists(os.path.join(directories['results_dir_cd'],  save_networkname,'result_testset')):
+        os.mkdir(os.path.join(directories['results_dir_cd'], save_networkname,'result_testset')) 
+        
+    # init save-file
+    fieldnames = ['im_idx', 'kthfold', 'filename','pretask_filename','networkname', \
+              'layers_branches', 'layers_joint', 'cfg_classifier_cd',\
+              'threshold', 'threshold_name', 'tp', 'tn', 'fp', 'fn', \
+               'precision', 'recall', 'f1', 'neg_acc', 'pos_acc', 'avg_acc']
+    if not os.path.exists(os.path.join(directories['results_dir_cd'], save_networkname,'result_testset', 'quantitative_results.csv')):
+        with open(os.path.join(directories['results_dir_cd'], save_networkname,'result_testset', 'quantitative_results.csv'), 'a') as file:
+            filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
+            filewriter.writeheader()
+    
+    for q, idx in enumerate(indices):
+        filename = str(idx)+'.npy'
+        prob = np.load(os.path.join(prob_dir, filename))
+        prob_change = prob[1]
+        
+        # plot          
+        fig, ax = plt.subplots(figsize=(5,5))
+        ax.imshow(prob_change>threshold, cmap='gray')
+        ax.axis('off')
+        plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_testset', 
+                                     str(idx)+'_GRAY_threshold-'+threshold_name+'-'+str(threshold)'.png'))
+        plt.show()
+        
+        if os.path.exisits(os.path.join(directories['labels_path'], filename)):
+            gt = np.load(os.path.join(directories['labels_path'], filename))
+            gt = gt-1
+            fig, ax = plt.subplots()
+            ax.imshow(gt, cmap='gray')
+            ax.axis('off')
+            plt.show())
+    
+            prediction = prob_change>threshold
+            fig, ax = plot_changemap_colors(gt, prediction, axis=False, title=None)
+            plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'result_testset', 
+                                     str(idx)+'_COLOR_threshold-'+threshold_name+'-'+str(threshold)'.png'))
+            plt.show()
             
-def inference_on_images(network, images, conv_classifier, 
-                        n_branches=2, gpu=None, extract_features=None,
-                        avg_pool=None, use_softmax=False):
-    
-    network.eval() 
-    
-    inputs = list()
-    for im in images: 
-        if gpu != None:
-            inputs.append(images[im].float().cuda())
-        else:
-            inputs.append(images[im].float())               
-         
-    # forward pass 
-    with torch.no_grad():
-        outputs = network(inputs, n_branches, extract_features=extract_features, 
-                      avg_pool=avg_pool,conv_classifier=conv_classifier, 
-                      use_softmax=use_softmax)
-
-    probabilities = softmax(outputs, dim=1)
-
-    return probabilities
-      
+            tp = np.sum(prediction == 1) & (prediction == gt))
+            fp = np.sum((prediction == 1) & (prediction != gt))
+            tn = np.sum((prediction == 0) & (prediction == gt))
+            fn = np.sum((prediction == 0) & (prediction != gt))
+            precision = tp.float() / (tp.float()+fp.float()+1e-10)
+            recall = tp.float() / (tp.float()+fn.float()+1e-10)
+            f1 = 2 * (precision * recall) / (precision + recall+1e-10)
+            neg_acc = tn.float() / (tn.float()+fp.float()+1e-10)
+            pos_acc = tp.float() / (tp.float()+fn.float()+1e-10)
+            avg_acc = (neg_acc+pos_acc)/2
+       
+            # save in csv
+            with open(os.path.join(directories['results_dir_cd'], save_networkname, 'best_thresholds.csv' ), 'a') as file:
+                filewriter = csv.DictWriter(file, fieldnames, delimiter = ",", extrasaction='ignore')
+                filewriter.writerow({'im_idx': idx, 
+                                 'kthfold': model_settings['kthfold'],
+                                 'filename': model_settings['filename'],
+                                 'pretask_filename': model_settings['pretask_filename'],
+                                 'networkname': model_settings['networkname'], 
+                                 'layers_branches': model_settings['layers_branches'], 
+                                 'layers_joint': model_settings['layers_joint'], 
+                                 'cfg_classifier_cd': model_settings['cfg_classifier_cd'],
+                                 'threshold_name': threshold_name, 
+                                 'threshold': threshold, 
+                                 'tp': tp, 
+                                 'tn': tn, 
+                                 'fp': fp, 
+                                 'fn': fn, 
+                                 'precision': precision, 
+                                 'recall': recall, 
+                                 'f1': f1, 
+                                 'neg_acc': neg_acc, 
+                                 'pos_acc': pos_acc, 
+                                 'avg_acc': avg_acc})  
+                               
+        print('\r {}/{}'.format(q+1, len(indices))) 
    
