@@ -257,7 +257,7 @@ def apply_best_threshold(directories, indices, model_settings, threshold, thresh
     # init save-file
     fieldnames = ['im_idx', 'kthfold', 'filename','pretask_filename','networkname', \
               'layers_branches', 'layers_joint', 'cfg_classifier_cd',\
-              'threshold', 'threshold_name', 'tp', 'tn', 'fp', 'fn', \
+              'threshold_name', 'threshold', 'tp', 'tn', 'fp', 'fn', \
                'precision', 'recall', 'f1', 'neg_acc', 'pos_acc', 'avg_acc']
     if not os.path.exists(os.path.join(directories['results_dir_cd'], save_networkname,'result_testset', 'quantitative_results.csv')):
         with open(os.path.join(directories['results_dir_cd'], save_networkname,'result_testset', 'quantitative_results.csv'), 'a') as file:
