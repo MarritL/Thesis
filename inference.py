@@ -98,7 +98,7 @@ def find_best_threshold(directories, indices, model_settings):
     tprs = list()
     avg_accs = list()
 
-    for idx in indices:
+    for q, idx in enumerate(indices):
         filename = str(idx)+'.npy'
         prob = np.load(os.path.join(prob_dir, filename))
         prob_change = prob[1]
@@ -153,7 +153,8 @@ def find_best_threshold(directories, indices, model_settings):
                              str(idx)+'_threshold-'+str(best_threshold2)+'_avg_acc-'+str(best_avg_acc)), 
                 prob_change>best_threshold2)
         
-        return thresholds_f1, f1s, recalls, precisions, thresholds_avg_acc, tnrs, tprs, avg_acc
+        print('\r {}/{}'.format(q+1, len(indices)))
+    return thresholds_f1, f1s, recalls, precisions, thresholds_avg_acc, tnrs, tprs, avg_acc
 
 
             
