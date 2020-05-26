@@ -608,7 +608,7 @@ def plot_changemap_colors(changemap, gt, title='Change map', axis=True):
 
     changemap_colors = np.stack((255*gt,255*changemap,255*gt),2).astype(np.int)
  
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(5,5))
     ax.imshow(changemap_colors)
     ax.set_title(title)
     if not axis:
