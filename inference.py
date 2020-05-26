@@ -291,7 +291,7 @@ def apply_best_threshold(directories, indices, model_settings, threshold, thresh
                                      str(idx)+'_COLOR_threshold-'+threshold_name+'-'+str(threshold)+'.png'))
             plt.show()
             
-            tp = np.sum(prediction == 1) & (prediction == gt))
+            tp = np.sum((prediction == 1) & (prediction == gt))
             fp = np.sum((prediction == 1) & (prediction != gt))
             tn = np.sum((prediction == 0) & (prediction == gt))
             fn = np.sum((prediction == 0) & (prediction != gt))
