@@ -8,6 +8,7 @@ Created on Mon May 25 16:41:53 2020
 import os
 import numpy as np
 import torch
+import csv
 from torch.nn.functional import softmax
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import roc_curve
@@ -97,6 +98,15 @@ def find_best_threshold(directories, indices, model_settings):
     tnrs = list()
     tprs = list()
     avg_accs = list()
+    
+    # init save-file
+    fieldnames = ['im_idx', 'kthfold', 'filename','pretask_filename','networkname', \
+              'layers_branches', 'layers_joint', 'cfg_classifier_cd',\
+              'threshold_f1', 'f1', 'threshold_avg_acc', 'avg_acc']
+    if not os.path.exists(os.path.join(directories['results_dir_cd'], save_networkname, 'best_thresholds.csv' )):
+        with open(os.path.join(directories['results_dir_cd'], save_networkname, 'best_thresholds.csv' ), 'a') as file:
+            filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
+            filewriter.writeheader()
 
     for q, idx in enumerate(indices):
         filename = str(idx)+'.npy'
@@ -193,6 +203,22 @@ def find_best_threshold(directories, indices, model_settings):
                              str(idx)+'_tnr'), tnr)
         np.save(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_avg_acc',
                              str(idx)+'_avg_acc'), avg_acc)
+
+        # save in csv
+        with open(os.path.join(directories['results_dir_cd'], save_networkname, 'best_thresholds.csv' ), 'a') as file:
+            filewriter = csv.DictWriter(file, fieldnames, delimiter = ",", extrasaction='ignore')
+            filewriter.writerow({'im_idx': idx, 
+                                 'kthfold': model_settings['kthfold'],
+                                 'filename': model_settings['filename'],
+                                 'pretask_filename': model_settings['pretask_filename'],
+                                 'networkname': model_settings['networkname'], 
+                                 'layers_branches': model_settings['layers_branches'], 
+                                 'layers_joint': model_settings['layers_joint'], 
+                                 'cfg_classifier_cd': model_settings['cfg_classifier_cd'],
+                                 'threshold_f1': best_threshold, 
+                                 'f1': best_f1, 
+                                 'threshold_avg_acc': best_threshold2, 
+                                 'avg_acc': best_avg_acc})  
 
         print('\r {}/{}'.format(q+1, len(indices)))
     return thresholds_f1, f1s, recalls, precisions, thresholds_avg_acc, tnrs, tprs, avg_accs
