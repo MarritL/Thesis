@@ -283,7 +283,7 @@ def apply_best_threshold(directories, indices, model_settings, threshold, thresh
             fig, ax = plt.subplots()
             ax.imshow(gt, cmap='gray')
             ax.axis('off')
-            plt.show())
+            plt.show()
     
             prediction = prob_change>threshold
             fig, ax = plot_changemap_colors(gt, prediction, axis=False, title=None)
