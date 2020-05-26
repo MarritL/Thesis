@@ -421,15 +421,17 @@ def plot_sampled_triplets(image_folder, image_list, patch1_start, patch2_start, 
         nrows = 1
         ncols = 6
     
-    fig = plt.figure(constrained_layout=constrained_layout)
+    fig = plt.figure(constrained_layout=constrained_layout)#, figsize=(10,20))
     gs = fig.add_gridspec(nrows, ncols)
     
     # create squars for the patches. Note: first columns than rows
     patch_locs = []
+    colors = ['r','g','b']
     patch_starts = [patch1_start, patch2_start, patch3_start]
-    for start in patch_starts:
-        patch_locs.append(patches.Rectangle((start[::-1]),patch_size,patch_size,linewidth=2,edgecolor='r',facecolor='none'))
-        patch_locs.append(patches.Rectangle((start[::-1]),patch_size,patch_size,linewidth=1,linestyle =(0, (3, 3)),edgecolor='r',facecolor='none'))       
+    for q, start in enumerate(patch_starts):
+        patch_locs.append(patches.Rectangle((start[::-1]),patch_size,patch_size,linewidth=2,edgecolor=colors[q],facecolor='none'))
+        #patch_locs.append(patches.Rectangle((start[::-1]),patch_size,patch_size,linewidth=2,edgecolor='r',facecolor='none'))
+        #patch_locs.append(patches.Rectangle((start[::-1]),patch_size,patch_size,linewidth=1,linestyle =(0, (3, 3)),edgecolor='r',facecolor='none'))       
         
     ax = []
     images = []
@@ -473,10 +475,12 @@ def plot_sampled_triplets(image_folder, image_list, patch1_start, patch2_start, 
             ax[ax_pos].add_patch(patch_locs[i*2])
         else:
             ax_pos = ord(file.split('.')[0].split('_')[1])-97
-            ax[ax_pos].add_patch(patch_locs[(i*2)])
+            #ax[ax_pos].add_patch(patch_locs[(i*2)])
+            ax[ax_pos].add_patch(patch_locs[(i)])
             not_ax = 1 if ax_pos == 0 else 0
-            ax[not_ax].add_patch(patch_locs[i+((i+1)*1)])
-        ax[ax_pos].text(patch_locs[(i*2)].xy[0], patch_locs[(i*2)].xy[1]+patch_size/2+20, 'p'+str(i+1), fontsize=10, color='r')
+            #ax[not_ax].add_patch(patch_locs[i+((i+1)*1)])
+        #ax[ax_pos].text(patch_locs[(i*2)].xy[0], patch_locs[(i*2)].xy[1]+patch_size/2+20, 'p'+str(i+1), fontsize=10, color='r')
+        #ax[ax_pos].text(patch_locs[(i)].xy[0], patch_locs[(i)].xy[1]+patch_size/2+20, 'p'+str(i+1), fontsize=10, color=colors[i])
         
         # plot patch. Note: subsetting in numpy, thus again first rows than columns      
         if plot_patches:
@@ -604,7 +608,7 @@ def plot_changemap_colors(changemap, gt, title='Change map', axis=True):
 
     changemap_colors = np.stack((255*gt,255*changemap,255*gt),2).astype(np.int)
  
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots()
     ax.imshow(changemap_colors)
     ax.set_title(title)
     if not axis:
