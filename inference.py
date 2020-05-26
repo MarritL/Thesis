@@ -13,7 +13,7 @@ from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
 
-from plots import normalize2plot
+from plots import normalize2plot, plot_changemap_colors
 from data_generator import channelsfirst
 from train import get_downstream_network
 
@@ -120,10 +120,13 @@ def find_best_threshold(directories, indices, model_settings):
         f1s.append(f1)
         recalls.append(recall)
         precisions.append(precision)
-        fig, ax = plt.subplots()
-        ax.imshow(prob_change>best_threshold, cmap='gray')
-        ax.axis('off')
-        plt.show()
+# =============================================================================
+#         fig, ax = plt.subplots()
+#         ax.imshow(prob_change>best_threshold, cmap='gray')
+#         ax.axis('off')
+#         plt.show()
+# =============================================================================
+        fig, ax = plot_changemap_colors(gt, prob_change>best_threshold, axis=False, title=None)
         
         if not os.path.exists(os.path.join(directories['results_dir_cd'], 
                                            save_networkname,'threshold_f1')):
@@ -148,10 +151,13 @@ def find_best_threshold(directories, indices, model_settings):
         tnrs.append(tnr)
         tprs.append(tpr)
         avg_accs.append(avg_acc)
-        fig, ax = plt.subplots()
-        ax.imshow(prob_change>best_threshold2, cmap='gray')
-        ax.axis('off')
-        plt.show()
+# =============================================================================
+#         fig, ax = plt.subplots()
+#         ax.imshow(prob_change>best_threshold2, cmap='gray')
+#         ax.axis('off')
+#         plt.show()
+# =============================================================================
+        fig, ax = plot_changemap_colors(gt, prob_change>best_threshold2, axis=False, title=None)
         
         if not os.path.exists(os.path.join(directories['results_dir_cd'], 
                                            save_networkname,'threshold_avg_acc')):
