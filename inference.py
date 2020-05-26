@@ -9,6 +9,9 @@ import os
 import numpy as np
 import torch
 from torch.nn.functional import softmax
+from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import roc_curve
+import matplotlib.pyplot as plt
 
 from plots import normalize2plot
 from data_generator import channelsfirst
@@ -74,11 +77,42 @@ def inference(directories, dataset_settings, model_settings, train_settings,
         if not os.path.exists(os.path.join(directories['results_dir_cd'], save_networkname,'probability_maps')):
             os.mkdir(os.path.join(directories['results_dir_cd'], save_networkname,'probability_maps'))
         
-        np.save(os.path.join(directories['results_dir_cd'], save_networkname,'probability_maps',str(idx)+'.png'), prob_maps)
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname,'probability_maps',str(idx)), prob_maps)
     
         print('\r {}/{}'.format(q+1, len(dataset_settings['indices_test'])))
         
     print('all probability maps saved!')
+    
+    
+def find_best_threshold(directories, indices, model_settings):
+    
+    save_networkname = model_settings['filename'].split('/')[-1]
+    prob_dir = os.path.join(directories['results_dir_cd'], save_networkname,'probability_maps')
+    
+    for idx in indices:
+        filename = str(idx)+'.png.npy'
+        prob = np.load(os.path.join(prob_dir, filename))
+        prob_change = prob[1]
+        
+        gt = np.load(os.path.join(directories['labels_path'], filename))
+        gt = gt-1
+        
+        precision, recall, thresholds = precision_recall_curve(gt.ravel(), prob_change.ravel())
+        f1 = (2*precision*recall)/(precision+recall)
+        best_f1 = np.nanmax(f1)
+        best_threshold = thresholds[np.nanargmax(f1)]
+        best_recall = recall[np.nanargmax(f1)]
+        best_precision = precision[np.nanargmax(f1)]
+        plt.imshow(prob_change>best_threshold)
+        
+        fpr, tpr, thresholds = roc_curve(gt.ravel(), prob_change.ravel())
+        tnr = 1-fpr
+        avg_acc = (tpr+tnr)/2
+        best_avg_acc = avg_acc[np.nanargmax(avg_acc)]
+        best_threshold2 = thresholds[np.nanargmax(avg_acc)]
+        best_tpr = tpr[np.nanargmax(avg_acc)] # Sensitivity
+        best_tnr = tnr[np.nanargmax(avg_acc)] # Specificity
+        plt.imshow(prob_change>best_threshold2)
 
 def inference_on_images(network, images, conv_classifier, 
                         n_branches=2, gpu=None, extract_features=None,
