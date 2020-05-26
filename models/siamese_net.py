@@ -208,7 +208,10 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=True, 
 
     """
     # determine number of max-pool layers
-    n_mpool = np.sum(cfg['branch'] == 'M') + np.sum(cfg['top'] == 'M')   
+    if cfg['branch'] is not None:
+        n_mpool = np.sum(cfg['branch'] == 'M') + np.sum(cfg['top'] == 'M')   
+    else:
+        n_mpool = 0
     
     # determine input sizes for input classification layers
     patch_size_lin = patch_size
@@ -221,7 +224,10 @@ def siamese_net(cfg, n_channels=13,n_classes=2, patch_size=96, batch_norm=True, 
                 patch_size_lin = int(patch_size_lin/2) 
     
     # create layers
-    branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm,first_77=False)
+    if cfg['branch'] is not None:
+        branches = make_layers(cfg['branch'],n_channels,batch_norm=batch_norm,first_77=False)
+    else:
+        branches = Identity()
     if cfg['top'] is not None: 
         joint = make_layers(cfg['top'],
                             int(cfg['branch'][cfg['branch'] != 'M'][-1])*(n_branches-1),

@@ -1912,7 +1912,11 @@ def get_downstream_network(model_settings, gpu, n_branches):
         layers_joint= int(model_settings['layers_joint'] / 3)
     else: 
         layers_joint = int(model_settings['layers_joint'] / 2)
-    if layers_joint == 0:
+    if layers_branch == 0:
+        model_settings['cfg'] = {'branch': None, 
+                             'top': None,
+                             'classifier': np.array(classifier, dtype='object')}
+    elif layers_joint == 0:
         model_settings['cfg'] = {'branch': np.array(branch, dtype='object'), 
                              'top': None,
                              'classifier': np.array(classifier, dtype='object')}
