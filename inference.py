@@ -105,7 +105,9 @@ def find_best_threshold(directories, indices, model_settings):
         
         gt = np.load(os.path.join(directories['labels_path'], filename))
         gt = gt-1
-        plt.imshow(gt, cmap='gray')
+        fig, ax = plt.subplots()
+        ax.imshow(gt, cmap='gray')
+        ax.axis('off')
         plt.show()
         
         precision, recall, thresholds = precision_recall_curve(gt.ravel(), prob_change.ravel())
@@ -118,6 +120,10 @@ def find_best_threshold(directories, indices, model_settings):
         f1s.append(f1)
         recalls.append(recall)
         precisions.append(precision)
+        fig, ax = plt.subplots()
+        ax.imshow(prob_change>best_threshold, cmap='gray')
+        ax.axis('off')
+        plt.show()
         
         if not os.path.exists(os.path.join(directories['results_dir_cd'], 
                                            save_networkname,'threshold_f1')):
@@ -142,6 +148,10 @@ def find_best_threshold(directories, indices, model_settings):
         tnrs.append(tnr)
         tprs.append(tpr)
         avg_accs.append(avg_acc)
+        fig, ax = plt.subplots()
+        ax.imshow(prob_change>best_threshold2, cmap='gray')
+        ax.axis('off')
+        plt.show()
         
         if not os.path.exists(os.path.join(directories['results_dir_cd'], 
                                            save_networkname,'threshold_avg_acc')):
