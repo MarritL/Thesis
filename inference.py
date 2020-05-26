@@ -274,7 +274,7 @@ def apply_best_threshold(directories, indices, model_settings, threshold, thresh
         ax.imshow(prob_change>threshold, cmap='gray')
         ax.axis('off')
         plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_testset', 
-                                     str(idx)+'_GRAY_threshold-'+threshold_name+'-'+str(threshold)'.png'))
+                                     str(idx)+'_GRAY_threshold-'+threshold_name+'-'+str(threshold)+'.png'))
         plt.show()
         
         if os.path.exisits(os.path.join(directories['labels_path'], filename)):
@@ -288,7 +288,7 @@ def apply_best_threshold(directories, indices, model_settings, threshold, thresh
             prediction = prob_change>threshold
             fig, ax = plot_changemap_colors(gt, prediction, axis=False, title=None)
             plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'result_testset', 
-                                     str(idx)+'_COLOR_threshold-'+threshold_name+'-'+str(threshold)'.png'))
+                                     str(idx)+'_COLOR_threshold-'+threshold_name+'-'+str(threshold)+'.png'))
             plt.show()
             
             tp = np.sum(prediction == 1) & (prediction == gt))
