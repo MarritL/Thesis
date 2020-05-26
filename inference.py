@@ -154,7 +154,7 @@ def find_best_threshold(directories, indices, model_settings):
                 prob_change>best_threshold2)
         
         print('\r {}/{}'.format(q+1, len(indices)))
-    return thresholds_f1, f1s, recalls, precisions, thresholds_avg_acc, tnrs, tprs, avg_acc
+    return thresholds_f1, f1s, recalls, precisions, thresholds_avg_acc, tnrs, tprs, avg_accs
 
 
             
