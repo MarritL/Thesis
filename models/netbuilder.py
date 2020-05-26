@@ -14,8 +14,9 @@ from torch.nn import functional as F
 
 from models import siamese_net, hypercolumn_net, siamese_unet_diff, siamese_net_apn, \
     siamese_unet, triplet_unet, siamese_net_dilated, siamese_net_apn_dilated, \
-    siamese_net_concat, logistic_regression, CD_siamese_net, CD_siamese_net_apn
-
+    siamese_net_concat, logistic_regression, CD_siamese_net, CD_siamese_net_apn, \
+    CD_siamese_net_apn_classifier    
+        
 class NetBuilder:
     # custom weights initialization
     @staticmethod
@@ -112,6 +113,14 @@ class NetBuilder:
                 patch_size=patch_size,
                 batch_norm=batch_norm,
                 n_branches=n_branches) 
+        elif net == 'CD_triplet_apn':
+            net = CD_siamese_net_apn_classifier.__dict__['siamese_net_apn_classifier'](
+                cfg=cfg, 
+                n_channels=n_channels,
+                n_classes=n_classes, 
+                batch_norm=batch_norm,
+                patch_size=patch_size,
+                n_branches=n_branches)
         else:
             raise Exception('Architecture undefined!\n \
                         Choose one of: "siamese", "hypercolumn", \
