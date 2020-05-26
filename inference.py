@@ -126,7 +126,7 @@ def find_best_threshold(directories, indices, model_settings):
         np.save(os.path.join(directories['results_dir_cd'], 
                              save_networkname,
                              'threshold_f1',
-                             str(idx)+'_threshold-'+str(best_threshold)+'_f1-',str(best_f1)), 
+                             str(idx)+'_threshold-'+str(best_threshold)+'_f1-'+str(best_f1)), 
                 prob_change>best_threshold)
     
         
@@ -150,7 +150,7 @@ def find_best_threshold(directories, indices, model_settings):
         np.save(os.path.join(directories['results_dir_cd'], 
                              save_networkname,
                              'threshold_avg_acc',
-                             str(idx)+'_threshold-'+str(best_threshold2)+'_avg_acc-',str(best_avg_acc)), 
+                             str(idx)+'_threshold-'+str(best_threshold2)+'_avg_acc-'+str(best_avg_acc)), 
                 prob_change>best_threshold2)
         
         return thresholds_f1, f1s, recalls, precisions, thresholds_avg_acc, tnrs, tprs, avg_acc
