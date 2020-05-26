@@ -89,13 +89,24 @@ def find_best_threshold(directories, indices, model_settings):
     save_networkname = model_settings['filename'].split('/')[-1]
     prob_dir = os.path.join(directories['results_dir_cd'], save_networkname,'probability_maps')
     
+    thresholds_f1 = list()
+    f1s = list()
+    recalls = list()
+    precisions = list()
+    thresholds_avg_acc = list()
+    tnrs = list()
+    tprs = list()
+    avg_acc = list()
+
     for idx in indices:
-        filename = str(idx)+'.png.npy'
+        filename = str(idx)+'.npy'
         prob = np.load(os.path.join(prob_dir, filename))
         prob_change = prob[1]
         
         gt = np.load(os.path.join(directories['labels_path'], filename))
         gt = gt-1
+        plt.imshow(gt, cmap='gray')
+        plt.show()
         
         precision, recall, thresholds = precision_recall_curve(gt.ravel(), prob_change.ravel())
         f1 = (2*precision*recall)/(precision+recall)
@@ -103,7 +114,22 @@ def find_best_threshold(directories, indices, model_settings):
         best_threshold = thresholds[np.nanargmax(f1)]
         best_recall = recall[np.nanargmax(f1)]
         best_precision = precision[np.nanargmax(f1)]
-        plt.imshow(prob_change>best_threshold)
+        thresholds_f1.append(thresholds)    
+        f1s.append(f1)
+        recalls.append(recall)
+        precisions.append(precision)
+        
+        if not os.path.exists(os.path.join(directories['results_dir_cd'], 
+                                           save_networkname,'threshold_f1')):
+            os.mkdir(os.path.join(directories['results_dir_cd'], 
+                                  save_networkname,'threshold_f1'))       
+        np.save(os.path.join(directories['results_dir_cd'], 
+                             save_networkname,
+                             'threshold_f1',
+                             str(idx)+'_threshold-'+str(best_threshold)+'_f1-',str(best_f1)), 
+                prob_change>best_threshold)
+    
+        
         
         fpr, tpr, thresholds = roc_curve(gt.ravel(), prob_change.ravel())
         tnr = 1-fpr
@@ -112,8 +138,25 @@ def find_best_threshold(directories, indices, model_settings):
         best_threshold2 = thresholds[np.nanargmax(avg_acc)]
         best_tpr = tpr[np.nanargmax(avg_acc)] # Sensitivity
         best_tnr = tnr[np.nanargmax(avg_acc)] # Specificity
-        plt.imshow(prob_change>best_threshold2)
+        thresholds_avg_acc.append(thresholds)
+        tnrs.append(tnr)
+        tprs.append(tpr)
+        avg_acc.append(avg_acc)
+        
+        if not os.path.exists(os.path.join(directories['results_dir_cd'], 
+                                           save_networkname,'threshold_avg_acc')):
+            os.mkdir(os.path.join(directories['results_dir_cd'], 
+                                  save_networkname,'threshold_avg_acc'))       
+        np.save(os.path.join(directories['results_dir_cd'], 
+                             save_networkname,
+                             'threshold_avg_acc',
+                             str(idx)+'_threshold-'+str(best_threshold2)+'_avg_acc-',str(best_avg_acc)), 
+                prob_change>best_threshold2)
+        
+        return thresholds_f1, f1s, recalls, precisions, thresholds_avg_acc, tnrs, tprs, avg_acc
 
+
+            
 def inference_on_images(network, images, conv_classifier, 
                         n_branches=2, gpu=None, extract_features=None,
                         avg_pool=None, use_softmax=False):
