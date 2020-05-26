@@ -96,7 +96,7 @@ def find_best_threshold(directories, indices, model_settings):
     thresholds_avg_acc = list()
     tnrs = list()
     tprs = list()
-    avg_acc = list()
+    avg_accs = list()
 
     for idx in indices:
         filename = str(idx)+'.npy'
@@ -141,7 +141,7 @@ def find_best_threshold(directories, indices, model_settings):
         thresholds_avg_acc.append(thresholds)
         tnrs.append(tnr)
         tprs.append(tpr)
-        avg_acc.append(avg_acc)
+        avg_accs.append(avg_acc)
         
         if not os.path.exists(os.path.join(directories['results_dir_cd'], 
                                            save_networkname,'threshold_avg_acc')):
