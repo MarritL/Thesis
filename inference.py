@@ -110,6 +110,7 @@ def find_best_threshold(directories, indices, model_settings):
         ax.axis('off')
         plt.show()
         
+        # calculate f1 for various thresholds
         precision, recall, thresholds = precision_recall_curve(gt.ravel(), prob_change.ravel())
         f1 = (2*precision*recall)/(precision+recall)
         best_f1 = np.nanmax(f1)
@@ -120,26 +121,35 @@ def find_best_threshold(directories, indices, model_settings):
         f1s.append(f1)
         recalls.append(recall)
         precisions.append(precision)
-# =============================================================================
-#         fig, ax = plt.subplots()
-#         ax.imshow(prob_change>best_threshold, cmap='gray')
-#         ax.axis('off')
-#         plt.show()
-# =============================================================================
+
+        if not os.path.exists(os.path.join(directories['results_dir_cd'],  save_networkname,'threshold_f1')):
+            os.mkdir(os.path.join(directories['results_dir_cd'], save_networkname,'threshold_f1'))    
+         
+        # plots
         fig, ax = plot_changemap_colors(gt, prob_change>best_threshold, axis=False, title=None)
+        plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_f1', 
+                                 str(idx)+'_COLOR_threshold-'+str(best_threshold)+'_f1-'+str(best_f1)+'.png'))
         
-        if not os.path.exists(os.path.join(directories['results_dir_cd'], 
-                                           save_networkname,'threshold_f1')):
-            os.mkdir(os.path.join(directories['results_dir_cd'], 
-                                  save_networkname,'threshold_f1'))       
-        np.save(os.path.join(directories['results_dir_cd'], 
-                             save_networkname,
-                             'threshold_f1',
+        fig, ax = plt.subplots(figsize=(5,5))
+        ax.imshow(prob_change>best_threshold, cmap='gray')
+        ax.axis('off')
+        plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_f1', 
+                                 str(idx)+'_GRAY_threshold-'+str(best_threshold)+'_f1-'+str(best_f1)+'.png'))
+        plt.show()
+        
+        # save also numpy array
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname,'threshold_f1',
                              str(idx)+'_threshold-'+str(best_threshold)+'_f1-'+str(best_f1)), 
                 prob_change>best_threshold)
-    
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname,'threshold_f1',
+                             str(idx)+'_recall'), recall)
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname,'threshold_f1',
+                             str(idx)+'_precision'), precision)
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname,'threshold_f1',
+                             str(idx)+'_f1'), f1)
+   
         
-        
+        # calculate average accuracy for various thresholds
         fpr, tpr, thresholds = roc_curve(gt.ravel(), prob_change.ravel())
         tnr = 1-fpr
         avg_acc = (tpr+tnr)/2
@@ -151,24 +161,39 @@ def find_best_threshold(directories, indices, model_settings):
         tnrs.append(tnr)
         tprs.append(tpr)
         avg_accs.append(avg_acc)
-# =============================================================================
-#         fig, ax = plt.subplots()
-#         ax.imshow(prob_change>best_threshold2, cmap='gray')
-#         ax.axis('off')
-#         plt.show()
-# =============================================================================
-        fig, ax = plot_changemap_colors(gt, prob_change>best_threshold2, axis=False, title=None)
+       
+        # SAVE
+        if not os.path.exists(os.path.join(directories['results_dir_cd'], save_networkname,'threshold_avg_acc')):
+            os.mkdir(os.path.join(directories['results_dir_cd'], save_networkname,'threshold_avg_acc'))   
         
-        if not os.path.exists(os.path.join(directories['results_dir_cd'], 
-                                           save_networkname,'threshold_avg_acc')):
-            os.mkdir(os.path.join(directories['results_dir_cd'], 
-                                  save_networkname,'threshold_avg_acc'))       
-        np.save(os.path.join(directories['results_dir_cd'], 
-                             save_networkname,
-                             'threshold_avg_acc',
+        # plots
+        fig, ax = plot_changemap_colors(gt, prob_change>best_threshold2, axis=False, title=None)
+        plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_avg_acc',
+                             str(idx)+'_COLOR_threshold-'+str(best_threshold2)+'_avg_acc-'+str(best_avg_acc)+'.png'))
+        
+        fig, ax = plt.subplots(figsize=(5,5))
+        ax.imshow(prob_change>best_threshold2, cmap='gray')
+        ax.axis('off')
+        plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_avg_acc',
+                             str(idx)+'_GRAY_threshold-'+str(best_threshold2)+'_avg_acc-'+str(best_avg_acc)+'.png'))
+        plt.show()
+        
+        # np array
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_avg_acc',
                              str(idx)+'_threshold-'+str(best_threshold2)+'_avg_acc-'+str(best_avg_acc)), 
                 prob_change>best_threshold2)
         
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_avg_acc',
+                             str(idx)+'_thresholds'), thresholds)
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_avg_acc',
+                             str(idx)+'_fpr'), fpr)
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_avg_acc',
+                             str(idx)+'_tpr'), tpr)
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_avg_acc',
+                             str(idx)+'_tnr'), tnr)
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_avg_acc',
+                             str(idx)+'_avg_acc'), avg_acc)
+
         print('\r {}/{}'.format(q+1, len(indices)))
     return thresholds_f1, f1s, recalls, precisions, thresholds_avg_acc, tnrs, tprs, avg_accs
 
