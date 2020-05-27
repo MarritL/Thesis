@@ -113,7 +113,23 @@ class NetBuilder:
                 patch_size=patch_size,
                 batch_norm=batch_norm,
                 n_branches=n_branches) 
+        elif net == 'FINETUNE_siamese': 
+            net = siamese_net.__dict__['siamese_net'](
+                cfg=cfg, 
+                n_channels=n_channels,                                                       
+                n_classes=n_classes, 
+                patch_size=patch_size,
+                batch_norm=batch_norm,
+                n_branches=n_branches) 
         elif net == 'CD_triplet_apn':
+            net = CD_siamese_net_apn_classifier.__dict__['siamese_net_apn_classifier'](
+                cfg=cfg, 
+                n_channels=n_channels,
+                n_classes=n_classes, 
+                batch_norm=batch_norm,
+                patch_size=patch_size,
+                n_branches=n_branches)
+        elif net == 'FINETUNE_triplet_apn':
             net = CD_siamese_net_apn_classifier.__dict__['siamese_net_apn_classifier'](
                 cfg=cfg, 
                 n_channels=n_channels,
@@ -152,18 +168,7 @@ class NetBuilder:
                 layers_branches=network_settings['layers_branches'], 
                 layers_joint=network_settings['layers_joint'], 
                 cfg_classifier=network_settings['cfg']['classifier_cd'])
-        elif network_name == 'FINETUNE_siamese':
-            net = CD_siamese_net.__dict__['siamese_cd_net'](
-                network=network, 
-                layers_branches=network_settings['layers_branches'], 
-                layers_joint=network_settings['layers_joint'], 
-                cfg_classifier=network_settings['cfg']['classifier_cd'])
         elif network_name == 'CD_triplet_apn':
-            net = CD_siamese_net_apn.__dict__['cd_siamese_net_apn'](
-                network=network, 
-                layers_branches=network_settings['layers_branches'], 
-                cfg_classifier=network_settings['cfg']['classifier_cd'])
-        elif network_name == 'FINETUNE_triplet_apn':
             net = CD_siamese_net_apn.__dict__['cd_siamese_net_apn'](
                 network=network, 
                 layers_branches=network_settings['layers_branches'], 
