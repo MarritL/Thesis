@@ -49,7 +49,7 @@ def inference(directories, dataset_settings, model_settings, train_settings,
     if model_settings['networkname'].startswith('CD') or model_settings['networkname'].startswith('FINETUNE'):
         network, conv_classifier = get_downstream_network(model_settings, train_settings['gpu'], n_branches)
     else:
-        network = get_network(model_settings, train_settings['gpu'], n_branches)
+        network = get_network(model_settings, train_settings['gpu'])
         conv_classifier = True
     # load net to GPU     
     if train_settings['gpu'] != None:
