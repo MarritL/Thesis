@@ -18,7 +18,7 @@ import gdal, ogr, os, osr
 
 from plots import normalize2plot, plot_changemap_colors
 from data_generator import channelsfirst
-from train import get_downstream_network
+from train import get_downstream_network, get_network
 from extract_features import calculate_changemap
 
 def load_images(data_dir, filenames, channels=np.arange(13)):
@@ -46,7 +46,11 @@ def inference(directories, dataset_settings, model_settings, train_settings,
     
     # get network
     n_branches = 2
-    network, conv_classifier = get_downstream_network(model_settings, train_settings['gpu'], n_branches)
+    if model_settings['networkname'].startswith('CD') or model_settings['networkname'].startswith('FINETUNE'):
+        network, conv_classifier = get_downstream_network(model_settings, train_settings['gpu'], n_branches)
+    else:
+        network = get_network(model_settings, train_settings['gpu'], n_branches)
+        conv_classifier = True
     # load net to GPU     
     if train_settings['gpu'] != None:
         torch.cuda.set_device(train_settings['gpu'])
