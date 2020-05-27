@@ -93,8 +93,10 @@ def train(directories, dataset_settings, network_settings, train_settings):
     optim = create_optimizer(network_settings['optimizer'], network.parameters(), 
                              network_settings['lr'], 
                              weight_decay=network_settings['weight_decay'])
-    
-    # Datasets
+       
+        # Datasets
+    if dataset_settings['dataset_type'] == 'supervised_from_file':
+         dataset_settings['df'] = dataset_settings['dataset_train_df']
     dataset_train = get_dataset(
         data_path=directories['data_path'], 
         indices=dataset_settings['indices_train'], 
@@ -103,6 +105,8 @@ def train(directories, dataset_settings, network_settings, train_settings):
         dataset_settings=dataset_settings, 
         network_settings=network_settings,
         directories=directories)
+    if dataset_settings['dataset_type'] == 'supervised_from_file':
+         dataset_settings['df'] = dataset_settings['dataset_val_df']    
     dataset_val = get_dataset(
         data_path=directories['data_path'], 
         indices=dataset_settings['indices_val'], 
