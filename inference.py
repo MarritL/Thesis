@@ -13,6 +13,8 @@ from torch.nn.functional import softmax
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
+import gdal, ogr, os, osr
+
 
 from plots import normalize2plot, plot_changemap_colors
 from data_generator import channelsfirst
@@ -268,16 +270,30 @@ def apply_best_threshold(directories, indices, model_settings, threshold, thresh
         filename = str(idx)+'.npy'
         prob = np.load(os.path.join(prob_dir, filename))
         prob_change = prob[1]
+        prediction = prob_change>threshold
         
         # plot          
         fig, ax = plt.subplots(figsize=(5,5))
         ax.imshow(prob_change>threshold, cmap='gray')
         ax.axis('off')
-        plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'threshold_testset', 
+        plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'result_testset', 
                                      str(idx)+'_GRAY_threshold-'+threshold_name+'-'+str(threshold)+'.png'))
         plt.show()
         
-        if os.path.exisits(os.path.join(directories['labels_path'], filename)):
+        # save numpy array
+        np.save(os.path.join(directories['results_dir_cd'], save_networkname, 'result_testset', 
+                     str(idx)+'_threshold-'+threshold_name+'-'+str(threshold)), 
+                        prediction)
+        
+        # save ENVI raw
+        prediction = prediction.astype(np.int64) + 1
+        array2raster(os.path.join(directories['results_dir_cd'], save_networkname, 'result_testset', 
+                                  str(idx)+'_threshold-'+threshold_name+'-'+str(threshold)+ '.raw'),(0,0),1,1, prediction) # convert array to raster 
+
+        
+        
+        if os.path.exists(os.path.join(directories['labels_path'], filename)):
+            prediction = prob_change>threshold
             gt = np.load(os.path.join(directories['labels_path'], filename))
             gt = gt-1
             fig, ax = plt.subplots()
@@ -285,7 +301,7 @@ def apply_best_threshold(directories, indices, model_settings, threshold, thresh
             ax.axis('off')
             plt.show()
     
-            prediction = prob_change>threshold
+
             fig, ax = plot_changemap_colors(gt, prediction, axis=False, title=None)
             plt.savefig(os.path.join(directories['results_dir_cd'], save_networkname, 'result_testset', 
                                      str(idx)+'_COLOR_threshold-'+threshold_name+'-'+str(threshold)+'.png'))
@@ -295,15 +311,15 @@ def apply_best_threshold(directories, indices, model_settings, threshold, thresh
             fp = np.sum((prediction == 1) & (prediction != gt))
             tn = np.sum((prediction == 0) & (prediction == gt))
             fn = np.sum((prediction == 0) & (prediction != gt))
-            precision = tp.float() / (tp.float()+fp.float()+1e-10)
-            recall = tp.float() / (tp.float()+fn.float()+1e-10)
+            precision = tp / (tp+fp+1e-10)
+            recall = tp / (tp+fn+1e-10)
             f1 = 2 * (precision * recall) / (precision + recall+1e-10)
-            neg_acc = tn.float() / (tn.float()+fp.float()+1e-10)
-            pos_acc = tp.float() / (tp.float()+fn.float()+1e-10)
+            neg_acc = tn / (tn+fp+1e-10)
+            pos_acc = tp / (tp+fn+1e-10)
             avg_acc = (neg_acc+pos_acc)/2
        
             # save in csv
-            with open(os.path.join(directories['results_dir_cd'], save_networkname, 'best_thresholds.csv' ), 'a') as file:
+            with open(os.path.join(directories['results_dir_cd'], save_networkname, 'quantitative_results.csv' ), 'a') as file:
                 filewriter = csv.DictWriter(file, fieldnames, delimiter = ",", extrasaction='ignore')
                 filewriter.writerow({'im_idx': idx, 
                                  'kthfold': model_settings['kthfold'],
@@ -328,3 +344,36 @@ def apply_best_threshold(directories, indices, model_settings, threshold, thresh
                                
         print('\r {}/{}'.format(q+1, len(indices))) 
    
+# =============================================================================
+# def convert_to_esp(directories, indices, model_settings):
+#     
+#     save_networkname = model_settings['filename'].split('/')[-1]
+#     changemap_dir = os.path.join(directories['results_dir_cd'], save_networkname, 'result_testset')
+#         
+#     for q, idx in enumerate(indices):
+#         filename = str(idx)+'.npy'
+#         prob = np.load(os.path.join(prob_dir, filename))
+#         prob_change = prob[1]
+#         
+# 
+#     changemap = changemap.astype(np.int64) + 1
+#     array2raster(os.path.join(directories['results_dir'],model_settings['filename'].split('/')[-1], 'testset_' +  model_settings['cd_method'] + '_method-triangle_layer-' + model_settings['extract_layers'],city + '.raw'),(0,0),1,1,changemap) # convert array to raster 
+# 
+# =============================================================================
+
+def array2raster(newRasterfn,rasterOrigin,pixelWidth,pixelHeight,array):
+
+    cols = array.shape[1]
+    rows = array.shape[0]
+    originX = rasterOrigin[0]
+    originY = rasterOrigin[1]
+
+    driver = gdal.GetDriverByName('ENVI')
+    outRaster = driver.Create(newRasterfn, cols, rows, 1, gdal.GDT_Byte)
+    outRaster.SetGeoTransform((originX, pixelWidth, 0, originY, 0, pixelHeight))
+    outband = outRaster.GetRasterBand(1)
+    outband.WriteArray(array)
+    outRasterSRS = osr.SpatialReference()
+    outRasterSRS.ImportFromEPSG(4326)
+    outRaster.SetProjection(outRasterSRS.ExportToWkt())
+    outband.FlushCache()
