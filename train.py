@@ -128,7 +128,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
         shuffle=False,
         num_workers = 2)
     
-    if dataset_settings['dataset_type'] == 'supervised':
+    if dataset_settings['dataset_type'] == 'supervised' or dataset_settings['dataset_type'] == 'supervised_from_file':
         pos_weight = dataset_train.pos_weight
         loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], pos_weight=pos_weight)
      
