@@ -237,7 +237,11 @@ def create_loss_function(lossfunction, pos_weight=1):
         pos_weight = torch.tensor(pos_weight)
         one_hot = True
         loss_func = BCEl1RegLoss(pos_weight=pos_weight)
-        acc_func = acc_functions['accuracy_onehot']      
+        acc_func = acc_functions['accuracy_onehot']  
+    elif lossfunction == 'F1loss':
+        one_hot = True
+        loss_func = F1Loss()
+        acc_func = acc_functions['f1']   
     else:
         raise Exception('loss function not implemented! \n \
                         Choose one of: "cross_entropy", "bce_sigmoid" \
@@ -278,6 +282,7 @@ def accuracy_fake(outputs, labels, im_size=(1,1)):
     return torch.max(labels).float()
 
 def F1(outputs, labels, im_size=(1,1)):
+    _, labels = torch.max(labels, dim=1)
     val, preds = torch.max(outputs, dim=1)
     tp = torch.sum((preds == 1) & (preds == labels))
     fp = torch.sum((preds == 1) & (preds != labels))
@@ -318,6 +323,54 @@ class TripletLoss(nn.Module):
         else:
             raise Exception('reduction undefined! \n \
                             Choose one of: "mean", "sum", "none"!')
+                            
+
+class F1Loss(nn.Module):
+    def __init__(self):
+        super(F1Loss, self).__init__()
+    
+    def forward(self, outputs, labels, im_size=(1,1)):
+        outputs = torch.nn.functional.softmax(outputs, dim=1) 
+        tp = torch.sum(labels*outputs, axis=0)
+        #tn = torch.sum((1-labels)*(1-outputs), axis=0)
+        fp = torch.sum((1-labels)*outputs, axis=0)
+        fn = torch.sum(labels*(1-outputs), axis=0)
+        precision = tp.float() / (tp.float()+fp.float()+1e-10)
+        recall = tp.float() / (tp.float()+fn.float()+1e-10)
+        f1 = 2 * (precision * recall) / (precision + recall+1e-10)
+        return 1 - torch.mean(f1)
+
+    
+
+# =============================================================================
+# def f1(y_true, y_pred):
+#     y_pred = K.round(y_pred)
+#     tp = K.sum(K.cast(y_true*y_pred, 'float'), axis=0)
+#     tn = K.sum(K.cast((1-y_true)*(1-y_pred), 'float'), axis=0)
+#     fp = K.sum(K.cast((1-y_true)*y_pred, 'float'), axis=0)
+#     fn = K.sum(K.cast(y_true*(1-y_pred), 'float'), axis=0)
+# 
+#     p = tp / (tp + fp + K.epsilon())
+#     r = tp / (tp + fn + K.epsilon())
+# 
+#     f1 = 2*p*r / (p+r+K.epsilon())
+#     f1 = tf.where(tf.is_nan(f1), tf.zeros_like(f1), f1)
+#     return K.mean(f1)
+# 
+# def f1_loss(y_true, y_pred):
+#     
+#     tp = K.sum(K.cast(y_true*y_pred, 'float'), axis=0)
+#     tn = K.sum(K.cast((1-y_true)*(1-y_pred), 'float'), axis=0)
+#     fp = K.sum(K.cast((1-y_true)*y_pred, 'float'), axis=0)
+#     fn = K.sum(K.cast(y_true*(1-y_pred), 'float'), axis=0)
+# 
+#     p = tp / (tp + fp + K.epsilon())
+#     r = tp / (tp + fn + K.epsilon())
+# 
+#     f1 = 2*p*r / (p+r+K.epsilon())
+#     f1 = tf.where(tf.is_nan(f1), tf.zeros_like(f1), f1)
+#     return 1 - K.mean(f1)
+# =============================================================================
     
 # =============================================================================
 #     def forward(self, pos_dist, neg_dist, reduction='mean'):
