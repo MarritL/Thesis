@@ -222,13 +222,16 @@ def train(directories, dataset_settings, network_settings, train_settings):
     except KeyboardInterrupt:
         print("KeyboardInterrupt. Saving progress...")
         
-    
+    if network_settings['cfg']['top'] != None: 
+        top = str(list(network_settings['cfg']['top']))
+    else:
+        top = 'None'
     # TODO: write info to csv-file
     savedata = {'filename':os.path.join(directories['model_dir'],
                         'network-{}_date-{}'.format(network_name, outputtime)), 
                'networkname': network_name, 
                'cfg_branch': str(list(network_settings['cfg']['branch'])), 
-               'cfg_top': str(list(network_settings['cfg']['top'])),
+               'cfg_top': top,
                'cfg_classifier': str(list(network_settings['cfg']['classifier'])),
                'optimizer': network_settings['optimizer'],
                'lr': network_settings['lr'], 
