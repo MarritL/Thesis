@@ -50,8 +50,8 @@ class SiameseNet(nn.Module):
             used for feature extraction
         """
         res = list()
-        for i in range(n_branches): # Siamese/triplet nets; sharing weights
-            x = data[i]
+        for j in range(n_branches): # Siamese/triplet nets; sharing weights
+            x = data[j]
             
             # if in feature extracting phase, extract hypercolumn for specified features
             if isinstance(extract_features,list):
@@ -67,7 +67,7 @@ class SiameseNet(nn.Module):
                                  mode='bilinear', align_corners=True)
                     else:
                         activations[names[i]] = l(activations[names[i-1]])
-                        if activations[names[i]].shape[2:] != data[i].shape[2:]:
+                        if activations[names[i]].shape[2:] != data[j].shape[2:]:
                             activations[names[i]] = nn.functional.interpolate(
                                  activations[names[i]], size=data[i].shape[2:], 
                                  mode='bilinear', align_corners=True)
