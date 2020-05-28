@@ -44,6 +44,26 @@ def extract_features(net, layers, imagepair):
         
     return featlist
 
+def extract_features_only_feat(net, layers, imagepair):
+    
+    featlist = list()
+    for j, im in enumerate(imagepair): 
+
+        # prepare image
+        im_n = normalize2plot(im)
+        im_n = np.moveaxis(im_n, -1, 0)
+        im_n = np.expand_dims(im_n, axis=0)
+        im_t = torch.as_tensor(im_n)
+            
+        # get features
+        im_out = net([im_t.float(),im_t], 1, extract_features=layers)
+        im_out = im_out[0]
+        im_out = np.moveaxis(np.squeeze(im_out.detach().numpy()), 0,-1)
+        
+        # concat
+        featlist.append(im_out)
+        
+    return featlist
 
 
 def extract_features_perImage(directories, imagelist, model_settings, layers):
