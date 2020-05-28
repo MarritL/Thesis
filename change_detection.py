@@ -94,11 +94,11 @@ def detect_changes(model_settings, directories, dataset_settings, network_settin
             if network_settings['extract_features'] == None:
                 distmap = calculate_distancemap(im_a, im_b)
             elif network_settings['extract_features'] == 'joint':
-                distmap = calculate_magnitudemap(features)
+                distmap = calculate_magnitudemap(normalize2plot(features,100))
             elif network_settings['extract_features'] == 'diff':
-                distmap = calculate_magnitudemap(features)
+                distmap = calculate_magnitudemap(normalize2plot(features,100))
             elif isinstance(network_settings['extract_features'], list): 
-                distmap = calculate_distancemap(features[0], features[1])
+                distmap = calculate_distancemap(normalize2plot(features[0],100), normalize2plot(features[1],100))
             else:
                  raise Exception('distance map calculation not implemented for these settings of extract_features')              
             np.save(os.path.join(directories['results_dir_cd'], save_networkname,'cva','distmap_'+str(idx)+'.npy'), distmap)
