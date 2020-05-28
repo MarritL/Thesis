@@ -61,7 +61,7 @@ class SiameseNet(nn.Module):
                     names.append('x'+str(i))
                     if i == 0:
                         activations[names[i]] = l(x)
-                        if activations[names[i]].shape[2:] != data[i].shape[2:]:
+                        if activations[names[i]].shape[2:] != data[j].shape[2:]:
                             activations[names[i]] = nn.functional.interpolate(
                                  activations[names[i]], size=data[i].shape[2:], 
                                  mode='bilinear', align_corners=True)
