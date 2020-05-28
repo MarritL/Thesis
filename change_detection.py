@@ -41,12 +41,14 @@ def detect_changes(model_settings, directories, dataset_settings, network_settin
     tn = dict()
     fp = dict()
     fn = dict()
+    th = dict()
 
     for method in threshold_methods:       
         tp[method] = dict()
         tn[method] = dict()
         fp[method] = dict()
         fn[method] = dict()
+        th[method] = dict()
             
     for idx in dataset_settings['indices_eval']:
         
@@ -123,8 +125,9 @@ def detect_changes(model_settings, directories, dataset_settings, network_settin
                 tn[method][str(idx)] = np.logical_and(np.logical_not(cm_pos), np.logical_not(gt_pos)).sum()
                 fp[method][str(idx)] = np.logical_and(cm_pos, np.logical_not(gt_pos)).sum()
                 fn[method][str(idx)] = np.logical_and(np.logical_not(cm_pos), gt_pos).sum()
+                th[method][str(idx)] = threshold
 
-    return (tp, tn, fp, fn)
+    return (tp, tn, fp, fn, th)
             
 def detect_changes_no_gt(model_settings, directories, dataset_settings, network_settings, train_settings, threshold_methods=['triangle']):
     
