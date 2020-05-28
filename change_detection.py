@@ -8,6 +8,8 @@ Created on Mon May 11 16:08:21 2020
 import numpy as np
 import os
 import torch
+from sklearn.metrics import precision_recall_curve, roc_curve
+
 
 from train import get_network, determine_branches
 from extract_features import  calculate_distancemap, calculate_magnitudemap, calculate_changemap, extract_features_only_feat
@@ -94,9 +96,27 @@ def detect_changes(model_settings, directories, dataset_settings, network_settin
             np.save(os.path.join(directories['results_dir_cd'], save_networkname,'cva','distmap_'+str(idx)+'.npy'), distmap)
             
             for method in threshold_methods:
-                changemap, threshold = calculate_changemap(distmap, method=method, plot=True)
+                if method == 'f1':
+                    precision, recall, thresholds = precision_recall_curve(gt.ravel(), distmap.ravel())
+                    f1 = (2*precision*recall)/(precision+recall)
+                    #best_f1 = np.nanmax(f1)
+                    threshold = thresholds[np.nanargmax(f1)]
+                    #best_recall = recall[np.nanargmax(f1)]
+                    #best_precision = precision[np.nanargmax(f1)]
+                    changemap = distmap>threshold
+                elif method == 'AA':
+                    fpr, tpr, thresholds = roc_curve(gt.ravel(), distmap.ravel())
+                    tnr = 1-fpr
+                    avg_acc = (tpr+tnr)/2
+                    #best_avg_acc = avg_acc[np.nanargmax(avg_acc)]
+                    threshold = thresholds[np.nanargmax(avg_acc)]
+                    #best_tpr = tpr[np.nanargmax(avg_acc)] # Sensitivity
+                    #best_tnr = tnr[np.nanargmax(avg_acc)] # Specificity
+                    changemap = distmap>threshold
+                else:
+                    changemap, threshold = calculate_changemap(distmap, method=method, plot=True)
                 np.save(os.path.join(directories['results_dir_cd'], save_networkname,'cva',
-                                     'changemap_threshold_'+method+'_'+str(threshold)+'_'+str(idx)+'.npy'), changemap)
+                                         'changemap_threshold_'+method+'_'+str(threshold)+'_'+str(idx)+'.npy'), changemap)
                 # calculate change detection accuracy
                 cm_pos = changemap > 0    
                 tp[method][str(idx)] = np.logical_and(cm_pos, gt_pos).sum()
