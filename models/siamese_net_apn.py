@@ -18,7 +18,7 @@ class SiameseNetAPN(nn.Module):
                 
         self.branches = branches    
 
-    def forward(self, data, n_branches, avg_pool=False , **kwargs):
+    def forward(self, data, n_branches, avg_pool=False, extract_features=None,**kwargs):
         """
         forward pass through network
 
@@ -42,11 +42,37 @@ class SiameseNetAPN(nn.Module):
             used for feature extraction
         """
         res = list()
-        for i in range(n_branches): # Siamese/triplet nets; sharing weights
-            x = data[i]
-            if avg_pool:
-                x = F.adaptive_avg_pool2d(x, (1,1))
-            res.append(self.branches(x))
+        for j in range(n_branches): # Siamese/triplet nets; sharing weights
+            x = data[j]
+            
+            if isinstance(extract_features,list):
+                activations = dict()
+                names = list()
+                for i, l in enumerate(self.branches):
+                    names.append('x'+str(i))
+                    if i == 0:
+                        activations[names[i]] = l(x)
+                        if activations[names[i]].shape[2:] != data[j].shape[2:]:
+                            activations[names[i]] = nn.functional.interpolate(
+                                 activations[names[i]], size=data[j].shape[2:], 
+                                 mode='bilinear', align_corners=True)
+                    else:
+                        activations[names[i]] = l(activations[names[i-1]])
+                        if activations[names[i]].shape[2:] != data[j].shape[2:]:
+                            activations[names[i]] = nn.functional.interpolate(
+                                 activations[names[i]], size=data[j].shape[2:], 
+                                 mode='bilinear', align_corners=True)
+                            
+                # return a list of features
+                #features = [x]
+                features=list()
+                features.extend([activations[names[i]] for i in extract_features])
+            
+                return features
+            else:
+                if avg_pool:
+                    x = F.adaptive_avg_pool2d(x, (1,1))
+                res.append(self.branches(x))
         
         return res
 # =============================================================================
