@@ -1,6 +1,6 @@
 # Towards self-supervised learning for change detection
-Code for MSc. Thesis project
-Author: Marrit Leenstra
+Code for MSc. Thesis project \
+Author: Marrit Leenstra \
 Date: 25/06/2020
 
 ## Abstract
@@ -16,7 +16,8 @@ Change detection with the proposed methodology results in a best Average Accurac
 better than learning from scratch.
 
 ## Run
-Use the **main.py** script to go through the pipeline of the project. The first cell is used for the main configuration applicaple to all cells, parameters only relevant to one part of the project are set in relevant cells. Note that not all settings are compatible.
+Use the **main.py** script to go through the pipeline of the project. \ 
+The first cell is used for the main configuration applicaple to all cells, parameters only relevant to one part of the project are set in relevant cells. Note that not all settings are compatible.
 
 ## Documentation
 ### Unlabelled training dataset
@@ -24,77 +25,78 @@ Use the **main.py** script to go through the pipeline of the project. The first 
 * Channels: B1 - B2 - B3 - B4 - B5 - B6 - B7 - B8 - B8A - B9 - B10 - B11 - B12
 
 ### Change detection dataset
-* OSCD Benchmark dataset (Daudt et al., 2018), available via the DASE portal (http://dase.grss-ieee.org/) 
+* OSCD Benchmark dataset (Daudt et al., 2018), available via the DASE portal (http://dase.grss-ieee.org/) \
 The dataset is originally divided into 14 training pairs with freely available ground reference maps and 10 test pairs for which reference labels are only
 available through the DASE portal. Here 12 images are used as training set; the remaining 2 images for which ground reference maps are freely available will be added to the test set in order to be able to qualitatively evaluate the change detection results.
 
 ### Scripts
-**main.py**: main pipeline of the project. \n
+**main.py**: main pipeline of the project. \
+\
 Settings for pretext task 1: 
-* network_settings = {
-    'network': 'siamese', 
-    'optimizer': 'adam',
-    'lr':1e-3,
-    'weight_decay': 1e-4,
-    'loss': 'bce_sigmoid',
-    'n_classes': 2,
-    'patch_size': 96,
-    'im_size': (96,96),
-    'batch_norm': True,
-    'weights_file': '',
-    'extract_features': None,
-    'avg_pool': False} 
-* cfg = {'branch': np.array([32,32,32], dtype='object'), 
-       'top': np.array([32], dtype='object'),
-       'classifier': np.array([128,64,network_settings['n_classes']])} 
-* train_settings = {
-    'start_epoch': 0,
-    'num_epoch':300,
-    'batch_size': 25,
-    'disp_iter': 25,
-    'gpu': 0,
-    'early_stopping': 5}
-* dataset_settings = {
-    'dataset_type' : 'triplet_apn',
-    'perc_train': 0.85,
-    'channels': np.arange(13),
-    'min_overlap': 1, 
-    'max_overlap': 1,
-    'stride': int(network_settings['patch_size']),
-    'patches_per_image': 5} \n
+* network_settings = { \
+&emsp; 'network': 'siamese', \
+&emsp;'optimizer': 'adam', \
+&emsp;'lr':1e-3, \
+    &emsp;'weight_decay': 1e-4, \
+    &emsp;'loss': 'bce_sigmoid', \
+    &emsp;'n_classes': 2, \
+    &emsp;'patch_size': 96, \
+    &emsp;'im_size': (96,96), \
+    &emsp;'batch_norm': True, \
+    &emsp;'weights_file': '', \
+    &emsp;'extract_features': None, \
+    &emsp;'avg_pool': False} 
+* cfg = {'branch': np.array([32,32,32], dtype='object'),  \
+       &emsp;'top': np.array([32], dtype='object'), \
+       &emsp;'classifier': np.array([128,64,network_settings['n_classes']])} 
+* train_settings = { \
+    &emsp;'start_epoch': 0, \
+    &emsp;'num_epoch':300, \
+    &emsp;'batch_size': 25, \
+    &emsp;'disp_iter': 25, \
+    &emsp;'gpu': 0, \
+    &emsp;'early_stopping': 5}
+* dataset_settings = { \
+    &emsp;'dataset_type' : 'triplet_apn', \
+    &emsp;'perc_train': 0.85, \
+    &emsp;'channels': np.arange(13), \
+    &emsp;'min_overlap': 1,  \
+    &emsp;'max_overlap': 1, \
+    &emsp;'stride': int(network_settings['patch_size']), \
+    &emsp;'patches_per_image': 5} \
     
 Settings for pretext task 2: 
-* network_settings = {
-    'network': 'triplet_apn', 
-    'optimizer': 'adam',
-    'lr':1e-3,
-    'weight_decay': 1e-4,
-    'loss': 'l1+triplet',
-    'n_classes': 2,
-    'patch_size': 96,
-    'im_size': (96,96),
-    'batch_norm': True,
-    'weights_file': '',
-    'extract_features': None,
-    'avg_pool': False} 
-* cfg = {'branch': np.array([32,32,32], dtype='object'), 
-       'top': np.array([32], dtype='object'),
-       'classifier': np.array([128,64,network_settings['n_classes']])} 
-* train_settings = {
-    'start_epoch': 0,
-    'num_epoch':300,
-    'batch_size': 25,
-    'disp_iter': 25,
-    'gpu': 0,
-    'early_stopping': 5}
-* dataset_settings = {
-    'dataset_type' : 'triplet_apn',
-    'perc_train': 0.85,
-    'channels': np.arange(13),
-    'min_overlap': 1, 
-    'max_overlap': 1,
-    'stride': int(network_settings['patch_size']),
-    'patches_per_image': 5} \n
+* network_settings = { \
+    &emsp;'network': 'triplet_apn',  \
+    &emsp;'optimizer': 'adam', \
+    &emsp;'lr':1e-3, \
+    &emsp;'weight_decay': 1e-4, \
+    &emsp;'loss': 'l1+triplet', \
+    &emsp;'n_classes': 2, \
+    &emsp;'patch_size': 96, \
+    &emsp;'im_size': (96,96), \
+    &emsp;'batch_norm': True, \
+    &emsp;'weights_file': '', \
+    &emsp;'extract_features': None, \
+    &emsp;'avg_pool': False} 
+* cfg = {'branch': np.array([32,32,32], dtype='object'),  \
+       &emsp;'top': np.array([32], dtype='object'), \
+       &emsp;'classifier': np.array([128,64,network_settings['n_classes']])} 
+* train_settings = { \
+    &emsp;'start_epoch': 0, \
+    &emsp;'num_epoch':300, \
+    &emsp;'batch_size': 25, \
+    &emsp;'disp_iter': 25, \
+    &emsp;'gpu': 0, \
+    &emsp;'early_stopping': 5}
+* dataset_settings = { \
+    &emsp;'dataset_type' : 'triplet_apn', \
+    &emsp;'perc_train': 0.85, \
+    &emsp;'channels': np.arange(13), \
+    &emsp;'min_overlap': 1,  \
+    &emsp;'max_overlap': 1, \
+    &emsp;'stride': int(network_settings['patch_size']), \
+    &emsp;'patches_per_image': 5} \
 
 ## References
 * R. C. Daudt, B. Le Saux, A. Boulch, and Y. Gousseau, “Urban change detection for multispectral earth observation using convolutional neural networks,” in IEEE International Geoscience and Remote Sensing Symposium (IGARSS), 2018, pp. 2115–2118. doi: 10.1109/IGARSS.2018.8518015.
