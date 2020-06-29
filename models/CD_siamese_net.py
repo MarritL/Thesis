@@ -41,7 +41,7 @@ class SiameseCDNetwork(nn.Module):
         
 
     def forward(self, data, n_branches, extract_features=None, 
-                conv_classifier=False, use_softmax=False, **kwargs):
+                conv_classifier=False, use_softmax='False', **kwargs):
         """
         forward pass through network
 
@@ -76,11 +76,20 @@ class SiameseCDNetwork(nn.Module):
                     names.append('x'+str(i))
                     if i == 0:
                         activations[names[i]] = l(x)
+                        if activations[names[i]].shape[2:] != data[i].shape[2:]:
+                            activations[names[i]] = nn.functional.interpolate(
+                                 activations[names[i]], size=data[i].shape[2:], 
+                                 mode='bilinear', align_corners=True)
                     else:
                         activations[names[i]] = l(activations[names[i-1]])
+                        if activations[names[i]].shape[2:] != data[i].shape[2:]:
+                            activations[names[i]] = nn.functional.interpolate(
+                                 activations[names[i]], size=data[i].shape[2:], 
+                                 mode='bilinear', align_corners=True)
                             
                 # return a list of features
-                features = [x]
+                #features = [x]
+                features=list()
                 features.extend([activations[names[i]] for i in extract_features])
             
                 return features
@@ -104,8 +113,10 @@ class SiameseCDNetwork(nn.Module):
             x = self.classifier(x)
         else:
             x = self.classifier(x)
-            if use_softmax: # is True during inference
+            if use_softmax == 'True': # is True during inference
                 x = nn.functional.softmax(x, dim=1)
+            elif use_softmax == 'sigmoid':
+                x = nn.functional.sigmoid(x)
             else:
                 x = nn.functional.log_softmax(x, dim=1)
 
@@ -150,3 +161,5 @@ def siamese_cd_net(network, layers_branches, layers_joint,
     
     print(net)
     return net
+
+siamese_cd_net
