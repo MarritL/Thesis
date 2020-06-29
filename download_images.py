@@ -27,11 +27,11 @@ bands = ['B1','B2','B3','B4','B5','B6','B7','B8','B8A','B9','B10','B11','B12','Q
 
 # directories cities
 source_dir_cities = '/media/cordolo/marrit/source_data/worldcities'
-results_dir_cities = '/media/cordolo/elements/results/cities'
+results_dir_cities = '/media/cordolo/marrit/results/cities'
 cities_csv = 'r_cities.csv'
 # directories training
-intermediate_dir_training = '/media/cordolo/elements/Intermediate/training_S2'
-results_dir_training = '/media/cordolo/elements/results/training_S2'
+intermediate_dir_training = '/media/cordolo/marrit/Intermediate/training_S2'
+results_dir_training = '/media/cordolo/marrit/results/training_S2'
 data_dir_S21C = 'data_S21C'
 data_dir_S21C_repeat = 'data_S21C_repeat'
 data_dir_S21C_repeat2 = 'data_S21C_repeat2'
@@ -39,16 +39,11 @@ csv_file_S21C = 'S21C_dataset.csv'
 csv_file_S21C_repeat = 'S21C_dataset_repeat.csv'
 csv_file_S21C_repeat2 = 'S21C_dataset_repeat2.csv'
 # directories test
-source_dir_test = '/media/cordolo/elements/source_data/test_OSCD'
-intermediate_dir_test = '/media/cordolo/elements/Intermediate/CD_OSCD'
+source_dir_test = '/media/cordolo/marrit/source_data/test_OSCD'
+intermediate_dir_test = '/media/cordolo/marrit/Intermediate/CD_OSCD'
 data_dir_OSCD = 'data_OSCD'
 csv_file_OSCD = 'OSCD_dataset.csv'
 
-#data_out = '/home/cordolo/Documents/Studie Marrit/2019-2020/Thesis/dataout/'
-#csv_file = '/home/cordolo/Documents/Studie Marrit/2019-2020/Thesis/S21C_dataset.csv'
-#data_out = '/media/cordolo/5EBB-8C9A/Studie Marrit/2019-2020/Thesis/data/'
-#csv_file = '/media/cordolo/5EBB-8C9A/Studie Marrit/2019-2020/Thesis/S21C_dataset.csv'
-#data_dir = '/home/cordolo/Documents/Studie Marrit/2019-2020/Thesis/Data'
 #%% 
 """create and preprocess world-cities dataset from geonames"""
 
@@ -170,11 +165,10 @@ print('cityCollection size: ', n_cities)
 fieldnames = ['im_idx', 'pair_idx', 'im_id', 'filename', 'system_idx', 'city',\
               'city_ascii', 'country', 'geonameid', 'lng', 'lat', 'date',\
               'time', 'error']
-# =============================================================================
-# with open(os.path.join(results_dir_training, csv_file_S21C), 'a') as file:
-#     writer = csv.DictWriter(file, fieldnames, delimiter = ",")
-#     writer.writeheader()
-# =============================================================================
+if not os.path.exists(os.path.join(results_dir_training, csv_file_S21C)):   
+    with open(os.path.join(results_dir_training, csv_file_S21C), 'a') as file:
+        writer = csv.DictWriter(file, fieldnames, delimiter = ",")
+        writer.writeheader()
 
 # save individual images
 tot_time = 0
@@ -243,16 +237,17 @@ if not os.path.isdir(os.path.join(intermediate_dir_test, data_dir_OSCD)):
     os.makedirs(os.path.join(intermediate_dir_test, data_dir_OSCD))
 
 # get info about which images are used for training and which for test
-train_cities = pd.read_csv(os.path.join(source_dir_test,'train.txt'),header =None).values
-test_cities = pd.read_csv(os.path.join(source_dir_test,'test.txt'),header =None).values
+source_dir = '/media/cordolo/marrit/source_data/CD_OSCD/data_OSCD'
+train_cities = pd.read_csv(os.path.join(source_dir,'train.txt'),header =None).values
+test_cities = pd.read_csv(os.path.join(source_dir,'test.txt'),header =None).values
 
 # specify directories 
-dirs = list_directories(source_dir_test)
-image_dirs = ['imgs_1_rect','imgs_2_rect']
+dirs = list_directories(source_dir)
+image_dirs = ['imgs_1','imgs_2']
 systemid_dirs = ['imgs_1', 'imgs_2']
 
 # get the images and metadata
-for i_city, city in enumerate(dirs):
+for i_city, city in enumerate(dirs): 
     
     # check if training or test image
     if city in train_cities:
@@ -261,16 +256,19 @@ for i_city, city in enumerate(dirs):
         traintest = 'test'
         
     # get dates
-    dates = (pd.read_csv(os.path.join(source_dir_test,city,'dates.txt'),header =None).values).squeeze()
+    dates = (pd.read_csv(os.path.join(source_dir,city,'dates.txt'),header =None).values).squeeze()
     
     # read and save the images
-    for i_dir, image_dir in enumerate(image_dirs):
-        image_path = os.path.join(source_dir_test, city, image_dir)
+    for i_dir, image_dir in enumerate(image_dirs): 
+        image_path = os.path.join(source_dir, city, image_dir)
         im_bands = os.listdir(image_path)
         n_bands = len(im_bands)
         
         # read images to numpy array
         im = tif_to_numpy(image_path, im_bands, n_bands)
+        #plt.imshow(normalize2plot(im[:,:,[3,2,1]]))
+        #plt.show()
+        #print(im.shape)
 
         im_id = str(i_city)+'_'+chr(ord('a')+i_dir)
         
@@ -444,11 +442,10 @@ print('cityCollection size: ', n_cities)
 fieldnames = ['im_idx', 'pair_idx', 'im_id', 'filename', 'system_idx', 'city',\
               'city_ascii', 'country', 'geonameid', 'lng', 'lat', 'date',\
               'time', 'error']
-# =============================================================================
-# with open(os.path.join(results_dir_training, csv_file_S21C_repeat), 'a') as file:
-#     writer = csv.DictWriter(file, fieldnames, delimiter = ",")
-#     writer.writeheader()
-# =============================================================================
+if not os.path.exists(os.path.join(results_dir_training, csv_file_S21C_repeat)):    
+    with open(os.path.join(results_dir_training, csv_file_S21C_repeat), 'a') as file:
+        writer = csv.DictWriter(file, fieldnames, delimiter = ",")
+        writer.writeheader()
 
 # save individual images
 tot_time = 0
@@ -660,11 +657,10 @@ print('cityCollection size: ', n_cities)
 fieldnames = ['im_idx', 'pair_idx', 'im_id', 'filename', 'system_idx', 'city',\
               'city_ascii', 'country', 'geonameid', 'lng', 'lat', 'date',\
               'time', 'error']
-# =============================================================================
-# with open(os.path.join(results_dir_training, csv_file_S21C_repeat2), 'a') as file:
-#     writer = csv.DictWriter(file, fieldnames, delimiter = ",")
-#     writer.writeheader()
-# =============================================================================
+if not os.path.exists(os.path.join(results_dir_training, csv_file_S21C_repeat2)): 
+    with open(os.path.join(results_dir_training, csv_file_S21C_repeat2), 'a') as file:
+         writer = csv.DictWriter(file, fieldnames, delimiter = ",")
+         writer.writeheader()
 
 # save individual images
 tot_time = 0
@@ -828,123 +824,7 @@ for im in dataset2['filename']:
     dst = os.path.join(results_dir_training, data_dir_S21C, im)
     shutil.copy(src, dst)    
     
-#%%
-""" Save some patches for faster training """
 
-from data_download_functions import sample_patches_from_image,save_patches,generate_gt_overlap
-
-computer = 'desktop'
-# init
-if computer == 'desktop':
-    directories = {
-        'intermediate_dir_training': '/media/cordolo/marrit/Intermediate/training_S2',
-        'results_dir_training': '/media/cordolo/marrit/results/training_S2',
-        'intermediate_dir_cd': '/media/cordolo/marrit/Intermediate/CD_OSCD',
-        'intermediate_dir': '/media/cordolo/marrit/Intermediate',
-        'csv_file_S21C': 'S21C_dataset.csv',
-        'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
-        'csv_file_oscd': 'OSCD_dataset.csv',
-        'csv_file_train_oscd' : 'OSCD_train.csv',
-        'csv_file_test_oscd': 'OSCD_test.csv',
-        'csv_file_patches90-100': 'S21C_patches_overlap90-100.csv',
-        'csv_models': 'trained_models.csv',
-        'data_dir_S21C': 'data_S21C',
-        'data_dir_oscd': 'data_OSCD',
-        'data_dir_patches90-100': 'patches_S21C_overlap90-100',
-        'labels_dir_oscd' : 'labels_OSCD',
-        'tb_dir': '/media/cordolo/marrit/Intermediate/tensorboard',
-        'model_dir': '/media/cordolo/marrit/Intermediate/trained_models'}
-elif computer == 'optimus':
-    directories = {
-        'intermediate_dir_training': '/media/marrit/Intermediate/training_S2',
-        'results_dir_training': '/media/marrit/results/training_S2',
-        'intermediate_dir_cd': '/media/marrit/Intermediate/CD_OSCD',
-        'intermediate_dir': '/media/marrit/Intermediate',
-        'csv_file_S21C': 'S21C_dataset.csv',
-        'csv_file_S21C_cleaned': 'S21C_dataset_clean.csv',
-        'csv_file_oscd': 'OSCD_dataset.csv',
-        'csv_file_train_oscd' : 'OSCD_train.csv',
-        'csv_file_test_oscd': 'OSCD_test.csv',
-        'csv_file_patches90-100': 'S21C_patches_overlap90-100.csv',
-        'csv_models': 'trained_models.csv',
-        'data_dir_S21C': 'data_S21C',
-        'data_dir_oscd': 'data_OSCD',
-        'labels_dir_oscd' : 'labels_OSCD',
-        'data_dir_patches90-100': 'patches_S21C_overlap90-100',
-        'tb_dir': '/media/marrit/Intermediate/tensorboard',
-        'model_dir': '/media/marrit/Intermediate/trained_models'}
-
-# dirs
-intermediate_dir_training= directories['intermediate_dir_training']
-results_dir_training = directories['results_dir_training'] #'/media/marrit/results/training_S2'
-csv_file_S21C = 'S21C_dataset.csv'
-csv_file_patches = 'S21C_patches_overlap50-70.csv'
-data_dir_S21C = 'data_S21C'
-patches_dir_S21C = 'patches_S21C_overlap50-70'
-gt_dir_S21C = 'gt_S21C_overlap50-70'
-# combinations of dirs
-images_csv=os.path.join(results_dir_training, csv_file_S21C)
-images_dir=os.path.join(results_dir_training,data_dir_S21C)
-patches_csv=os.path.join(intermediate_dir_training, csv_file_patches)
-patches_dir=os.path.join(intermediate_dir_training,patches_dir_S21C)
-gt_dir = os.path.join(intermediate_dir_training, gt_dir_S21C)
-
-# sample start locations of patche and store in csv
-sample_patches_from_image(images_csv, images_dir, patches_csv, patch_size=96, 
-                          min_overlap = 0.5, max_overlap = 0.7)
-
-# create dirs
-if not os.path.isdir(os.path.join(intermediate_dir_training, patches_dir_S21C)):
-    os.makedirs(os.path.join(intermediate_dir_training, patches_dir_S21C)) 
-if not os.path.isdir(os.path.join(intermediate_dir_training, gt_dir_S21C)):
-    os.makedirs(os.path.join(intermediate_dir_training, gt_dir_S21C)) 
-
-patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
-# =============================================================================
-# patches_a = patches_df[patches_df['impair_idx'] == 'a']
-# patches_b = patches_df[patches_df['impair_idx'] == 'b']
-# =============================================================================
-patch_size = 96
-
-# save patches from the 'a' images
-save_patches(patches_df=patches_df, images_dir=images_dir, patches_dir=patches_dir, patch_size=patch_size)
-
-# save a gt of the overlap
-generate_gt_overlap(patches_df, gt_dir, patch_size)
-
-0
-
-
-0# =============================================================================
-# # I changed my mind about the filenames, so i have to change the df
-# patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
-# patches_df['im_patch_idx'] = 'NA'
-# patches_df['filename_alt'] = 'NA'
-# for i, row in patches_df.iterrows():
-#    patches_df.loc[i,'im_patch_idx'] = str(row.im_idx) + '_' + str(row.patch_idx) 
-#    patches_df.loc[i,'filename_alt'] = str(row.im_idx) + '_' + str(row.patch_idx) + '_' + str(row.patchpair_idx) + '.npy' 
-#    if (i+1) % 100 == 0:
-#         print("\r row {}/{}".format(i+1,len(patches_df)), end='')
-# 
-# patches_df.to_csv(os.path.join(intermediate_dir_training, csv_file_patches), index=False)
-# patches_df= patches_df[patches_df['impair_idx'] == 'b']
-# 
-# 
-# for i, row in patches_df.iterrows():
-#     os.rename(os.path.join(patches_dir, row.filename), os.path.join(patches_dir, row.filename_alt)) 
-#     if (i+1) % 100 == 0:
-#         print("\r row {}/{}".format(i+1,len(patches_df)), end='')
-# =============================================================================
-
-
-# =============================================================================
-# patches_df = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_patches))
-# read_patches = patches_df[patches_df['impair_idx'] == 'b']
-# for i, row in read_patches.iterrows():
-#     os.remove(os.path.join(patches_dir, row.filename_alt))
-#     if (i+1) % 100 == 0:
-#         print("\r row {}/{}".format(i+1,len(read_patches)), end='')
-# =============================================================================
 
 #%%
 """ Preprocess OSCD labels """
@@ -1003,509 +883,4 @@ for city in dirs:
     # save
     np.save(os.path.join(intermediate_dir_test,labels_dir_oscd, str(im_idx)+'.npy'), gt)
 
-#%%
-""" Save Barrax dataset """
-import scipy.io
-import imageio
-from setup import setup
-directories, network_settings, train_settings, dataset_settings = setup()
 
-mat = scipy.io.loadmat(os.path.join(directories['source_dir_barrax'],'preChangeImage.mat'))
-b4 = mat['preChangeImage'][:,:,2]
-b3 = mat['preChangeImage'][:,:,1]
-b2 = mat['preChangeImage'][:,:,0]
-b5 = mat['preChangeImage'][:,:,3]
-b6 = mat['preChangeImage'][:,:,4]
-b7 = mat['preChangeImage'][:,:,5]
-b8 = mat['preChangeImage'][:,:,6]
-b8a = mat['preChangeImage'][:,:,7]
-b11 = mat['preChangeImage'][:,:,8]
-b12 = mat['preChangeImage'][:,:,9]
-im0 = np.stack([b2,b3,b4,b5,b6,b7,b8,b8,b8a,b11,b12],axis=2)
-np.save(os.path.join(directories['intermediate_dir'],'CD_barrax',directories['data_dir_barrax'],'0_a.npy'),im0)
-
-mat = scipy.io.loadmat(os.path.join(directories['source_dir_barrax'],'postChangeImage.mat'))
-b4 = mat['postChangeImage'][:,:,2]
-b3 = mat['postChangeImage'][:,:,1]
-b2 = mat['postChangeImage'][:,:,0]
-b5 = mat['postChangeImage'][:,:,3]
-b6 = mat['postChangeImage'][:,:,4]
-b7 = mat['postChangeImage'][:,:,5]
-b8 = mat['postChangeImage'][:,:,6]
-b8a = mat['postChangeImage'][:,:,7]
-b11 = mat['postChangeImage'][:,:,8]
-b12 = mat['postChangeImage'][:,:,9]
-im1 = np.stack([b2,b3,b4,b5,b6,b7,b8,b8,b8a,b11,b12],axis=2)
-np.save(os.path.join(directories['intermediate_dir'],'CD_barrax',directories['data_dir_barrax'],'0_b.npy'),im1)
-
-labels = imageio.imread(os.path.join(directories['source_dir_barrax'],'referenceImage.png'))
-np.save(os.path.join(directories['intermediate_dir'],'CD_barrax','labels_barrax','0.npy'),labels[:,:,0])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#%%
-""" Check the downloaded Sentinel-2 1C images and remove possible errors """
-from data_download_functions import filter_errors
-from plots import plot_image, plot_random_images, plot_random_imagepairs
-from random import sample
-
-# read csvs
-cities = pd.read_csv(os.path.join(results_dir_cities, cities_csv))
-dataset = pd.read_csv(os.path.join(intermediate_dir_training, csv_file_S21C), header=None, names=['im_id', 'system_idx', 'city', 'date', 'time'])
-
-# filter out the images that did not lead to a download
-errors = dataset.loc[dataset.loc[:,'im_id'] == 'ERROR']
-dataset = dataset.loc[dataset.loc[:,'im_id'] != 'ERROR']
-
-# add some more columns
-im_ids = dataset.loc[:,'im_id'].values
-dataset['im_idx'] = [image.split('_')[0] for image in im_ids]
-dataset['pair_idx'] = [image.split('_')[1] for image in im_ids]
-dataset['filename'] = [image + '.npy' for image in im_ids]
-# merge with cities dataset
-dataset = dataset.merge(cities[['Lng_alt', 'Lat_alt', 'geonameid']], how = 'left', left_on = ['im_idx'], right_on = cities.index)
-
-
-# find the entries with only one image
-counts = dataset.groupby(['im_idx']).count()
-onescounts = counts[counts.loc[:,'city'] != 2]
-onesdataset = dataset.loc[dataset['im_idx'].isin(onescounts.index)]
-dataset = dataset.drop(onesdataset.index, axis=0)
-
-# find corrupt images at threshold 0.5
-corrupts = filter_errors(os.path.join(intermediate_dir_training, data_dir_S21C), dataset['filename'].values, threshold=0.5, plot = False)
-
-# find the entries with only one image
-corrupts_df = pd.DataFrame(corrupts, columns=['filename'])
-corrupt_filenames = corrupts_df.loc[:,'filename'].values
-corrupts_df['im_idx'] = [image.split('_')[0] for image in corrupt_filenames]
-corrupts_df['pair_idx'] = [image.split('_')[1].split('.')[0] for image in corrupt_filenames]
-corrupts_df['im_id'] = [image.split('.')[0] for image in corrupt_filenames]
-corrupts_count = corrupts_df.groupby(['im_idx']).count()
-corrupts_onescounts = corrupts_count[corrupts_count.loc[:,'im_id'] != 2]
-corrupts_onesdataset = corrupts_df.loc[corrupts_df['im_idx'].isin(corrupts_onescounts.index)]
-corrupts_twodataset = corrupts_df.drop(corrupts_onesdataset.index, axis=0)
-
-# after visually checking the ones and twos dataset: 
-# only 1232_b from the onesdataset is really an error (only clouds)
-# from the twosdataset ['67_a.npy', '76_a.npy', '187_a.npy', '258_a.npy', '905_a.npy', '942_a.npy', '946_a.npy', '1202_a.npy', '1262_a.npy', '1490_a.npy', '1254_a.npy', 
-# '67_b.npy', '76_b.npy', '187_b.npy', '258_b.npy', '905_b.npy', '942_b.npy', '946_b.npy', '1202_b.npy', '1262_b.npy', '1490_b.npy', '1254_b.npy']
-# are not corrupt
-not_corrupts = ['67_a.npy', '76_a.npy', '187_a.npy', '258_a.npy', '905_a.npy', '942_a.npy', '946_a.npy', '1202_a.npy', '1262_a.npy', '1490_a.npy', '1254_a.npy', '67_b.npy', '76_b.npy', '187_b.npy', '258_b.npy', '905_b.npy', '942_b.npy', '946_b.npy', '1202_b.npy', '1262_b.npy', '1490_b.npy', '1254_b.npy']
-corrupts_onesdataset = corrupts_onesdataset[corrupts_onesdataset['filename'] != '1232_b.npy']
-# add the remaining 1231_a to the onesdataset
-onesdataset = pd.concat([onesdataset, dataset[dataset['filename'] == '1232_a.npy']])
-corrupts_df = corrupts_df[~corrupts_df['filename'].isin(not_corrupts)]
-corrupts_df = corrupts_df[~corrupts_df['filename'].isin(corrupts_onesdataset['filename'])]
-
-# remove corrupt images from datast
-dataset = dataset[~dataset['filename'].isin(corrupts_df['filename'])]
-# remove single 1231_b from dataset
-dataset = dataset[dataset['filename'] != '1232_a.npy']
-
-# take a random sample to check
-rand_im = sample(list(dataset['filename'].values), 8)
-fig,ax = plot_image(os.path.join(intermediate_dir_training, data_dir_S21C), rand_im, [4,3,2], axis=False, normalize=True, titles = None)
-
-# one duplicate in onesdataset present
-onesdataset.drop_duplicates(subset='im_id',inplace=True)
-dataset = pd.concat([dataset, onesdataset[onesdataset['city'] == 'Toyama']])
-onesdataset = onesdataset[onesdataset['city'] != 'Toyama']
-
-# I found also that some cities are duplicated in the cities dataset
-citiesgroup = cities.groupby('city_ascii').count()
-np.any(citiesgroup['Lat_alt'] > 1)
-
-# look only at 1 image per pair to find duplicate pairs
-dataset_a = dataset[dataset['pair_idx'] == 'a']
-duplicated = dataset_a[dataset_a.duplicated(subset = ['Lng_alt', 'Lat_alt'])]['im_idx'].values
-
-# remove pairs with duplicated im_idx
-dataset = dataset[~dataset['im_idx'].isin(duplicated)]
-
-# save cleaned dataset
-dataset.to_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_cleaned.csv'),index=False)
-onesdataset.to_csv(os.path.join(intermediate_dir_training, 'single_images.csv'), index=False)
-errors.to_csv(os.path.join(intermediate_dir_training, 'errors.csv'), index=False)
-corrupts_df.to_csv(os.path.join(intermediate_dir_training, 'corrupts.csv'), index=False)
-
-#%%
-""" Download again Sentinel 2 1C images that went wrong """
-
-errors = pd.read_csv(os.path.join(intermediate_dir_training, 'errors.csv'))
-onesdataset = pd.read_csv(os.path.join(intermediate_dir_training, 'single_images.csv'))
-cities = pd.read_csv(os.path.join(results_dir_cities, cities_csv))
-dataset = pd.read_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_copy.csv'), header=None, names=['errors', 'system_idx', 'city', 'date', 'time', 'im_id'])
-
-# filter out the images that did not lead to a download
-errors = dataset.loc[dataset.loc[:,'errors'] == 'ERROR']
-errors = errors[errors['im_id'] != '-99999']
-dataset = dataset.loc[dataset['errors'] != 'ERROR']
-
-# add some more columns
-im_ids = errors.loc[:,'im_id'].values
-errors['im_idx'] = [image.split('_')[0] for image in im_ids]
-errors['pair_idx'] = [image.split('_')[1] for image in im_ids]
-errors['filename'] = [image + '.npy' for image in im_ids]
-
-# merge with cities dataset
-errors['im_idx'] = errors['im_idx'].astype('int64')
-errors = errors.merge(cities[['Lng_alt', 'Lat_alt', 'geonameid']], how = 'left', left_on = ['im_idx'], right_on = cities.index)
-
-# I will take for every error 2 new iamges
-errors = errors.drop_duplicates(subset = ['im_idx'])
-errors = errors.drop_duplicates(subset = ['Lat_alt', 'Lng_alt'])
-
-# save 
-errors.to_csv(os.path.join(intermediate_dir_training, 'errors_repeat.csv'), index=False)
-
-###########################   REPEAT   ########################################
-from data_download_functions import filterOnCities, eeToNumpy, \
-create_featurecollection
-
-data_dir_S21C_errors = 'data_S21C_repeat'
-csv_file_S21C_errors = 'S21C_dataset_repeat.csv'
-if not os.path.isdir(intermediate_dir_training):
-    os.makedirs(intermediate_dir_training) 
-if not os.path.isdir(os.path.join(intermediate_dir_training, data_dir_S21C_errors)):
-    os.makedirs(os.path.join(intermediate_dir_training, data_dir_S21C_errors)) 
-
-# init gee session
-#ee.Authenticate()
-ee.Initialize()
-
-errors = pd.read_csv(os.path.join(intermediate_dir_training, 'errors_repeat.csv'))
-errors['im_idx'] = errors['im_idx'].astype('object')
-
-# create features
-cities_fc = create_featurecollection(errors, ('Lng_alt', 'Lat_alt'), 
-                            properties = ['city_idx','city', 'im_idx'], 
-                            columns = ['city', 'im_idx'])
-
-# get image collection
-S21C = ee.ImageCollection('COPERNICUS/S2').filterBounds(cities_fc) \
-    .filterMetadata('CLOUDY_PIXEL_PERCENTAGE','less_than',1) \
-    .select(bands)
-    
-# filter image collection to get 2 random images per city
-city_collection = cities_fc.map(filterOnCities(S21C, size, n=n_im)) #featurecollection of imagecollection per city
-city_list = city_collection.toList(city_collection.size().getInfo()) #List of imagecollection per city
-print('cityCollection size: ', city_collection.size().getInfo())
-
-n_cities = len(city_list.getInfo())
-tot_time = 0
-for im in range(n_cities): 
-    
-    start_city = time.time()
-    imagePair = ee.ImageCollection(city_list.get(im))
-    pairsize = imagePair.size().getInfo()
-    if pairsize != n_im:
-        continue
-    images = imagePair.toList(pairsize)
-    area = imagePair.geometry()    
-    
-    for i in range(n_im):
-        start_im = time.time()
-        imx = ee.Image(images.get(i))
-        
-        # get some metadata
-        im_id = str(imx.get('city_idx').getInfo())+'_'+chr(ord('a')+i)
-        im_id2 = im_id
-        system_idx = imx.get('system:index').getInfo()
-        city = imx.get('city').getInfo()
-        datestr = system_idx.split('_')[0]
-        date = datestr.split('T')[0]
-        time_im = datestr.split('T')[1]
-
-        B = ee.ImageCollection([imx])
-        B = ee.Image(B.median())
-        
-        # covert to numpy array
-        try: 
-            np_image = eeToNumpy(B, area, bands, ntry=15)
-            # save
-            np.save(os.path.join(intermediate_dir_training,data_dir_S21C_errors, im_id+'.npy'), np_image)
-        except:
-            im_id = 'ERROR'
-            
-        
-        # save some info in csv-file
-        with open(os.path.join(intermediate_dir_training, csv_file_S21C_errors), 'a') as file:
-            writer = csv.writer(file, delimiter = ",")
-            writer.writerow([im_id, system_idx, city, date, time_im, im_id2])   
-        
-
-        end_im= time.time() - start_im
-        tot_time = tot_time + end_im
-        avg_time = tot_time / ((im*2)+i+1)
-
-        print("\r image {}/{} for city {}/{}. Avg time image (sec): {}".format(i+1,n_im,im+1,n_cities, avg_time), end='')
-
-#%%
-""" Check the repeated downloaded Sentinel-2 1C images and remove possible errors """
-from data_download_functions import filter_errors
-from plots import plot_image, plot_random_images
-from random import sample
-
-# read csvs
-cities = pd.read_csv(os.path.join(results_dir_cities, cities_csv))
-dataset = pd.read_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_repeat.csv'), header=None, names=['im_id_errors', 'system_idx', 'city', 'date', 'time', 'im_id'])
-
-# filter out the images that did not lead to a download
-errors = dataset.loc[dataset.loc[:,'im_id_errors'] == 'ERROR']
-dataset = dataset.loc[dataset.loc[:,'im_id_errors'] != 'ERROR']
-
-# add some more columns
-im_ids = dataset.loc[:,'im_id'].values
-dataset['im_idx'] = [image.split('_')[0] for image in im_ids]
-dataset['pair_idx'] = [image.split('_')[1] for image in im_ids]
-dataset['filename'] = [image + '.npy' for image in im_ids]
-# merge with cities dataset
-dataset['im_idx'] = dataset['im_idx'].astype('int64')
-dataset = dataset.merge(cities[['Lng_alt', 'Lat_alt', 'geonameid']], how = 'left', left_on = ['im_idx'], right_on = cities.index)
-dataset = dataset.drop(['im_id_errors'], axis = 1)
-
-# find the entries with only one image
-counts = dataset.groupby(['im_idx']).count()
-onescounts = counts[counts.loc[:,'city'] != 2]
-onesdataset = dataset.loc[dataset['im_idx'].isin(onescounts.index)]
-dataset = dataset.drop(onesdataset.index, axis=0)
-
-# find corrupt images at threshold 0.5
-corrupts = filter_errors(os.path.join(intermediate_dir_training, data_dir_S21C_errors), dataset['filename'].values, threshold=0.5, plot = False)
-
-# find the entries with only one image
-corrupts_df = pd.DataFrame(corrupts, columns=['filename'])
-corrupt_filenames = corrupts_df.loc[:,'filename'].values
-corrupts_df['im_idx'] = [image.split('_')[0] for image in corrupt_filenames]
-corrupts_df['pair_idx'] = [image.split('_')[1].split('.')[0] for image in corrupt_filenames]
-corrupts_df['im_id'] = [image.split('.')[0] for image in corrupt_filenames]
-corrupts_count = corrupts_df.groupby(['im_idx']).count()
-corrupts_onescounts = corrupts_count[corrupts_count.loc[:,'im_id'] != 2]
-corrupts_onesdataset = corrupts_df.loc[corrupts_df['im_idx'].isin(corrupts_onescounts.index)]
-corrupts_twodataset = corrupts_df.drop(corrupts_onesdataset.index, axis=0)
-
-
-# after visually checking the corrupt ones and twos dataset: 
-# the corrupts ones dataset does not contain errors
-# from the twosdataset ['127_a.npy', '127_b.npy', '730_a.npy', '730_b.npy', '756_a.npy', '756_b.npy'] are not corrupt
-plot_image(os.path.join(intermediate_dir_training, data_dir_S21C_errors), corrupts_twodataset['filename'].values[:8], [8,4,3])
-not_corrupts = ['127_a.npy', '127_b.npy', '730_a.npy', '730_b.npy', '756_a.npy', '756_b.npy']
-# remove the not corrupt images from the corrupts dataset
-corrupts_df = corrupts_df[~corrupts_df['filename'].isin(not_corrupts)]
-corrupts_df = corrupts_df[~corrupts_df['filename'].isin(corrupts_onesdataset['filename'])]
-
-# remove corrupt images from datast
-dataset = dataset[~dataset['filename'].isin(corrupts_df['filename'])]
-
-
-# take a random sample to check
-rand_im = sample(list(dataset['filename'].values), 8)
-fig,ax = plot_image(os.path.join(intermediate_dir_training, data_dir_S21C_errors), rand_im, [4,3,2], axis=False, normalize=True, titles = None)
-
-# check also the onesdataset for corrupt images
-corrupts = filter_errors(os.path.join(intermediate_dir_training, data_dir_S21C_errors), onesdataset['filename'].values, threshold=0.5, plot = False)
-corrupts_df = pd.DataFrame(corrupts, columns=['filename'])
-corrupt_filenames = corrupts_df.loc[:,'filename'].values
-corrupts_df['im_idx'] = [image.split('_')[0] for image in corrupt_filenames]
-corrupts_df['pair_idx'] = [image.split('_')[1].split('.')[0] for image in corrupt_filenames]
-corrupts_df['im_id'] = [image.split('.')[0] for image in corrupt_filenames]
-not_corrupts = ['64_b.npy', '394_a.npy']
-# remove the not corrupt images from the corrupts dataset
-corrupts_df = corrupts_df[~corrupts_df['filename'].isin(not_corrupts)]
-# remove corrupt images from onesdatast
-onesdataset = onesdataset[~onesdataset['filename'].isin(corrupts_df['filename'])]
-
-
-
-# save cleaned dataset
-dataset.to_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_errors_cleaned.csv'),index=False)
-onesdataset.to_csv(os.path.join(intermediate_dir_training, 'single_images_errors.csv'), index=False)
-
-dataset_repeated = dataset
-
-dataset_repeated = pd.read_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_errors_cleaned.csv'))
-dataset = pd.read_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_cleaned.csv'))
-dataset = pd.concat([dataset, dataset_repeated])
-
-# look only at 1 image per pair to find duplicate pairs
-dataset_a = dataset[dataset['pair_idx'] == 'a']
-duplicated = dataset_a[dataset_a.duplicated(subset = ['Lng_alt', 'Lat_alt'])]['im_idx'].values
-duplicated = dataset_a[dataset_a.duplicated(subset = ['geonameid'])]['im_idx'].values
-# remove pairs with duplicated im_idx
-dataset = dataset[~dataset['im_idx'].isin(duplicated)]
-# remove also from dataset_repeated
-dataset_repeated = dataset_repeated[~dataset_repeated['im_idx'].isin(duplicated)]
-
-# save datasets
-# save cleaned dataset
-dataset_repeated.to_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_errors_cleaned.csv'),index=False)
-dataset.to_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_cleaned.csv'),index=False)
-
-# move the extra files to the S21C datafolder
-import shutil
-for im in dataset_repeated['filename']:
-    print(im)
-    src = os.path.join(intermediate_dir_training, data_dir_S21C_errors, im)
-    dst = os.path.join(intermediate_dir_training, data_dir_S21C, im)
-    print(src)
-    print(dst)
-    shutil.move(src, dst)
-    
-# check if there are single images that can make a pair in both downloads
-onesdataset_repeated = pd.read_csv(os.path.join(intermediate_dir_training, 'single_images_errors.csv'))
-onesdataset_original = pd.read_csv(os.path.join(intermediate_dir_training, 'single_images.csv'))
-
-# first remove the single entries that were in the repeated download as pair
-onesdataset_original = onesdataset_original[~onesdataset_original['im_idx'].isin(dataset_repeated['im_idx'])]
-
-# check if there are corrupt images in the original sigle image dataset
-corrupts = filter_errors(os.path.join(intermediate_dir_training, data_dir_S21C), onesdataset_original['filename'].values, threshold=0.5, plot = False)
-corrupts_df = pd.DataFrame(corrupts, columns=['filename'])
-corrupt_filenames = corrupts_df.loc[:,'filename'].values
-corrupts_df['im_idx'] = [image.split('_')[0] for image in corrupt_filenames]
-corrupts_df['pair_idx'] = [image.split('_')[1].split('.')[0] for image in corrupt_filenames]
-corrupts_df['im_id'] = [image.split('.')[0] for image in corrupt_filenames]
-plot_image(os.path.join(intermediate_dir_training, data_dir_S21C), corrupts_df['filename'].values[:8], [8,4,3])
-not_corrupts = ['64_b.npy', '125_a.npy', '270_a.npy', '394_b.npy']
-# remove the not corrupt images from the corrupts dataset
-corrupts_df = corrupts_df[~corrupts_df['filename'].isin(not_corrupts)]
-# remove corrupt images from onesdatast
-onesdataset_original = onesdataset_original[~onesdataset_original['filename'].isin(corrupts_df['filename'])]
-
-# check if there are pairs
-doubles_original = onesdataset_original[onesdataset_original['im_idx'].isin(onesdataset_repeated['im_idx'])]
-doubles_original = doubles_original.merge(cities[['Lng_alt', 'Lat_alt', 'geonameid']], how = 'left', left_on = ['im_idx'], right_on = cities.index)
-doubles_repeated = onesdataset_repeated[onesdataset_repeated['im_idx'].isin(onesdataset_original['im_idx'])]
-doubles_repeated['dataset'] = 'repeated'
-doubles_original['dataset'] = 'original'
-
-# concatenate them
-together = pd.concat([doubles_original, doubles_repeated])
-together = together.sort_values('im_idx').reset_index()
-together['filename_old'] = together['filename']
-#together['filename'] = together['filename_old']
-
-# check if there are identical iamges
-if np.any(together.duplicated('system_idx')):
-    identical = together.duplicated('system_idx', keep=False)
-    together = together[~together['system_idx'].isin(together[identical]['system_idx'])]
-
-# modify filenames in dataframe
-unique_im_idx = np.unique(together['im_idx'])
-for idx in unique_im_idx:
-    i_iter = 0
-    for row_idx in together[together['im_idx'] == idx].index:
-        together.loc[row_idx, 'filename'] = str(together.loc[row_idx,'im_idx'])+'_'+chr(ord('a')+i_iter)+'.npy'
-        i_iter += 1
-        print(together.loc[row_idx, 'filename'])
-    
-# modify filenames in directory
-originals = together[together['dataset']=='original']
-repeats = together[together['dataset'] == 'repeated']    
-
-for idx, row in originals.iterrows():
-    src = os.path.join(intermediate_dir_training, data_dir_S21C, row.filename_old)
-    dest = os.path.join(intermediate_dir_training, data_dir_S21C, row.filename)
-    if src != dest:
-        print('move:', row.filename_old, ' to ', row.filename)
-        shutil.move(src, dest)
-
-for idx, row in repeats.iterrows():
-    src = os.path.join(intermediate_dir_training, data_dir_S21C_errors, row.filename_old)
-    dest = os.path.join(intermediate_dir_training, data_dir_S21C, row.filename)
-    if src != dest:
-        shutil.move(src, dest)
-
-# save together dataframe
-together.to_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_singles_together.csv'), index=False)
-
-# add the new data to the dataset
-dataset = pd.read_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_cleaned.csv'))
-together = pd.read_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_singles_together.csv'))
-together = together.drop(['dataset', 'filename_old', 'index'], axis = 1)
-dataset = pd.concat([dataset, together])
-
-# look only at 1 image per pair to find duplicate pairs
-dataset_a = dataset[dataset['pair_idx'] == 'a']
-duplicated = dataset_a[dataset_a.duplicated(subset = ['geonameid'])]['im_idx'].values
-# remove pairs with duplicated im_idx
-dataset = dataset[~dataset['im_idx'].isin(duplicated)]
-
-
-# save datasets
-dataset.to_csv(os.path.join(intermediate_dir_training, 'S21C_dataset_cleaned.csv'),index=False)
-# move the extra files to the S21C datafolder
-import shutil
-for im in dataset_repeated['filename']:
-    print(im)
-    src = os.path.join(intermediate_dir_training, data_dir_S21C_errors, im)
-    dst = os.path.join(intermediate_dir_training, data_dir_S21C, im)
-    print(src)
-    print(dst)
-    shutil.move(src, dst)
-
-#%%        
-        
-from plots import plot_random_imagepairs, plot_random_images, plot_image
-
-
-fig, ax = plot_random_imagepairs(2, os.path.join(result_dir_test, data_dir_OSCD), [4,3,2], rows = 4)
-fig, ax = plot_random_images(7, os.path.join(intermediate_dir_test, data_dir_OSCD), [4,3,2], cols = 4, axis= True)
-fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['833_a.npy', '833_b.npy', '337_a.npy', '337_b.npy'], [4,3,2], titles = ['336_a.npy', '336_b.npy', '337_a.npy', '337_b.npy'], axis=True)
-fig, ax = plot_image(os.path.join(intermediate_dir_training, data_dir_S21C), ['833_a.npy', '833_b.npy'], [3,2,1], titles = ['Sambalpur 21/02/2019', 'Sambalpur 14/11/2018', 'Yokohama 08/05/2019', 'Yokohama 14/12/2029'], axis=False)
-fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['1001_a.npy', '1001_b.npy','516_a.npy', '516_b.npy', '517_a.npy', '517_b.npy'], [4,3,2], rows=6, cols=0, titles = ['1001_a.npy', '1001_b.npy','516_a.npy', '516_b.npy', '517_a.npy', '517_b.npy'], axis=True)
-fig, ax = plot_image2(os.path.join(intermediate_dir_training, data_dir_S21C), ['1811_a.npy', '1811_b.npy'], [4,3,2], titles = ['1811_a.npy', '1811_b.npy'], axis=True)
-fig, ax = plot_random_imagepairs(2, os.path.join(results_dir_training, data_dir_S21C), [4,3,2])
-fig, ax = plot_image(os.path.join(results_dir_training, data_dir_S21C), ['1012_a.npy', '1012_b.npy', '617_a.npy', '617_b.npy'], [3,2,1])
-fig, ax = plot_image(os.path.join(patches_dir), ['100_2_0.npy', '100_2_1.npy'], [3,2,1], titles = ['a', 'b'], axis=True)
-fig, ax = plot_random_imagepairs(2, os.path.join(directories['results_dir_training'], directories['data_dir_S21C']), bands=[3,2,1], titles='image_nr')
-fig, ax = plot_image(os.path.join(directories['results_dir_training'], directories['data_dir_S21C']), ['992_b.npy'], [3,2,1])
-
-
-im1 = np.load(os.path.join(intermediate_dir_training, data_dir_S21C, '337_a.npy'))
-im2 = np.load(os.path.join(intermediate_dir_training, data_dir_S21C, '337_b.npy'))
-assert im1.shape == im2.shape, "Shape not matching in pair {}".format(im_idx)
-assert np.any(im1 != 0) & np.any(im2 != 0), "No non-zeros in pair {}".format('im_337')
-assert np.any(~np.isnan(im2)) & np.any(~np.isnan(im1)), "Nans in pair {}".format(im_idx) 
-
-
-#%%
-import pandas as pd
-from data_download_functions import filter_errors
-from plots import plot_image
-
-csv_file = '/media/cordolo/5EBB-8C9A/Studie Marrit/2019-2020/Thesis/data/S21C_dataset.csv'
-image_folder = '/media/cordolo/5EBB-8C9A/Studie Marrit/2019-2020/Thesis/data/example_data'
-
-
-dataset = pd.read_csv(csv_file, header=None, names=['im_id', 'system_idx', 'city', 'date', 'time'])
-dataset.loc[:,'im_id']
-dataset = dataset.loc[dataset.loc[:,'im_id'] != 'ERROR']
-im_ids = dataset.loc[:,'im_id'].values
-dataset['im_idx'] = [image.split('_')[0] for image in im_ids]
-dataset['pair_idx'] = [image.split('_')[1] for image in im_ids]
-dataset['filename'] = [image + '.npy' for image in im_ids]
-errors = filter_errors(image_folder, dataset['filename'].values, threshold=0.5, plot = False)
-fig = plot_image(image_folder, dataset['filename'].values, [3,2,1], axis = False, normalize=True)

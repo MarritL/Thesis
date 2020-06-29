@@ -15,9 +15,12 @@ from torch.nn import functional as F
 from models import siamese_net, hypercolumn_net, siamese_unet_diff, siamese_net_apn, \
     siamese_unet, triplet_unet, siamese_net_dilated, siamese_net_apn_dilated, \
     siamese_net_concat, logistic_regression, CD_siamese_net, CD_siamese_net_apn, \
-    CD_siamese_net_apn_classifier    
+    CD_siamese_net_apn_classifier, CD_siamese_net_cat 
         
 class NetBuilder:
+    """
+    Load the correct network, and initialize parameters
+    """
     # custom weights initialization
     @staticmethod
     def init_weight(m):
@@ -160,7 +163,7 @@ class NetBuilder:
         return net
  
     @staticmethod
-    def build_cd_network(network, network_name, network_settings):
+    def build_cd_network(network, network_name, network_settings,n_branches=2):
         
         if network_name == 'CD_siamese':
             net = CD_siamese_net.__dict__['siamese_cd_net'](
@@ -173,6 +176,13 @@ class NetBuilder:
                 network=network, 
                 layers_branches=network_settings['layers_branches'], 
                 cfg_classifier=network_settings['cfg']['classifier_cd'])
+        elif network_name == 'CD_cat_siamese':
+            net = CD_siamese_net_cat.__dict__['siamese_cd_net_cat'](
+                network=network, 
+                layers_branches=network_settings['layers_branches'], 
+                layers_joint=network_settings['layers_joint'], 
+                cfg_classifier=network_settings['cfg']['classifier_cd'],
+                n_branches=n_branches)
         else:
             raise Exception('Architecture undefined!\n \
                         Choose one of: "siamese", "hypercolumn", \
@@ -196,8 +206,9 @@ def create_loss_function(lossfunction, pos_weight=1):
     
     if lossfunction == 'cross_entropy':
         one_hot = False
-        loss_func = nn.CrossEntropyLoss() 
-        acc_func = acc_functions['accuracy']
+        pos_weight = torch.tensor(pos_weight)
+        loss_func = nn.CrossEntropyLoss(weight=pos_weight) 
+        acc_func = acc_functions['avg_accuracy']
     elif lossfunction == 'bce_sigmoid':
         pos_weight = torch.tensor(pos_weight)
         one_hot = True
@@ -266,12 +277,48 @@ def create_optimizer(optimizer_string, params, lr, weight_decay=0):
 
 
 def accuracy(outputs, labels, im_size=(1,1)):
+    """
+    Calculate accuracy for labels of shape N
+
+    Parameters
+    ----------
+    outputs : tensor
+        output of forward pass.
+    labels : tensor
+        labels.
+    im_size : tuple, optional
+        For dense predictions, the accuracy should be divided by the image size. 
+        The default is (1,1), for single value predictions.
+
+    Returns
+    -------
+    acc : tensor
+        Accuracy of prediction.
+    """
     val, preds = torch.max(outputs, dim=1)
     acc_sum = torch.sum(preds == labels)
     acc = acc_sum.float() / (len(labels) + 1e-10) / (im_size[0]*im_size[1])
     return acc
 
 def accuracy_onehot(outputs, labels, im_size=(1,1)):
+    """
+    Calculate accuracy for one-hot labels shape N*C where C is number of classes
+
+    Parameters
+    ----------
+    outputs : tensor 
+        output of forward pass.
+    labels : tensor
+        labels.
+    im_size : tuple, optional
+        For dense predictions, the accuracy should be divided by the image size. 
+        The default is (1,1), for single value predictions.
+
+    Returns
+    -------
+    acc : tensor
+        Accuracy of prediction.
+    """
     _, preds = torch.max(outputs, dim=1)
     _, labs = torch.max(labels, dim=1)
     acc_sum = torch.sum(preds == labs)
@@ -279,9 +326,28 @@ def accuracy_onehot(outputs, labels, im_size=(1,1)):
     return acc
 
 def accuracy_fake(outputs, labels, im_size=(1,1)):
-    return torch.max(labels).float()
+    """ Function to use when task does not have any accuracy output """
+    return 0
 
 def F1(outputs, labels, im_size=(1,1)):
+    """
+    Calculate F1-score for labels of shape N
+
+    Parameters
+    ----------
+    outputs : tensor
+        output of forward pass.
+    labels : tensor
+        labels.
+    im_size : tuple, optional
+        For dense predictions, the accuracy should be divided by the image size. 
+        The default is (1,1), for single value predictions.
+
+    Returns
+    -------
+    f1 : tensor
+        F1-score of prediction.
+    """
     _, labels = torch.max(labels, dim=1)
     val, preds = torch.max(outputs, dim=1)
     tp = torch.sum((preds == 1) & (preds == labels))
@@ -294,6 +360,24 @@ def F1(outputs, labels, im_size=(1,1)):
     return f1
 
 def avg_accuracy(outputs, labels, im_size=(1,1)):
+    """
+    Calculate Average Accuarcy for labels of shape N
+
+    Parameters
+    ----------
+    outputs : tensor
+        output of forward pass.
+    labels : tensor
+        labels.
+    im_size : tuple, optional
+        For dense predictions, the accuracy should be divided by the image size. 
+        The default is (1,1), for single value predictions.
+
+    Returns
+    -------
+    acc : tensor
+        Average Accuracy of prediction.
+    """
     val, preds = torch.max(outputs, dim=1)
     tp = torch.sum((preds == 1) & (preds == labels))
     fp = torch.sum((preds == 1) & (preds != labels))
@@ -340,73 +424,6 @@ class F1Loss(nn.Module):
         f1 = 2 * (precision * recall) / (precision + recall+1e-10)
         return 1 - torch.mean(f1)
 
-    
-
-# =============================================================================
-# def f1(y_true, y_pred):
-#     y_pred = K.round(y_pred)
-#     tp = K.sum(K.cast(y_true*y_pred, 'float'), axis=0)
-#     tn = K.sum(K.cast((1-y_true)*(1-y_pred), 'float'), axis=0)
-#     fp = K.sum(K.cast((1-y_true)*y_pred, 'float'), axis=0)
-#     fn = K.sum(K.cast(y_true*(1-y_pred), 'float'), axis=0)
-# 
-#     p = tp / (tp + fp + K.epsilon())
-#     r = tp / (tp + fn + K.epsilon())
-# 
-#     f1 = 2*p*r / (p+r+K.epsilon())
-#     f1 = tf.where(tf.is_nan(f1), tf.zeros_like(f1), f1)
-#     return K.mean(f1)
-# 
-# def f1_loss(y_true, y_pred):
-#     
-#     tp = K.sum(K.cast(y_true*y_pred, 'float'), axis=0)
-#     tn = K.sum(K.cast((1-y_true)*(1-y_pred), 'float'), axis=0)
-#     fp = K.sum(K.cast((1-y_true)*y_pred, 'float'), axis=0)
-#     fn = K.sum(K.cast(y_true*(1-y_pred), 'float'), axis=0)
-# 
-#     p = tp / (tp + fp + K.epsilon())
-#     r = tp / (tp + fn + K.epsilon())
-# 
-#     f1 = 2*p*r / (p+r+K.epsilon())
-#     f1 = tf.where(tf.is_nan(f1), tf.zeros_like(f1), f1)
-#     return 1 - K.mean(f1)
-# =============================================================================
-    
-# =============================================================================
-#     def forward(self, pos_dist, neg_dist, reduction='mean'):
-#         losses = F.relu(self.margin + pos_dist - neg_dist)
-#         if reduction == 'none':
-#             return losses
-#         elif reduction == 'mean':
-#             return losses.mean()
-#         elif reduction == 'sum':
-#             return losses.sum()
-#         else:
-#             raise Exception('reduction undefined! \n \
-#                             Choose one of: "mean", "sum", "none"!')
-# =============================================================================
-
-# Here L1 with power and sum. 
-# =============================================================================
-# class CombinedLoss(nn.Module):
-#     def __init__(self, margin = 1.0, weight=1):
-#         super(CombinedLoss, self).__init__()
-#         self.weight = weight
-#         self.l1 = nn.L1Loss(reduction='mean')
-#         self.ltriplet = nn.TripletMarginLoss()
-#         
-#     def forward(self, inputs, targets):
-#         anchor = inputs[0]
-#         positives = inputs[1]
-#         negatives = inputs[2]
-#         
-#         loss1 = self.l1(positives.pow(2).sum(1), anchor.pow(2).sum(1))
-#         loss2 = self.ltriplet(anchor, positives, negatives)
-#         
-#         loss = loss1 + self.weight * loss2
-#         
-#         return loss, loss1, loss2
-# =============================================================================
     
 # Here L1 without power and sum    
 class CombinedLossL1(nn.Module):
@@ -505,38 +522,6 @@ def init_weight(m):
     elif classname.find('Linear') != -1:
         m.weight.data.normal_(0.0, 0.0001)
         
-        
-# =============================================================================
-# class CombinedLoss(nn.Module):
-#     def __init__(self, margin = 1.0, weight=1):
-#         super(CombinedLoss, self).__init__()
-#         self.weight = weight
-#         self.L1 = nn.L1Loss(reduction='mean') 
-#         self.Ltriplet = TripletLoss(margin)
-#         
-#     def forward(self, inputs, targets):
-#         pos_dist = inputs[0]
-#         neg_dist = inputs[1]
-#         
-#         # average over image
-#         #loss1 = self.L1(pos_dist.mean((1,2)), targets) 
-#         #loss2 = self.Ltriplet(pos_dist.mean((1,2)), neg_dist.mean((1,2))) 
-#         
-#         # pixel-wise
-#         loss1 = self.L1(pos_dist, targets)      
-#         loss2 = self.Ltriplet(pos_dist, neg_dist)
-#         #print("L1: {}, triplet: {}".format(loss1, loss2))
-#         
-#         loss = loss1 + self.weight * loss2
-#         
-#         return loss, loss1, loss2
-# =============================================================================
-
-# =============================================================================
-# fig, ax = plt.subplots()
-# im2 = ax.imshow(F.relu(1 + pos_dist-neg_dist)[0].detach())
-# fig.colorbar(im2, ax=ax)
-# =============================================================================
 
 
 

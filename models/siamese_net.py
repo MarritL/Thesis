@@ -63,13 +63,13 @@ class SiameseNet(nn.Module):
                         activations[names[i]] = l(x)
                         if activations[names[i]].shape[2:] != data[j].shape[2:]:
                             activations[names[i]] = nn.functional.interpolate(
-                                 activations[names[i]], size=data[i].shape[2:], 
+                                 activations[names[i]], size=data[j].shape[2:], 
                                  mode='bilinear', align_corners=True)
                     else:
                         activations[names[i]] = l(activations[names[i-1]])
                         if activations[names[i]].shape[2:] != data[j].shape[2:]:
                             activations[names[i]] = nn.functional.interpolate(
-                                 activations[names[i]], size=data[i].shape[2:], 
+                                 activations[names[i]], size=data[j].shape[2:], 
                                  mode='bilinear', align_corners=True)
                             
                 # return a list of features

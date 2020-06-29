@@ -240,7 +240,7 @@ def plot_image(image_folder, image_list, bands, axis = False, normalize=True, ti
         cols = 1 if n_images < 2 else 2
     
     # prepare
-    fig = plt.figure(constrained_layout=constrainted_layout, figsize=(15,15))
+    fig = plt.figure(constrained_layout=constrainted_layout, figsize=(6,6))
     gs = fig.add_gridspec(rows, cols)
     
     #fig, ax = plt.subplots(rows,cols, figsize = (10,10))
@@ -469,6 +469,23 @@ def plot_sampled_triplets(image_folder, image_list, patch1_start, patch2_start, 
         ax.append(fig.add_subplot(gs[1,2:4]))
         ax.append(fig.add_subplot(gs[1,4:]))
 
+    
+# =============================================================================
+#     for i,file in enumerate(image_list):
+#         if n_images == 1:
+#             ax_pos = 0 
+#             ax[ax_pos].add_patch(patch_locs[i*2])
+#         else:
+#             ax_pos = ord(file.split('.')[0].split('_')[1])-97
+#             ax[ax_pos].add_patch(patch_locs[(i*2)])
+#             ax[ax_pos].add_patch(patch_locs[(i)])
+#             not_ax = 1 if ax_pos == 0 else 0
+#             ax[not_ax].add_patch(patch_locs[i+((i+1)*1)])
+#         ax[ax_pos].text(patch_locs[(i*2)].xy[0], patch_locs[(i*2)].xy[1]+patch_size/2+20, 'p'+str(i+1), fontsize=10, color='r')
+#         ax[ax_pos].text(patch_locs[(i)].xy[0], patch_locs[(i)].xy[1]+patch_size/2+20, 'p'+str(i+1), fontsize=10, color=colors[i])
+#       
+# =============================================================================
+    print(len(image_list))
     for i,file in enumerate(image_list):
         if n_images == 1:
             ax_pos = 0 
@@ -476,18 +493,33 @@ def plot_sampled_triplets(image_folder, image_list, patch1_start, patch2_start, 
         else:
             ax_pos = ord(file.split('.')[0].split('_')[1])-97
             #ax[ax_pos].add_patch(patch_locs[(i*2)])
-            ax[ax_pos].add_patch(patch_locs[(i)])
+            #ax[ax_pos].add_patch(patch_locs[(i)])
             not_ax = 1 if ax_pos == 0 else 0
-            #ax[not_ax].add_patch(patch_locs[i+((i+1)*1)])
+            ax[not_ax].add_patch(patch_locs[i])
         #ax[ax_pos].text(patch_locs[(i*2)].xy[0], patch_locs[(i*2)].xy[1]+patch_size/2+20, 'p'+str(i+1), fontsize=10, color='r')
         #ax[ax_pos].text(patch_locs[(i)].xy[0], patch_locs[(i)].xy[1]+patch_size/2+20, 'p'+str(i+1), fontsize=10, color=colors[i])
         
         # plot patch. Note: subsetting in numpy, thus again first rows than columns      
-        if plot_patches:
-                ax[i+n_images].imshow(images[ax_pos][patch_starts[i][0]:patch_starts[i][0]+patch_size,patch_starts[i][1]:patch_starts[i][1]+patch_size, :])
+        if plot_patches:          
+            ax[i+n_images].imshow(images[ax_pos][patch_starts[i][0]:patch_starts[i][0]+patch_size,patch_starts[i][1]:patch_starts[i][1]+patch_size, :])
+            ax[i+n_images].spines['bottom'].set_color(colors[i])
+            ax[i+n_images].spines['top'].set_color(colors[i])
+            ax[i+n_images].spines['left'].set_color(colors[i])
+            ax[i+n_images].spines['right'].set_color(colors[i])
+            ax[i+n_images].spines['bottom'].set_linewidth(3)
+            ax[i+n_images].spines['top'].set_linewidth(3)
+            ax[i+n_images].spines['left'].set_linewidth(3)
+            ax[i+n_images].spines['right'].set_linewidth(3)
+            ax[i+n_images].set_yticks([])
+            ax[i+n_images].set_xticks([])
 
+# =============================================================================
+#     if not axis:
+#         for i in range(len(ax)):
+#             ax[i].axis('off')
+# =============================================================================
     if not axis:
-        for i in range(len(ax)):
+        for i in range(2):
             ax[i].axis('off')
         
     if titles != None:

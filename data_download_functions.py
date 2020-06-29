@@ -51,104 +51,6 @@ def placenameToCoordinates(placename):
     return getLocation(placename)
 
 
-# =============================================================================
-# def clipImage(geom, label, index, size, resolution=10):
-#     """
-#     Clips an Image to specified size around a point
-# 
-#     Parameters
-#     ----------
-#     geom : ee.Geometry
-#         Central point of the output image
-#     label : string
-#         Name of central point (assumed to be a city)
-#     index : int
-#         identifier of city
-#     size : int
-#         size of output image in pixels
-#     resolution : int
-#         spatial resolution of input image. Default is 10 (Sentinel-2).
-# 
-#     Returns
-#     -------
-#     ee.Image
-#         Google earth engine image clipped around central point
-# 
-#     """
-#     def wrap(image):
-#         nonlocal geom
-#         nonlocal label
-#         nonlocal index
-#         nonlocal size
-#         
-#         #cast to ee objects
-#         geom = ee.Geometry(geom)
-#         image = ee.Image(image)
-#         
-#         # calculate aio
-#         aoi = geom.buffer((size/2*resolution)).bounds()
-#         
-#         #add label and clip to aoi
-#         image = image.set({'city': label}) \
-#                      .set({'city_idx': index})\
-#                      .clip(aoi) #\
-#         #             .select('B.+')
-#     
-#         return image
-#     return wrap
-# =============================================================================
-
-# =============================================================================
-# def filterOnCities(image_col, size, n=2): 
-#     """
-#     Filters an ImageCollection based on a FeatureCollection of city-points
-#     Should be used as a mapping function with a map over the FeatureCollection 
-#     of ee.Geometry() Points.
-# 
-#     Parameters
-#     ----------
-#     image_col : ee.ImageCollection
-#         google earth engine image collection, should contain multiple images for
-#         each city
-#     size : int
-#         approximage output size of final image (in pixels)
-#     n : int, optional
-#         Number of images per city. The default is 2.
-# 
-#     Returns
-#     -------
-#     ee.FeatureCollection
-#         Each feature in the google earth engine feature collection represents 
-#         1 city and contains an ee.ImageCollection of n images
-# 
-#     """
-#     def wrap(city):
-#         nonlocal image_col
-#         nonlocal size
-#         nonlocal n
-#         
-#         # get city info
-#         geometry = city.geometry();
-#         label = city.getString('city')
-#         idx = city.get('im_idx')
-#         
-#         # filter imges
-#         images = image_col.filterBounds(geometry) \
-#                          .randomColumn('random', 77) \
-#                          .sort('random') \
-#                          .limit(n) \
-#                          .set({'city': label}) \
-#                          .set({'geometry': geometry}) \
-#                          .set({'city_idx': idx}) \
-#                          .map(clipImage(geometry, label, idx, size))  
-#          
-#         #checksize = images.size().getInfo()    
-#         #assert checksize == n
-#         #assert images.size().getInfo() >2, "collection is 2"
-#         return ee.ImageCollection(images) 
-#     return wrap
-# =============================================================================
-
 def clipImage(geom, properties, size, resolution=10):
     """
     Clips an Image to specified size around a point
@@ -478,12 +380,14 @@ def tif_to_numpy(tif_folder, band_list, n_bands, n_rows=None, n_cols=None):
                 n_cols = ds.RasterXSize
             if n_rows == None:
                 n_rows = ds.RasterYSize 
+            n_cols = 688
+            n_rows = 639
             image = np.zeros((n_rows, n_cols, n_bands))  
         
         # check if object has correct shape
         if not ds.RasterXSize == n_cols or not ds.RasterYSize == n_rows:
             print("resample... {}".format(im_band))
-            ds = gdal.Warp("", ds, format='mem', width=n_cols, height=n_rows, resampleAlg=1)
+            ds = gdal.Warp("", ds, format='mem', width=n_cols, height=n_rows, resampleAlg=0)
         
         # read values in tiff image
         for b in range(ds.RasterCount):

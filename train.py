@@ -6,14 +6,13 @@ Created on Tue Feb  4 16:21:16 2020
 @author: M. Leenstra
 """
 
-#from tensorboardX import SummaryWriter
+
 from models.netbuilder import NetBuilder, create_loss_function, create_optimizer, init_weight
 from data_generator import PairDataset, TripletDataset, TripletDatasetPreSaved
 from data_generator import PartlyOverlapDataset, TripletAPNDataset, PairHardNegDataset
 from data_generator import TripletAPNHardNegDataset, ShuffleBandDataset, TripletFromFileDataset
 from data_generator import TripletAPNFinetuneDataset, PairDatasetOverlap, SupervisedDataset
-from data_generator import SupervisedDatasetFromFile
-from OSCDDataset import OSCDDataset, RandomFlip, RandomRot
+from data_generator import SupervisedDatasetFromFile, TripletAPNFromFileDataset
 from models.siameseNetAPNFinetune import siameseNetAPNFinetune
 from models.siamese_net import make_conv_classifier
 from utils import AverageMeter
@@ -25,17 +24,13 @@ import time
 import csv
 import copy
 import numpy as np
-#torch.manual_seed(211)
+
 
 def train(directories, dataset_settings, network_settings, train_settings):
 
     # init tensorboard
     network_name = network_settings['network']
     outputtime = '{}'.format(time.strftime("%d%m%Y_%H%M%S", time.localtime()))
-    #tb_dir = os.path.join(directories['tb_dir'], 'network-{}_date-{}'
-    #                      .format(network_name, outputtime))
-    #writer = SummaryWriter(logdir=tb_dir)
-    #print("tensorboard --logdir {}".format(tb_dir))
     
     # init save-file
     fieldnames = ['filename', 'networkname', 'cfg_branch', 'cfg_top', 'cfg_classifier', \
@@ -111,12 +106,12 @@ def train(directories, dataset_settings, network_settings, train_settings):
         dataset_train, 
         batch_size=train_settings['batch_size'], 
         shuffle=True,
-        num_workers = 4)
+        num_workers = 10)
     dataloader_val = DataLoader(
         dataset_val, 
         batch_size=train_settings['batch_size'], 
         shuffle=False,
-        num_workers = 2)
+        num_workers = 5)
     
     if dataset_settings['dataset_type'] == 'supervised' or dataset_settings['dataset_type'] == 'supervised_from_file':
         pos_weight = dataset_train.pos_weight
@@ -226,7 +221,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
         top = str(list(network_settings['cfg']['top']))
     else:
         top = 'None'
-    # TODO: write info to csv-file
+    # write info to csv-file
     savedata = {'filename':os.path.join(directories['model_dir'],
                         'network-{}_date-{}'.format(network_name, outputtime)), 
                'networkname': network_name, 
@@ -264,7 +259,7 @@ def train(directories, dataset_settings, network_settings, train_settings):
                         'history_network-{}_date-{}'.format(network_name, outputtime)))
         
     print('Training Done!')
-    #writer.close()
+
     
 
 def evaluate(model_settings, directories, dataset_settings, network_settings, train_settings):
@@ -338,231 +333,85 @@ def evaluate(model_settings, directories, dataset_settings, network_settings, tr
 
     return best_acc, best_loss, best_prob
 
-
-
+def evaluate_apn(model_settings, directories, dataset_settings, network_settings, train_settings):
     
-# =============================================================================
-# def finetune(model_settings, directories, dataset_settings, network_settings, train_settings):
-# 
-#     # init 
-#     network_name = model_settings['networkname']+'_finetune'
-#     outputtime = '{}'.format(time.strftime("%d%m%Y_%H%M%S", time.localtime()))
-#     
-#     # init save-file
-#     fieldnames = ['filename','pretask_filename','networkname', 'cfg_branch', 'cfg_top', 'cfg_classifier', \
-#                   'optimizer', 'lr', 'weight_decay', 'loss', 'n_classes', \
-#                   'n_channels','patch_size','batch_norm','dataset','min_overlap',\
-#                   'max_overlap', 'best_acc','best_epoch', 'best_loss', 'weight', \
-#                   'global_avg_pool', 'n_train_patches', 'patches_per_image', \
-#                   'n_val_patches', 'kthfold', 'n_eval_patches', 'eval_acc', 'eval_loss', 'eval_prob',\
-#                   'tp_oscd_eval_triangle', 'tn_oscd_eval_triangle', 'fp_oscd_eval_triangle',\
-#                   'fn_oscd_eval_triangle', 'f1_oscd_eval_triangle']
-#     if not os.path.exists(os.path.join(directories['intermediate_dir'],directories['csv_models_finetune'])):
-#         with open(os.path.join(directories['intermediate_dir'],directories['csv_models_finetune']), 'a') as file:
-#             filewriter = csv.DictWriter(file, fieldnames, delimiter = ",")
-#             filewriter.writeheader()
-#            
-#     # get network
-#     network_settings['im_size'] = (1,1)
-#     n_branches, pos_weight = determine_branches(network_settings, dataset_settings)
-#     network = get_network(model_settings, train_settings['gpu'])  
-#     
-#     # add new classifier
-#     in_channels = network.joint[0].out_channels
-#     cfg = np.array(['C', network_settings['n_classes']])
-#     classifier = make_conv_classifier(cfg[1:], in_channels, batch_norm=True)
-#     classifier.apply(init_weight)
-#     network.classifier = classifier
-#     print(network)
-#     conv_classifier = True 
-#     
-#     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], pos_weight=pos_weight)
-#     
-#     # load net to GPU     
-#     if train_settings['gpu'] != None:
-#         torch.cuda.set_device(train_settings['gpu'])
-#         network.cuda()
-#         loss_func = loss_func.cuda()
-# 
-#     optim = create_optimizer(network_settings['optimizer'], network.parameters(), 
-#                              network_settings['lr'], 
-#                              weight_decay=network_settings['weight_decay'])
-#     
-#     # Datasets
-#     if dataset_settings['dataset_type'] == 'supervised_from_file':
-#          dataset_settings['df'] = dataset_settings['dataset_train_df']
-#     dataset_train = get_dataset(
-#         data_path=directories['data_path'], 
-#         indices=dataset_settings['indices_train'], 
-#         channels=dataset_settings['channels'], 
-#         one_hot=one_hot, 
-#         dataset_settings=dataset_settings, 
-#         network_settings=network_settings)
-#     if dataset_settings['dataset_type'] == 'supervised_from_file':
-#          dataset_settings['df'] = dataset_settings['dataset_val_df']    
-#     dataset_val = get_dataset(
-#         data_path=directories['data_path'], 
-#         indices=dataset_settings['indices_val'], 
-#         channels=dataset_settings['channels'], 
-#         one_hot=one_hot, 
-#         dataset_settings=dataset_settings, 
-#         network_settings=network_settings)
-# 
-#     # Data loaders
-#     dataloader_train = DataLoader(
-#         dataset_train, 
-#         batch_size=train_settings['batch_size'], 
-#         shuffle=True,
-#         num_workers = 8)
-#     dataloader_val = DataLoader(
-#         dataset_val, 
-#         batch_size=train_settings['batch_size'], 
-#         shuffle=False,
-#         num_workers = 4)
-#     
-#     if dataset_settings['dataset_type'] == 'supervised':
-#         pos_weight = dataset_train.pos_weight
-#         loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], pos_weight=pos_weight)
-#      
-#     # save history
-#     history = {'train': {'epoch': [], 'loss': [], 'acc': []}, 
-#                'val':{'epoch': [], 'loss': [], 'acc': []}}
-#     
-#     epoch_iters =  max(len(dataset_train) // train_settings['batch_size'],1)
-#     val_epoch_iters = max(len(dataset_val) // train_settings['batch_size'],1)
-#     
-#     best_net_wts = copy.deepcopy(network.state_dict())
-#     best_acc = 0.0
-#     best_epoch = 0
-#     best_loss = 99999
-#     
-#     train_functions = {'train_normal': train_epoch,
-#                        'train_apn': train_epoch_apn,
-#                        'train_unet': train_epoch_unet}
-#     val_functions = {'val_normal': validate_epoch,
-#                      'val_apn': validate_epoch_apn,
-#                      'val_unet': validate_epoch_unet}
-#     
-#     if network_settings['network'] == 'triplet_apn' or network_settings['network'] == 'triplet_apn_dilated':
-#         train_func = train_functions['train_apn']
-#         val_func = val_functions['val_apn']
-#     elif network_settings['network'] == 'triplet_unet':
-#         train_func = train_functions['train_unet']
-#         val_func = val_functions['val_unet']
-#     else:
-#         train_func = train_functions['train_normal']
-#         val_func = val_functions['val_normal']
-#     
-#     try:            
-#         for epoch in range(train_settings['start_epoch'], 
-#                            train_settings['start_epoch']+train_settings['num_epoch']):
-#             
-#             # early stopping
-#             if (epoch - best_epoch) > train_settings['early_stopping']:
-#                 break
-#                        
-#             #training epoch
-#             train_func(
-#                 network_settings,
-#                 network=network, 
-#                 n_branches=n_branches,
-#                 dataloader=dataloader_train, 
-#                 optimizer=optim, 
-#                 loss_func=loss_func,
-#                 acc_func=acc_func,
-#                 history=history, 
-#                 epoch=epoch, 
-#                 writer=None,
-#                 epoch_iters=epoch_iters, 
-#                 disp_iter=train_settings['disp_iter'],
-#                 gpu = train_settings['gpu'],
-#                 im_size = network_settings['im_size'],
-#                 extract_features=network_settings['extract_features'],
-#                 avg_pool=network_settings['avg_pool'],
-#                 directories=directories, 
-#                 network_name=network_name, 
-#                 outputtime=outputtime,
-#                 conv_classifier=conv_classifier,
-#                 model_dir=directories['model_dir_finetune'])
-#             
-#             # validation epoch
-#             best_net_wts, best_acc, best_epoch, best_loss = val_func(
-#                 network_settings,
-#                 network=network, 
-#                 n_branches=n_branches,
-#                 dataloader=dataloader_val, 
-#                 loss_func=loss_func,
-#                 acc_func=acc_func,
-#                 history=history, 
-#                 epoch=epoch, 
-#                 writer=None,
-#                 val_epoch_iters=val_epoch_iters,
-#                 best_net_wts=best_net_wts,
-#                 best_acc=best_acc,
-#                 best_epoch=best_epoch,
-#                 best_loss=best_loss,
-#                 gpu = train_settings['gpu'],
-#                 im_size = network_settings['im_size'],
-#                 extract_features=network_settings['extract_features'],
-#                 avg_pool=network_settings['avg_pool'],
-#                 directories=directories, 
-#                 network_name=network_name, 
-#                 outputtime=outputtime,
-#                 conv_classifier=conv_classifier,
-#                 model_dir=directories['model_dir_finetune'])
-#     
-#     # on keyboard interupt continue the script: saves the best model until interrupt
-#     except KeyboardInterrupt:
-#         print("KeyboardInterrupt. Saving progress...")
-#         
-#     
-#     # TODO: write info to csv-file
-#     savedata = {'filename':os.path.join(directories['model_dir_finetune'],
-#                         'network-{}_date-{}'.format(network_name, outputtime)), 
-#                'pretask_filename': model_settings['filename'],
-#                'networkname': network_name, 
-#                'cfg_branch': str(list(network_settings['cfg']['branch'])), 
-#                'cfg_top': str(list(network_settings['cfg']['top'])),
-#                'cfg_classifier': str(list(cfg)),
-#                'optimizer': network_settings['optimizer'],
-#                'lr': network_settings['lr'], 
-#                'weight_decay': network_settings['weight_decay'],
-#                'loss': network_settings['loss'],
-#                'n_classes': network_settings['n_classes'],
-#                'n_channels' : len(dataset_settings['channels']),
-#                'patch_size': network_settings['patch_size'],
-#                'batch_norm': network_settings['batch_norm'],
-#                'dataset': dataset_settings['dataset_type'], 
-#                'min_overlap': dataset_settings['min_overlap'],
-#                'max_overlap': dataset_settings['max_overlap'],
-#                'best_acc': best_acc,
-#                'best_epoch': best_epoch, 
-#                'best_loss': best_loss,
-#                'weight': None,
-#                'global_avg_pool': 'False', 
-#                'basis': None,
-#                'n_train_patches': len(dataset_settings['indices_train']), 
-#                'patches_per_image': dataset_settings['patches_per_image'],
-#                'n_val_patches': len(dataset_settings['indices_val']),
-#                'kthfold': dataset_settings['kthfold']}
-#     with open(os.path.join(directories['intermediate_dir'], 
-#                            directories['csv_models_finetune']), 'a') as file:
-#             filewriter = csv.DictWriter(file, fieldnames, delimiter = ",", extrasaction='ignore')
-#             filewriter.writerow(savedata)  
-#     
-#     # save best model's weights
-#     torch.save(best_net_wts, savedata['filename'])
-#     torch.save(history, os.path.join(directories['model_dir_finetune'],
-#                         'history_network-{}_date-{}'.format(network_name, outputtime)))
-#         
-#     print('Finetune Done!')
-#     #writer.close()
-# =============================================================================
+    # build network
+    network_settings['im_size'] = (1,1)
+    model_settings['network'] = model_settings['networkname']
+    n_branches, pos_weight = determine_branches(model_settings, dataset_settings)
+    net = get_network(model_settings, train_settings['gpu'])
+    classifier = model_settings['cfg_classifier'].split("[" )[1]
+    classifier = classifier.split("]" )[0]
+    classifier = classifier.replace("'", "")
+    classifier = classifier.replace(" ", "")
+    classifier = classifier.split(",")
+    conv_classifier = True if classifier[0] == 'C' else False
+    
+    loss_func, acc_func, one_hot = create_loss_function(model_settings['loss'])
+    
+    # load net to GPU     
+    if train_settings['gpu'] != None:
+        torch.cuda.set_device(train_settings['gpu'])
+        net.cuda()
+        loss_func = loss_func.cuda()
+    
+    # get dataset
+    dataset_eval = get_dataset(
+        data_path=directories['data_path'], 
+        indices=dataset_settings['indices_eval'], 
+        channels=dataset_settings['channels'], 
+        one_hot=one_hot, 
+        dataset_settings=dataset_settings, 
+        network_settings=network_settings,
+        directories=directories)
+                        
+    # Data loaders
+    dataloader = DataLoader(
+        dataset_eval, 
+        batch_size=train_settings['batch_size'], 
+        shuffle=False,
+        num_workers = 1)
+    
+    val_epoch_iters = max(len(dataset_eval) // train_settings['batch_size'],1)
+    best_net_wts = copy.deepcopy(net.state_dict())
+    
+    # validation epoch
+    best_acc, best_loss = validate_epoch_apn(
+        network_settings,
+        network=net, 
+        n_branches=n_branches,
+        dataloader=dataloader, 
+        loss_func=loss_func,
+        acc_func=acc_func,
+        history=None, 
+        epoch=0, 
+        writer=None,
+        val_epoch_iters=val_epoch_iters,
+        best_net_wts=best_net_wts,
+        best_acc=0.0,
+        best_epoch=0,
+        best_loss=99999,
+        gpu = train_settings['gpu'],
+        im_size = network_settings['im_size'],
+        extract_features=None,
+        avg_pool=network_settings['avg_pool'],
+        directories=directories, 
+        network_name=model_settings['networkname'], 
+        outputtime=model_settings['filename'].split('-')[-1],
+        inference=True,
+        conv_classifier=conv_classifier,
+        model_dir=directories['model_dir'])
+
+    return best_acc, best_loss
+
     
 def use_features_downstream(model_settings, directories, dataset_settings, network_settings, train_settings, finetune=True):
 
     # init 
-    network_name = 'CD_'+model_settings['networkname']
+    if network_settings['concat']:
+        network_name = 'CD_cat_'+model_settings['networkname']
+    else:
+        network_name = 'CD_'+model_settings['networkname']
     outputtime = '{}'.format(time.strftime("%d%m%Y_%H%M%S", time.localtime()))
  
     # init save-file
@@ -607,7 +456,10 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
     conv_classifier = True if network_settings['cfg']['classifier_cd'][0] == 'C' else False     
     # change network name for saving if necessary
     if finetune:
-        network_name = 'FINETUNE_'+model_settings['networkname']
+        if network_settings['concat']:
+            network_name = 'FINETUNE_cat_'+model_settings['networkname']
+        else:
+            network_name = 'FINETUNE_'+model_settings['networkname']
  
     
     loss_func, acc_func, one_hot = create_loss_function(network_settings['loss'], pos_weight=pos_weight)
@@ -680,6 +532,10 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
             # early stopping
             if (epoch - best_epoch) > train_settings['early_stopping']:
                 break
+            if ((epoch+1) % 5) == 0:
+                best_acc = 0.0
+                best_epoch = 0
+                best_loss = 99999
                        
             #training epoch
             train_epoch(
@@ -731,10 +587,7 @@ def use_features_downstream(model_settings, directories, dataset_settings, netwo
                 conv_classifier=conv_classifier,
                 model_dir=model_dir)
             
-            if epoch+1 % 5 == 0:
-                torch.save(best_net_wts, os.path.join(model_dir,
-                            'network-{}_date-{}_epoch-{}'.format(
-                                network_name, outputtime, epoch)))
+            
     
     # on keyboard interupt continue the script: saves the best model until interrupt
     except KeyboardInterrupt:
@@ -876,7 +729,6 @@ def train_epoch(network_settings, network, n_branches, dataloader, optimizer, lo
         
         # save the starting points in csvfile for reproducability
         starts = batch_data['patch_starts'].detach().numpy()
-        #print(starts)
         im_idx = batch_data['im_idx'].detach().numpy()
     
         with open(os.path.join(model_dir,
@@ -947,7 +799,6 @@ def validate_epoch(network_settings, network, n_branches, dataloader, loss_func,
     if inference: 
         probability = AverageMeter()
         sigmoid = torch.nn.Sigmoid()
-        #use_softmax = True
         
     network.eval() 
     
@@ -1028,6 +879,11 @@ def validate_epoch(network_settings, network, n_branches, dataloader, loss_func,
         best_prob = probability.average()
         return best_acc, best_loss, best_prob
     else:
+        if epoch+1 % 5 == 0:
+            torch.save(copy.deepcopy(network.state_dict()), os.path.join(model_dir,
+                            'network-{}_date-{}_epoch-{}'.format(
+                                network_name, outputtime, epoch)))
+        
         if writer != None:
             writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
             writer.add_scalar('Val/Acc', ave_acc.average(), epoch)
@@ -1117,8 +973,6 @@ def train_epoch_apn(network_settings, network, n_branches, dataloader, optimizer
 
         #loss = loss_func(outputs, labels)
         loss, loss1, loss2 = loss_func(outputs, labels)
-        #loss = loss_func(outputs[0], outputs[1], outputs[2])
-        #print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}, min: {3:.3f}-{4:.3f}, max: {5:.3f}-{6:.3f}, mean: {7:.3f}-{8:.3f}".format(loss, loss1, loss2, min0, min1, max0, max1, mean0, mean1))
         acc = acc_func(outputs, labels, im_size)
 
         # Backward
@@ -1167,17 +1021,6 @@ def train_epoch_apn(network_settings, network, n_branches, dataloader, optimizer
 
         # calculate accuracy, and display
         if (i+1) % disp_iter == 0:
-# =============================================================================
-#             print('Epoch: [{}][{}/{}], Batch-time: {:.2f}, Data-time: {:.2f}, '
-#                   'Loss: {:.4f}, Acc: {:.4f}'
-#                   .format(epoch, i+1, epoch_iters,
-#                           batch_time.average(), data_time.average(),
-#                           ave_loss.average(), ave_acc.average()))
-#             ave_loss_all.update(ave_loss.average())
-#             ave_loss = AverageMeter()
-# =============================================================================
-
-            #print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}".format(loss, loss1, loss2))
             print('Epoch: [{}][{}/{}], Batch-time: {:.2f}, Data-time: {:.2f}, '
                   'Loss: {:.4f}, L1: {:.4f}, LTriplet: {:.4f}'
                   .format(epoch, i+1, epoch_iters,
@@ -1214,7 +1057,7 @@ def train_epoch_apn(network_settings, network, n_branches, dataloader, optimizer
 def validate_epoch_apn(network_settings, network, n_branches, dataloader, loss_func, acc_func, history, 
              epoch, writer, val_epoch_iters, best_net_wts, best_acc, best_epoch,
              best_loss, gpu, im_size, directories, network_name, outputtime, model_dir,
-             extract_features=None, avg_pool=False, evaluate=False, conv_classifier=False):    
+             extract_features=None, avg_pool=False, inference=False, conv_classifier=False):    
 
     ave_loss = AverageMeter()
     ave_lossL1 = AverageMeter()
@@ -1222,10 +1065,6 @@ def validate_epoch_apn(network_settings, network, n_branches, dataloader, loss_f
     ave_acc = AverageMeter()
     time_meter = AverageMeter()
     
-    if evaluate:
-        probability = AverageMeter()
-        sigmoid = torch.nn.Sigmoid()
-
     network.eval()
     
     iterator = iter(dataloader)
@@ -1256,7 +1095,6 @@ def validate_epoch_apn(network_settings, network, n_branches, dataloader, loss_f
                           batch_data['patch2'].float()] 
         labels = batch_data['label']
 
-        #labels = batch_data['gt']
         # to GPU
         if gpu != None:
             labels = labels.cuda()
@@ -1265,14 +1103,7 @@ def validate_epoch_apn(network_settings, network, n_branches, dataloader, loss_f
         with torch.no_grad():
             # forward pass
             outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
-            if evaluate:
-                prob = sigmoid(outputs)
-                correct = labels*prob
-                prob_correct = torch.sum(correct)/len(outputs)       
-                probability.update(prob_correct.item())
-            #loss = loss_func(outputs, labels)
             loss, loss1, loss2  = loss_func(outputs, labels)
-            #loss = loss_func(outputs[0], outputs[1], outputs[2])
             acc = acc_func(outputs, labels, im_size)
         
         loss = loss.mean()
@@ -1294,11 +1125,10 @@ def validate_epoch_apn(network_settings, network, n_branches, dataloader, loss_f
                   ave_loss.average(), ave_lossL1.average(), 
                   ave_lossTriplet.average()))
     
-    if evaluate:
+    if inference:
         best_acc = ave_acc.average()
         best_loss = ave_loss.average()
-        best_prob = probability.average()
-        return best_acc, best_loss, best_prob
+        return best_acc, best_loss
     else: 
         if writer != None:
             writer.add_scalar('Val/Loss', ave_loss.average(), epoch)
@@ -1342,7 +1172,6 @@ def train_epoch_unet(network_settings, network, n_branches, dataloader, optimize
     # main loop
     tic = time.time()
     epoch_start = time.time()
-    #for i in range(epoch_iters):
     for i, batch_data in enumerate(iterator): 
         
         for item in batch_data: 
@@ -1373,7 +1202,7 @@ def train_epoch_unet(network_settings, network, n_branches, dataloader, optimize
                           batch_data['patch2'].float()] 
         labels = batch_data['label']
         labels_bottle = batch_data['label_bottle']
-        #labels = batch_data['gt']
+
     
         # to gpu
         if gpu != None:
@@ -1382,24 +1211,7 @@ def train_epoch_unet(network_settings, network, n_branches, dataloader, optimize
             
         # forward pass
         outputs = network(inputs, n_branches, extract_features=extract_features, avg_pool=avg_pool)
-# =============================================================================
-#         # =====================================================================
-#         anchor = outputs[0]
-#         positive = outputs[1]
-#         negative = outputs[2]
-# 
-#         anchor_mean = anchor.mean((2,3))  
-#         positive_mean = positive.mean((2,3))
-#         negative_mean = negative.mean((2,3))            
-#         
-#         out = [output.mean((2,3)) for output in outputs]
-#             
-#         # =====================================================================    
-# =============================================================================
-        #loss = loss_func(outputs, labels)
         loss, loss1, loss2, loss3 = loss_func(outputs, labels, labels_bottle)
-        #loss = loss_func(outputs[0], outputs[1], outputs[2])
-        #print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}, min: {3:.3f}-{4:.3f}, max: {5:.3f}-{6:.3f}, mean: {7:.3f}-{8:.3f}".format(loss, loss1, loss2, min0, min1, max0, max1, mean0, mean1))
         acc = acc_func(outputs[0], labels_bottle, im_size)
 
         # Backward
@@ -1449,17 +1261,6 @@ def train_epoch_unet(network_settings, network, n_branches, dataloader, optimize
 
         # calculate accuracy, and display
         if (i+1) % disp_iter == 0:
-# =============================================================================
-#             print('Epoch: [{}][{}/{}], Batch-time: {:.2f}, Data-time: {:.2f}, '
-#                   'Loss: {:.4f}, Acc: {:.4f}'
-#                   .format(epoch, i+1, epoch_iters,
-#                           batch_time.average(), data_time.average(),
-#                           ave_loss.average(), ave_acc.average()))
-#             ave_loss_all.update(ave_loss.average())
-#             ave_loss = AverageMeter()
-# =============================================================================
-
-            #print("Combined: {0:.3f}, L1: {1:.3f}, triplet: {2:.3f}".format(loss, loss1, loss2))
             print('Epoch: [{}][{}/{}], Batch-time: {:.2f}, Data-time: {:.2f}, '
                   'Loss: {:.4f}, L1: {:.4f}, LTriplet: {:.4f}, LBCE: {:.4f}, Acc_bce: {:.4f}'
                   .format(epoch, i+1, epoch_iters,
@@ -1544,7 +1345,6 @@ def validate_epoch_unet(network_settings, network, n_branches, dataloader, loss_
         labels = batch_data['label']
         labels_bottle = batch_data['label_bottle']
 
-        #labels = batch_data['gt']
         # to GPU
         if gpu != None:
             labels = labels.cuda()
@@ -1558,9 +1358,7 @@ def validate_epoch_unet(network_settings, network, n_branches, dataloader, loss_
                 correct = labels*prob
                 prob_correct = torch.sum(correct)/len(outputs)       
                 probability.update(prob_correct.item())
-            #loss = loss_func(outputs, labels)
             loss, loss1, loss2, loss3  = loss_func(outputs, labels, labels_bottle)
-            #loss = loss_func(outputs[0], outputs[1], outputs[2])
             acc = acc_func(outputs[0], labels_bottle, im_size)
         
         loss = loss.mean()
@@ -1650,17 +1448,6 @@ def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network
             one_hot=one_hot,
             second_label=second_label,
             in_memory=in_memory)#,
-            #batch_size = 5)           # TODO: hardcoded
-    elif dataset_settings['dataset_type'] == 'triplet_oscd':
-        dataset = OSCDDataset(
-            data_dir=data_path,
-            indices=indices,
-            patch_size=network_settings['patch_size'], 
-            stride = dataset_settings['stride'], 
-            transform = transforms.Compose([RandomFlip(), RandomRot()]), 
-            one_hot=one_hot, 
-            alt_label=True, 
-            mode='train')
     elif dataset_settings['dataset_type'] == 'overlap_regression':
         in_memory = True if len(np.unique(indices)) < 21 else False
         dataset = PairDatasetOverlap(
@@ -1700,6 +1487,15 @@ def get_dataset(data_path, indices, channels, one_hot, dataset_settings, network
     elif dataset_settings['dataset_type'] == 'triplet_from_file':
         in_memory = True if len(np.unique(indices)) < 21 else False
         dataset = TripletFromFileDataset(
+            data_dir = data_path,
+            indices = indices,
+            patch_starts_df = dataset_settings['dataset_eval_df'],
+            channels=channels,
+            one_hot=one_hot,
+            in_memory=in_memory)
+    elif dataset_settings['dataset_type'] == 'triplet_apn_from_file':
+        in_memory = True if len(np.unique(indices)) < 21 else False
+        dataset = TripletAPNFromFileDataset(
             data_dir = data_path,
             indices = indices,
             patch_starts_df = dataset_settings['dataset_eval_df'],
