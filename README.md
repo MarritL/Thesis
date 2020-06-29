@@ -111,15 +111,16 @@ Settings for pretext task 2:
 **models/siamese_net.py**: network used for pretext task 1 \
 **models/siamese_net_apn.py**: network used for pretext task 2 \
 **models/x**: other models that are not used in final version of thesis \
-**utils.py**: some supporting functions  \
 **change_detection.py**: functions to apply thresholding technqiues to features extracted from the images, used for CVA \
-**inference.py**: functions to extract features from specified layers of CNN. Also functions to caluculate distance map or difference map. \
+**inference.py**: functions to create change maps.
+**extract_features**: functions to extract features from specified layers of CNN. Also functions to caluculate distance map or difference map. \
 **plots.py**: plotting functions used in througout the other scripts \
-**data_download_functions**: functions to download Unlabelled training dataset  \
-**download_images**: script used to download Unlabelled training dataset (result in S21C_dataset.csv). \  
-**geometric_registration**: script for evaluation of geometric registration accuracy of unlabelled dataset and OSCD dataset. \
-**experiment_radiometric_difference**: script for evaluation of radiometric registration accuracy of unlabelled dataset and OSCD dataset. \
-
+**data_download_functions.py**: functions to download Unlabelled training dataset  \
+**download_images.py**: script used to download Unlabelled training dataset (result in S21C_dataset.csv). \  
+**geometric_registration.py**: script for evaluation of geometric registration accuracy of unlabelled dataset and OSCD dataset. \
+**experiment_radiometric_difference.py**: script for evaluation of radiometric registration accuracy of unlabelled dataset and OSCD dataset. \
+**utils.py**: some supporting functions  \
+**setup.py**: quick setup of settings to be used in other scripts (e.g. directories dictionary)
 
 ## References
 * R. C. Daudt, B. Le Saux, A. Boulch, and Y. Gousseau, “Urban change detection for multispectral earth observation using convolutional neural networks,” in IEEE International Geoscience and Remote Sensing Symposium (IGARSS), 2018, pp. 2115–2118. doi: 10.1109/IGARSS.2018.8518015.
