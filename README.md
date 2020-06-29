@@ -31,6 +31,12 @@ available through the DASE portal. Here 12 images are used as training set; the 
 
 ### Scripts
 **main.py**: main pipeline of the project. \
+* For pretext task training use the cell: """ Train on S21C dataset""". \
+Set hyperparemeters in first cell.
+* For training of classifiers for change detection use the cell: """ Train supervised classifier on OSCD-dataset, fixed patches""". \
+Note: first train the cross-validation folds, then full training set. Set hyperparemeters in first cell.
+* For inference with CVA classifier use cell: """ Evaluate (preliminary) network on change detection task, using CVA classifier """ 
+* For inference with convolutional classifiers use cell: """ Evalutate downstream model on OSCD dataset, using 1-layer conv. classifier or 2-layer conv. classifier """ \
 \
 Settings for pretext task 1: 
 * network_settings = { \
@@ -97,6 +103,23 @@ Settings for pretext task 2:
     &emsp;'max_overlap': 1, \
     &emsp;'stride': int(network_settings['patch_size']), \
     &emsp;'patches_per_image': 5} \
+    
+**train.py**: functions used during training. \
+**data_generator.py**: script that loads the datasets in batches. \
+**models**: folder with all models\
+**models/netbuilder.py**: script that loads the correct model, loss-function and accuracy-function \
+**models/siamese_net.py**: network used for pretext task 1 \
+**models/siamese_net_apn.py**: network used for pretext task 2 \
+**models/x**: other models that are not used in final version of thesis \
+**utils.py**: some supporting functions  \
+**change_detection.py**: functions to apply thresholding technqiues to features extracted from the images, used for CVA \
+**inference.py**: functions to extract features from specified layers of CNN. Also functions to caluculate distance map or difference map. \
+**plots.py**: plotting functions used in througout the other scripts \
+**data_download_functions**: functions to download Unlabelled training dataset  \
+**download_images**: script used to download Unlabelled training dataset (result in S21C_dataset.csv). \  
+**geometric_registration**: script for evaluation of geometric registration accuracy of unlabelled dataset and OSCD dataset. \
+**experiment_radiometric_difference**: script for evaluation of radiometric registration accuracy of unlabelled dataset and OSCD dataset. \
+
 
 ## References
 * R. C. Daudt, B. Le Saux, A. Boulch, and Y. Gousseau, “Urban change detection for multispectral earth observation using convolutional neural networks,” in IEEE International Geoscience and Remote Sensing Symposium (IGARSS), 2018, pp. 2115–2118. doi: 10.1109/IGARSS.2018.8518015.
